@@ -1,0 +1,121 @@
+{
+  "schema": "wiflow.nr3053.golden-reference.v1",
+  "label": "User-supplied stable NR3053 firmware (structural golden reference)",
+  "reference_file_name": "immortalwrt-3.2.6-mediatek-filogic-viettel_nr3053-squashfs-sysupgrade.itb",
+  "original_image_uploaded_to_public_repo": false,
+  "reference_claim": "User reports this firmware operates stably on Viettel NR3053; no independent device test performed.",
+  "sha256": "15db1b9fd724f8c1f6529712b457039c5dcf839eabd20406d60f8c59ca186a93",
+  "size_bytes": 27808016,
+  "fit": {
+    "header_bytes": 4096,
+    "default_configuration": "config-1",
+    "configuration_description": "OpenWrt viettel_nr3053",
+    "components": {
+      "kernel": {
+        "position": 4096,
+        "size_bytes": 6235139,
+        "description": "ARM64 OpenWrt Linux-6.12.94",
+        "compression": "gzip",
+        "sha256": "01ad774480f2861cab329c404524a88add151782f78f77a46e4f51dff24f96a1"
+      },
+      "fdt": {
+        "position": 6242304,
+        "size_bytes": 24239,
+        "description": "ARM64 OpenWrt viettel_nr3053 device tree blob",
+        "sha256": "2e03d267a296e9333412000aa1546d6646760c1bb7224fee9f2578d6ba3910a5"
+      },
+      "rootfs": {
+        "position": 6266880,
+        "size_bytes": 21540864,
+        "compression": "squashfs-xz",
+        "squashfs_compression_id": 4,
+        "squashfs_block_size": 262144,
+        "sha256": "0a346dafd3e64296a35cae57a19a4a479af8946209df4bb145dc9151e6cbeea4"
+      }
+    },
+    "hashes_verified": {
+      "crc32": true,
+      "sha1": true,
+      "components": [
+        "kernel",
+        "fdt",
+        "rootfs"
+      ]
+    }
+  },
+  "metadata": {
+    "compat_version": "1.0",
+    "metadata_version": "1.1",
+    "supported_devices": [
+      "viettel,nr3053"
+    ],
+    "version": {
+      "board": "viettel_nr3053",
+      "dist": "ImmortalWrt",
+      "revision": "r0-495af17",
+      "target": "mediatek/filogic",
+      "version": "25.12-SNAPSHOT"
+    }
+  },
+  "dtb": {
+    "model": "Viettel NR3053",
+    "compatible": [
+      "viettel,nr3053",
+      "mediatek,mt7981"
+    ],
+    "wifi": {
+      "compatible": [
+        "mediatek,wbsys",
+        "mediatek,mt7981-wmac"
+      ],
+      "status": "okay",
+      "nvmem_cell_names": [
+        "eeprom"
+      ]
+    },
+    "spi_nand_partition_layout": [
+      {
+        "name": "BL2",
+        "offset": "0x00000000",
+        "size": "0x00100000"
+      },
+      {
+        "name": "u-boot-env",
+        "offset": "0x00100000",
+        "size": "0x00100000"
+      },
+      {
+        "name": "Factory",
+        "offset": "0x00200000",
+        "size": "0x00200000"
+      },
+      {
+        "name": "FIP",
+        "offset": "0x00400000",
+        "size": "0x00200000"
+      },
+      {
+        "name": "ubi",
+        "offset": "0x00600000",
+        "size": "0x0ea00000"
+      }
+    ]
+  },
+  "comparison_policy": {
+    "hard_blocks": [
+      "wrong board or missing viettel,nr3053 supported_devices",
+      "wrong SoC MT7981 hardware-compatible identifier",
+      "missing or corrupt kernel/FDT/rootfs FIT hashes",
+      "partition layout incompatible with validated device reference",
+      "missing WiFi/EEPROM mapping",
+      "unclear or untested device recovery path before flashing"
+    ],
+    "warnings_only": [
+      "different kernel patch version",
+      "different firmware/rootfs image bytes or SHA-256",
+      "rootfs compression or size changes with technically verified compatibility"
+    ],
+    "runtime_gate": "BLOCK until recovery path and on-device network/portal tests pass",
+    "purpose": "reference comparison; NEVER proof of Wiflow feature completeness or authority to flash"
+  }
+}
