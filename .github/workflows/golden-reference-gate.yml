@@ -1,0 +1,61 @@
+name: NR3053 Golden Reference Manifest Gate
+
+# Public, free, no firmware binary or private source code is uploaded.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "reference/nr3053-golden.json"
+      - "tools/check_nr3053_fit_reference.py"
+      - ".github/workflows/golden-reference-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-reference-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and pinned structural reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/check_nr3053_fit_reference.py
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+          m=json.loads(Path("reference/nr3053-golden.json").read_text())
+          assert m["schema"]=="wiflow.nr3053.golden-reference.v1"
+          assert re.fullmatch(r"[0-9a-f]{64}",m["sha256"])
+          assert m["size_bytes"]==27808016
+          assert m["metadata"]["supported_devices"]==["viettel,nr3053"]
+          assert m["dtb"]["compatible"]==["viettel,nr3053","mediatek,mt7981"]
+          assert m["fit"]["hashes_verified"]["crc32"] is True
+          assert m["fit"]["hashes_verified"]["sha1"] is True
+          assert len(m["dtb"]["spi_nand_partition_layout"])==5
+          assert m["original_image_uploaded_to_public_repo"] is False
+          print("GOLDEN_REFERENCE_MANIFEST_STATIC_PASS")
+          PY
+      - name: Fail-closed behavior for invalid FIT (no flashing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dd if=/dev/zero of=/tmp/nr3053-invalid.itb bs=4096 count=1 status=none
+          set +e
+          python3 tools/check_nr3053_fit_reference.py /tmp/nr3053-invalid.itb > /tmp/report.json
+          code=$?
+          set -e
+          test "$code" -eq 2
+          python3 - <<'PY'
+          import json
+          r=json.load(open("/tmp/report.json"))
+          assert r["structural_gate"]=="BLOCK"
+          assert r["flash_authorization"]=="BLOCK"
+          print("GOLDEN_GUARD_FAIL_CLOSED_PASS")
+          PY
+          test -z "$(git ls-files '*.itb')"
+          echo "GOLDEN_GUARD_SMOKE_PASS_NO_PRIVATE_BINARIES"
