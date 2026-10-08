@@ -1,0 +1,31 @@
+name: NR3053 Free Runner Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/runner-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-gate:
+    name: Confirm free public runner and disk
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Measure actual runner resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "WIFLOW_NR3053_RUNNER_EXECUTED"
+          uname -a
+          echo "CPU_COUNT=$(nproc)"
+          free -h
+          df -h "$GITHUB_WORKSPACE"
+          avail_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'END {print $4}')
+          echo "AVAILABLE_KIB=$avail_kib"
+          test "$avail_kib" -ge 15728640
+          echo "WIFLOW_NR3053_RUNNER_PASS"
