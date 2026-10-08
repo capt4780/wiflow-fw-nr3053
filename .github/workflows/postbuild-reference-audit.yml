@@ -1,0 +1,58 @@
+name: NR3053 Golden Reference Post-Build Audit
+
+# Read-only comparison of a successful PUBLIC base-build artifact.
+# A structural PASS/WARN does not authorize flashing or release.
+on:
+  workflow_run:
+    workflows:
+      - "NR3053 Clean ImmortalWrt Base Build"
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Compare NR3053 FIT against stable reference (no flash)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact preceding build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nr3053-public-base-NOT-FOR-FLASHING
+          path: inspected-build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Verify exactly one candidate and compare Golden Reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(inspected-build/*viettel_nr3053*sysupgrade.itb)
+          if (( ${#files[@]} != 1 )); then
+            echo "::error::Expected one NR3053 image, got ${#files[@]}"
+            exit 2
+          fi
+          python3 tools/check_nr3053_fit_reference.py "${files[0]}" \
+            --reference reference/nr3053-golden.json \
+            | tee nr3053-reference-comparison.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("nr3053-reference-comparison.json"))
+          assert r["structural_gate"] in ("PASS", "WARN"), r
+          assert r["flash_authorization"] == "BLOCK"
+          assert r["wiflow_features_verified"] is False
+          print("NR3053_GOLDEN_STRUCTURE_CHECK_COMPLETE_NOT_FLASH_APPROVED")
+          PY
+      - name: Preserve reference audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-golden-comparison-report
+          path: nr3053-reference-comparison.json
+          if-no-files-found: warn
+          retention-days: 7
