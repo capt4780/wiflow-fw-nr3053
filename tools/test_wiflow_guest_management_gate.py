@@ -7,7 +7,10 @@ behavior on a physical NR3053.
 from pathlib import Path
 import os
 import subprocess
+import tempfile
 import unittest
+
+from audit_nr3053_wiflow_image import audit_guest_gate_rootfs
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "package/wiflow-setup/files"
@@ -104,6 +107,30 @@ class GuestManagementGateTests(unittest.TestCase):
                     capture_output=True, text=True, timeout=5,
                 )
                 self.assertEqual(trial.returncode, 55, trial.stderr)
+
+    def test_compiled_rootfs_audit_matches_current_guest_gate_source(self):
+        self.assertEqual(audit_guest_gate_rootfs(SRC), [])
+
+    def test_compiled_rootfs_audit_blocks_missing_guest_captive_exception(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-guest-audit-") as tmp:
+            fake = Path(tmp)
+            source_paths = (
+                "usr/lib/wiflow/common.sh",
+                "usr/lib/wiflow/portal-firewall",
+                "usr/lib/wiflow/bootstrap",
+                "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
+                "www-wiflow-luci-gate/cgi-bin/unlock",
+                "www-wiflow/cgi-bin/gate",
+            )
+            for rel in source_paths:
+                p = fake / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes((SRC / rel).read_bytes())
+            captive = fake / "usr/lib/wiflow/portal-firewall"
+            captive.write_text(captive.read_text().replace(
+                "ip saddr 10.10.10.0/24 ip daddr 10.0.0.2 return", ""))
+            issues = audit_guest_gate_rootfs(fake)
+            self.assertTrue(any("redirect exception" in x for x in issues), issues)
 
     def test_no_standalone_ungated_luci_port_in_guest_firewall_rules(self):
         net = COMMON.read_text()
