@@ -89,6 +89,12 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
         if required not in guest_source:
             problems.append(f"guest default forward/Private DNS safety missing: {required}")
     captive_source = texts["captive"]
+    # A Website DNS answer must never create pre-auth exceptions for RFC1918,
+    # local management or special/reserved destinations. Verify the *image*,
+    # not only the working tree.
+    if 'wiflow_public_ipv4(){' not in captive_source or \
+       'wiflow_public_ipv4 "$ip"' not in captive_source:
+        problems.append("Website walled-garden public IPv4 gate missing from rootfs")
     for required in (
         '[ -f "$PORTAL_ACTIVE/portal.json" ] || { state_set portal_error',
         "uci set firewall.wiflow_guest_wan='forwarding'",
