@@ -141,7 +141,12 @@ def audit_root_shadow_field(fs: Path) -> dict:
     """
     path = fs / "etc/shadow"
     state = "MISSING"
-    if path.is_file():
+    # Reject a symlinked shadow file or an etc-directory link escaping the
+    # extracted FIT rootfs. Host credentials must never satisfy image checks.
+    if path.is_symlink() or (path.is_file() and not
+                             path.resolve().is_relative_to(fs.resolve())):
+        state = "SYMLINK_OR_OUTSIDE_ROOTFS"
+    elif path.is_file():
         data = path.read_text(encoding="utf-8", errors="replace")
         lines = [line for line in data.splitlines()
                  if line.split(":", 1)[0] == "root"]
