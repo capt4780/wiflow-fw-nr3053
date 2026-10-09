@@ -169,7 +169,7 @@ wifi_uplink_associated(){
 
 wifi_ssid_visible(){
     radio="$1"; want="$2"; tmp="/tmp/wiflow-visible.$$"
-    ( iwinfo "$radio" scan > "$tmp" 2>/dev/null ) & p=$!
+    ( /usr/bin/iwinfo-ucode "$radio" scan > "$tmp" 2>/dev/null ) & p=$!
     ( sleep 6; kill "$p" 2>/dev/null ) & w=$!
     wait "$p" 2>/dev/null || true; kill "$w" 2>/dev/null || true
     awk -v want="$want" '/ESSID: /{s=$0;sub(/^.*ESSID: "/,"",s);sub(/".*$/,"",s);if(s==want){ok=1;exit}} END{exit(ok?0:1)}' "$tmp" 2>/dev/null
