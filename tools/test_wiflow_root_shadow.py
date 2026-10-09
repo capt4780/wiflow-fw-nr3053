@@ -53,6 +53,15 @@ class RootShadowProvisioningTests(unittest.TestCase):
                 provision(upstream, overlay)
             self.assertFalse(overlay.exists())
 
+    def test_preflight_validates_real_pinned_root_shadow_overlay(self):
+        preflight = (ROOT / ".github/workflows/nr3053-kconfig-preflight.yml").read_text()
+        self.assertIn("nr3053-clean-upstream", preflight)
+        self.assertIn("files/etc/shadow", preflight)
+        self.assertIn('inspect_root_shadow(overlay.read_text())', preflight)
+        self.assertIn('ROOT_SHADOW_OVERLAY_NOT_STAGED', preflight)
+        self.assertIn('ROOT_SHADOW_PERMISSIONS_UNSAFE', preflight)
+        self.assertIn('NR3053_PINNED_ROOT_SHADOW_PROVISION_PASS_NO_IMAGE_NO_FLASH', preflight)
+
     def test_actual_firmware_build_stages_and_audits_hash(self):
         self.assertIn("tools/provision_nr3053_root_shadow.py", BUILD)
         self.assertIn("package/base-files/files/etc/shadow files/etc/shadow", BUILD)
