@@ -142,8 +142,8 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
     if not path.is_file():
         return ["captive authorization CGI missing from compiled rootfs"]
     source = path.read_text(encoding="utf-8", errors="replace")
-    marker = 'case "$action" in\\n authorize|event)'
-    successor = '\\ncase "$action" in\\n authorize)'
+    marker = 'case "$action" in\n authorize|event)'
+    successor = '\ncase "$action" in\n authorize)'
     if source.count(marker) != 1 or successor not in source:
         return ["captive authorization action guard absent"]
     start = source.index(marker)
