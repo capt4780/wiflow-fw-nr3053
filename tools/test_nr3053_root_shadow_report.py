@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from audit_nr3053_wiflow_image import audit_root_shadow_field
+from audit_nr3053_wiflow_image import audit_root_shadow_field, root_shadow_static_errors
 
 GOOD = "root:$6$salt1234$" + ("A" * 86) + ":0:0:99999:7:::\n"
 BAD = "root:1234:0:0:99999:7:::\n"
@@ -36,6 +36,8 @@ class BuiltRootShadowFieldTests(unittest.TestCase):
                 self.assertEqual(result["root_password_field_state"], expected)
                 self.assertEqual(result["root_shadow_static_check"], "BLOCK")
                 self.assertEqual(result["root_credential_release_gate"], "BLOCK")
+                self.assertEqual(root_shadow_static_errors(result),
+                                 [f"built root credential field unsafe: {expected}"])
 
     def test_one_supported_hash_is_presence_only_not_release_approval(self):
         result = self.inspect(GOOD)
@@ -44,6 +46,7 @@ class BuiltRootShadowFieldTests(unittest.TestCase):
         self.assertEqual(result["root_shadow_static_check"], "HASH_PRESENT_ONLY")
         self.assertEqual(result["root_credential_release_gate"], "BLOCK")
         self.assertNotIn("$6$", str(result))
+        self.assertEqual(root_shadow_static_errors(result), [])
 
     def test_duplicate_malformed_plaintext_and_other_hash_rejected(self):
         for body, expected in (
@@ -57,6 +60,8 @@ class BuiltRootShadowFieldTests(unittest.TestCase):
                 self.assertEqual(result["root_password_field_state"], expected)
                 self.assertEqual(result["root_shadow_static_check"], "BLOCK")
                 self.assertEqual(result["root_credential_release_gate"], "BLOCK")
+                self.assertEqual(root_shadow_static_errors(result),
+                                 [f"built root credential field unsafe: {expected}"])
                 self.assertNotIn("1234", str(result))
                 self.assertNotIn("secret", str(result))
 
@@ -71,6 +76,8 @@ class BuiltRootShadowFieldTests(unittest.TestCase):
         self.assertIn('"www-wiflow-portal", "etc/shadow"', source)
         self.assertIn("root_audit = audit_root_shadow_field(fs)", source)
         self.assertIn("**root_audit,", source)
+        self.assertIn("issues.extend(root_shadow_static_errors(root_audit))", source)
+        self.assertIn('"static_gate": "BLOCK" if issues else "PASS"', source)
         self.assertIn('"release_approval": "BLOCK"', source)
 
 
