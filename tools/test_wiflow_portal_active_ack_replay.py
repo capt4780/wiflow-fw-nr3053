@@ -149,6 +149,22 @@ class PortalActiveAckReplayTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertFalse(marker_exists)
 
+    def test_heartbeat_uses_idempotent_captive_firewall_ensure(self):
+        reconcile = HEARTBEAT[
+            HEARTBEAT.index("portal_runtime_reconcile(){"):
+            HEARTBEAT.index("\\ndelay=20")
+        ]
+        self.assertIn("/usr/lib/wiflow/portal-firewall ensure", reconcile)
+        self.assertNotIn("/usr/lib/wiflow/portal-firewall enable", reconcile)
+        firewall = (FILES / "usr/lib/wiflow/portal-firewall").read_text()
+        begin = firewall.index("ensure(){")
+        end = firewall.index("\\ndisable(){", begin)
+        ensure = firewall[begin:end]
+        self.assertIn("portal_nft_ready", ensure)
+        self.assertIn("wiflow_portal_prerouting", ensure)
+        self.assertIn("wiflow_portal_forward", ensure)
+        self.assertIn("enable", ensure)
+
     def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
         self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
         self.assertIn('cat "$PORTAL_ACK_CONFIRMED"', HEARTBEAT)
