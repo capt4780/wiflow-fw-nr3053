@@ -11,7 +11,7 @@ This is the single, clean PUBLIC engineering repository for NR3053. **Not a flas
 | Device FIT structure and stable-image comparison | [Run 37831729897](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37831729897) — no structural errors, expected new-image SHA difference | WARN |
 | Original stable NR3053 reference | [Golden manifest](reference/nr3053-golden.json) — metadata and hashes from the user's stable 3.2.6 firmware; original binary **not** published | REFERENCE |
 | Actual built SquashFS / init / radio | [Run 37872278328](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37872278328) — inspected extracted rootfs and driver | PASS |
-| First-boot LAN/WAN and Wi-Fi **static generation paths** | [Run 37873473927](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873473927): real SquashFS contains board_detect, config_generate, NR3053 LAN1–3/WAN board mapping and `/sbin/wifi config` before kmodloader | PASS (static only) |
+| First-boot LAN/WAN and Wi-Fi **static generation paths** | [Run 37873707260](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873707260): real SquashFS contains board_detect, config_generate, NR3053 LAN1–3/WAN board mapping and `/sbin/wifi config` before kmodloader | PASS (static only) |
 | First-boot 2.4/5 GHz Wi-Fi and network on physical NR3053 | Dynamic UCI config generation **not executed on the router**; actual management reachability and both bands still unverified | BLOCK |
 | Wiflow Setup, local captive portal, remote WP API integration | Not yet implemented in the public base image | BLOCK |
 | Recovery from failed boot/flash with Wi-Fi-only access | Not demonstrated | BLOCK |
@@ -19,7 +19,7 @@ This is the single, clean PUBLIC engineering repository for NR3053. **Not a flas
 
 The base build uses a pinned public ImmortalWrt source commit `e39aded8420d454804a376e63400aff73da66247`, targets the NR3053 only, and removes four unreviewed automatic Wi-Fi calibration writers. It does **not** change the reference device's factory EEPROM, NAND partition declarations or bootloader.
 
-Rootfs audit observed `lib/modules/6.12.94/mt_wifi.ko`, MT7981 firmware blobs, `dnsmasq-full`, `firewall4`, `uhttpd`, `rpcd`, `luci`, and the **APK package database** (ImmortalWrt 25.12). [Read-only first-boot audit](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873473927) additionally confirms boot-time UCI configuration scripts and correct NR3053 interface mapping are present, explaining the missing pre-populated `network`/`wireless` configs. This is source/firmware **static evidence only**; it does not prove live 2.4/5 GHz Wi-Fi, first-boot success, guest isolation, management recovery or Captive Portal on a real device.
+Rootfs audit observed `lib/modules/6.12.94/mt_wifi.ko`, MT7981 firmware blobs, `dnsmasq-full`, `firewall4`, `uhttpd`, `rpcd`, `luci`, and the **APK package database** (ImmortalWrt 25.12). [Read-only first-boot audit](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873707260) additionally confirms boot-time UCI configuration scripts and correct NR3053 interface mapping are present, explaining the missing pre-populated `network`/`wireless` configs. The latest audit also executed **four host regression tests** for real boot command ordering and comment/reversed-order rejection, all passing. This is source/firmware **static evidence only**; it does not prove live 2.4/5 GHz Wi-Fi, first-boot success, guest isolation, management recovery or Captive Portal on a real device.
 
 ## Work remaining — source-of-truth boundaries
 
