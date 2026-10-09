@@ -10,7 +10,7 @@ wiflow_root_shadow_hash_present(){
     awk -F: '
       $1 == "root" {
         found++
-        if (NF == 9 && $2 ~ /^\\$6\\$/ && length($2) > 90 && $2 !~ /[[:space:]]/) acceptable++
+        if (NF == 9 && substr($2, 1, 3) == "$6$" && length($2) > 90 && $2 !~ /[[:space:]]/) acceptable++
       }
       END { exit !(found == 1 && acceptable == 1) }
     ' "$wf_shadow"
