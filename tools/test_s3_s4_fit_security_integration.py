@@ -1,0 +1,41 @@
+"""CI-only guard against losing either S3/S4 FIT rootfs check on merge.
+
+This is host static integration evidence, not hardware/runtime verification.
+"""
+from pathlib import Path
+import tempfile
+import unittest
+
+from audit_nr3053_wiflow_image import (
+    audit_captive_mutation_rootfs,
+    audit_root_shadow_field,
+    root_shadow_static_errors,
+)
+
+ROOT = Path(__file__).resolve().parents[1]
+AUDITOR = ROOT / "tools/audit_nr3053_wiflow_image.py"
+
+
+class S3S4CombinedImageGuardTests(unittest.TestCase):
+    def test_missing_captive_and_empty_root_both_fail_independently(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-combined-guard-") as tmp:
+            fs = Path(tmp)
+            shadow = fs / "etc/shadow"
+            shadow.parent.mkdir(parents=True)
+            shadow.write_text("root::0:0:99999:7:::\n")
+            root = audit_root_shadow_field(fs)
+            self.assertEqual(root["root_password_field_state"], "EMPTY")
+            self.assertTrue(root_shadow_static_errors(root))
+            self.assertTrue(audit_captive_mutation_rootfs(fs))
+
+    def test_final_image_static_gate_includes_both_checks(self):
+        s = AUDITOR.read_text(encoding="utf-8")
+        self.assertIn("root_audit = audit_root_shadow_field(fs)", s)
+        self.assertIn("issues.extend(root_shadow_static_errors(root_audit))", s)
+        self.assertIn("issues.extend(audit_captive_mutation_rootfs(fs))", s)
+        self.assertIn('"static_gate": "BLOCK" if issues else "PASS"', s)
+        self.assertIn('"release_approval": "BLOCK"', s)
+
+
+if __name__ == "__main__":
+    unittest.main()
