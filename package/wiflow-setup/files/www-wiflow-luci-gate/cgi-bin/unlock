@@ -6,6 +6,8 @@ urldecode(){ /usr/sbin/uhttpd -d "$(printf '%s' "$1" | tr '+' ' ')" 2>/dev/null;
 param(){ key="$1"; old="$IFS"; IFS='&'; for kv in ${BODY:-}; do k="${kv%%=*}"; v="${kv#*=}"; if [ "$k" = "$key" ]; then IFS="$old"; urldecode "$v"; return 0; fi; done; IFS="$old"; return 1; }
 redirect(){ printf 'Status: 302 Found\r\nLocation: %s\r\nCache-Control: no-store\r\n\r\n' "$1"; exit 0; }
 [ "${REQUEST_METHOD:-}" = POST ] || redirect '/'
+# The public Gate code must not be usable by blind cross-site browser POSTs.
+[ "${HTTP_ORIGIN:-}" = 'http://10.0.0.2' ] || redirect '/?error=1'
 read_body; pin="$(param pin 2>/dev/null || true)"
 case "$pin" in
     [0-9][0-9][0-9][0-9][0-9][0-9]|WIFDIDNR3053) :;;
