@@ -1,0 +1,79 @@
+{
+  "schema": "wiflow.nr3053.device-wp-contract.v1",
+  "source": "Audited user-supplied 2026-10-05 baseline; non-sensitive interface metadata only",
+  "baseline": {
+    "id": "WIFLOW-2026-10-05-PWA-HISTORY-BACK",
+    "sha256": "753162a03c4c8fb97fa554d027bbf8577b8069cc2d4d85f83359c8d532c7e3db",
+    "wordpress_sha256": "236c8985fcd1765a4478868f27cc03efba18aead3c186fea4c7028b039ea3a8f",
+    "device_ipk_sha256": "a6607f0f94509c70bb8ef9071d8069706ee76efd29e096d5d354ba3350cad789",
+    "private_baseline_uploaded_to_repo": false
+  },
+  "remote": {
+    "rest_root": "https://projify.io.vn/wiflow/wp-json",
+    "devices_api": "https://projify.io.vn/wiflow/wp-json/devices",
+    "portal_api": "https://projify.io.vn/wiflow/wp-json/portal",
+    "data_generation": 4,
+    "api_version": 1,
+    "portal_snapshot_schema": 2,
+    "device_methods": {
+      "pair": "POST",
+      "heartbeat": "POST",
+      "sync": "GET",
+      "unpair": "POST"
+    },
+    "portal_methods": {
+      "manifest": "GET",
+      "media": "GET",
+      "ack": "POST"
+    },
+    "device_media_route": "/portal/media/{media_id}",
+    "portal_manifest_route": "/portal/manifest",
+    "portal_ack_route": "/portal/ack"
+  },
+  "device": {
+    "board": "viettel,nr3053",
+    "identity_prefix": "WIFDID-NR3053-",
+    "pairing_code_pattern": "XXXX-XXXX-XXXX",
+    "setup_address": "10.0.0.1",
+    "luci_gate_address": "10.0.0.2",
+    "guest_gateway": "10.10.10.1",
+    "guest_subnet": "10.10.10.0/24",
+    "mode_values": [
+      "website",
+      "image",
+      "video"
+    ],
+    "primary_media_roles": [
+      "image_landscape",
+      "image_portrait",
+      "video_landscape",
+      "video_portrait"
+    ],
+    "popup_roles": [
+      "popup_1",
+      "popup_2",
+      "popup_3",
+      "popup_4",
+      "popup_5"
+    ],
+    "portal_media_policy": "full snapshot validation, atomic activation, old revision removal only after successful activation",
+    "private_dns_pre_auth": "DNS bootstrap and TCP/853 allowed with otherwise-blocked guest Internet",
+    "package_manager": "apk"
+  },
+  "porting": {
+    "legacy_package_format": "opkg-ipk",
+    "new_package_format": "ImmortalWrt 25.12 APK-native source package",
+    "source_identity_old_prefix": "WIFDID-CR6609-",
+    "source_identity_target_prefix": "WIFDID-NR3053-",
+    "warning_only_source_does_not_imply_device_runtime_success": true
+  },
+  "release_gates": {
+    "hardware_wifi_bands": "BLOCK",
+    "device_recovery": "BLOCK",
+    "security_gate_hardcoded_fallback": "BLOCK",
+    "immutable_wp_revision_media": "BLOCK",
+    "device_local_captive_portal": "BLOCK",
+    "wp_device_pairing": "BLOCK",
+    "full_firmware_release": "BLOCK"
+  }
+}
