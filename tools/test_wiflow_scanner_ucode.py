@@ -4,6 +4,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 SCAN=(ROOT/"package/wiflow-setup/files/usr/lib/wiflow/scan-wifi").read_text()
+COMMON=(ROOT/"package/wiflow-setup/files/usr/lib/wiflow/common.sh").read_text()
 AUDIT=(ROOT/"tools/audit_nr3053_wiflow_image.py").read_text()
 PKG=(ROOT/"package/wiflow-setup/Makefile").read_text()
 
@@ -14,6 +15,14 @@ class WiFiScannerUcodeTests(unittest.TestCase):
         self.assertNotIn('( iwinfo "$r" scan', SCAN)
         self.assertIn('ESSID: ', SCAN)
         self.assertIn('Encryption: ', SCAN)
+
+    def test_ssid_visibility_probe_invokes_built_ucode_cli(self):
+        """Uplink SSID visibility must not depend on legacy iwinfo binary."""
+        self.assertIn('/usr/bin/iwinfo-ucode "$radio" scan', COMMON)
+        self.assertNotIn('( iwinfo "$radio" scan', COMMON)
+        self.assertIn('wifi_ssid_visible(){', COMMON)
+        self.assertIn('ESSID: ', COMMON)
+        self.assertIn('awk -v want="$want"', COMMON)
 
     def test_built_rootfs_must_contain_required_cli(self):
         self.assertIn('"usr/bin/iwinfo-ucode"', AUDIT)
