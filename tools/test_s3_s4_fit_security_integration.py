@@ -36,7 +36,7 @@ class S3S4CombinedImageGuardTests(unittest.TestCase):
             fs.mkdir()
             outside.mkdir()
             (outside / "shadow").write_text(
-                "root:$6$salt1234$" + ("A" * 86) + ":0:0:99999:7:::\\n",
+                "root:$6$salt1234$" + ("A" * 86) + ":0:0:99999:7:::\n",
                 encoding="utf-8",
             )
             (fs / "etc").symlink_to(outside, target_is_directory=True)
