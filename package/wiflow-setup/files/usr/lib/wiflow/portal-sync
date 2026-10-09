@@ -45,7 +45,46 @@ fi
 mkdir -p "$PORTAL_REVISIONS" || fail 'storage_unavailable'
 STAGE="$PORTAL_RUNTIME/.staging-$$-$REV"; rm -rf "$STAGE" 2>/dev/null || true; mkdir -p "$STAGE/media" || fail 'staging_create_failed'; MAN="$STAGE/manifest.list"; : > "$MAN"
 uci set wiflow.core.portal_sync_status='syncing'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true
-seen='|'; i=0
+# Media paths live in one shared stage directory across all roles.
+# Reject ambiguous or reused names BEFORE download: a second role must never
+# overwrite a previously SHA-256-validated media file before activation.
+media_name_valid(){
+ case "$1" in ''|.|..) return 1;; esac
+ printf '%s' "$1" | grep -Eq '^[A-Za-z0-9._-]{1,120}
+while [ "$i" -lt 12 ]; do
+ role="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].role" 2>/dev/null || true)"; [ -n "$role" ] || break
+ name="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].name" 2>/dev/null || true)"; url="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].download_url" 2>/dev/null || true)"; hash="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].sha256" 2>/dev/null || true)"; size="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].size" 2>/dev/null || true)"
+ case "$role" in image_landscape|image_portrait|video_landscape|video_portrait|popup_1|popup_2|popup_3|popup_4|popup_5) :;; *) fail 'media_role';; esac
+ case "$seen" in *"|$role|"*) fail 'media_duplicate';; esac; seen="$seen$role|"
+ media_name_valid "$name" || fail 'media_name'
+ media_name_unique "$name" || fail 'media_name_duplicate'
+ case "$url" in "$WIFLOW_PORTAL_API"/media/*) :;; *) fail 'media_url';; esac
+ printf '%s' "$hash" | grep -Eq '^[A-Fa-f0-9]{64}$' || fail 'media_hash'; case "$size" in ''|*[!0-9]*) fail 'media_size';; esac; [ "$size" -gt 0 ] && [ "$size" -le 157286400 ] || fail 'media_size'
+ out="$STAGE/media/$name"; wiflow_get "$out" "$url" >/dev/null 2>&1 || fail "download_$role"; got_size="$(wc -c < "$out" 2>/dev/null | tr -d ' ')"; [ "$got_size" = "$size" ] || fail "size_$role"; got_hash="$(sha256sum "$out" | awk '{print $1}')"; [ "$got_hash" = "$hash" ] || fail "hash_$role"; chmod 644 "$out" 2>/dev/null || true; printf '%s|%s\n' "$role" "$name" >> "$MAN"; i=$((i+1))
+done
+has(){ grep -q "^$1|" "$MAN" 2>/dev/null; }; path_for(){ awk -F'|' -v r="$1" '$1==r{print "/runtime/active/media/"$2;exit}' "$MAN"; }
+# A content snapshot may carry Website + Image + Video assets together. Active mode is synced separately.
+n=1; while [ "$n" -le "$popup_count" ]; do has "popup_$n" || fail "popup_${n}_missing"; n=$((n+1)); done
+il="$(path_for image_landscape)"; ip="$(path_for image_portrait)"; vl="$(path_for video_landscape)"; vp="$(path_for video_portrait)"
+{
+ printf '{"schema":2,"data_generation":4,"revision":%s,"mode":"%s","website_url":"%s","media":{' "$REV" "$mode" "$(json_escape "$website")"; printf '"image_landscape":"%s","image_portrait":"%s","video_landscape":"%s","video_portrait":"%s"},"popups":[' "$(json_escape "$il")" "$(json_escape "$ip")" "$(json_escape "$vl")" "$(json_escape "$vp")"; first=1; n=1; while [ "$n" -le "$popup_count" ]; do x="$(path_for "popup_$n")"; [ "$first" = 1 ] || printf ','; first=0; printf '"%s"' "$(json_escape "$x")"; n=$((n+1)); done; printf ']}\n'
+} > "$STAGE/portal.json" || fail 'config_write'
+jsonfilter -i "$STAGE/portal.json" -e '@.revision' >/dev/null 2>&1 || fail 'config_invalid'
+[ "$(jsonfilter -i "$STAGE/portal.json" -e '@.data_generation' 2>/dev/null || true)" = "$WIFLOW_DATA_GENERATION" ] || fail 'config_generation'
+[ "$(jsonfilter -i "$STAGE/portal.json" -e '@.mode' 2>/dev/null || true)" = "$mode" ] || fail 'config_mode'
+rm -f "$MAN"; chmod 644 "$STAGE/portal.json" 2>/dev/null || true
+DEST="$PORTAL_REVISIONS/rev-$REV"; rm -rf "$DEST" 2>/dev/null || true; mv "$STAGE" "$DEST" || fail 'revision_prepare'; STAGE=''; LINK="$PORTAL_RUNTIME/.active-$$"; rm -f "$LINK"; ln -s "revisions/rev-$REV" "$LINK" || fail 'active_link'; if [ -e "$PORTAL_ACTIVE" ] && [ ! -L "$PORTAL_ACTIVE" ]; then rm -rf "$PORTAL_ACTIVE" || fail 'legacy_active'; fi; mv -Tf "$LINK" "$PORTAL_ACTIVE" || fail 'active_swap'
+for d in "$PORTAL_REVISIONS"/rev-*; do [ -e "$d" ] || continue; [ "$d" = "$DEST" ] || rm -rf "$d"; done; rm -rf "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* 2>/dev/null || true
+uci set "wiflow.core.portal_revision=$REV"; uci set wiflow.core.portal_sync_status='active'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true; secure_configs; /usr/lib/wiflow/portal-firewall refresh >/dev/null 2>&1 || true
+ack="/tmp/wiflow-portal-ack.$$"; body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"; wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 || true; rm -f "$ack" "$RESP"; logger -t wiflow-portal-sync "status=active revision=$REV mode=$mode" 2>/dev/null || true
+exit 0
+
+}
+media_name_unique(){
+ case "$seen_names" in *"|$1|"*) return 1;; esac
+ seen_names="$seen_names$1|"
+}
+seen='|'; seen_names='|'; i=0
 while [ "$i" -lt 12 ]; do
  role="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].role" 2>/dev/null || true)"; [ -n "$role" ] || break
  name="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].name" 2>/dev/null || true)"; url="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].download_url" 2>/dev/null || true)"; hash="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].sha256" 2>/dev/null || true)"; size="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].size" 2>/dev/null || true)"
