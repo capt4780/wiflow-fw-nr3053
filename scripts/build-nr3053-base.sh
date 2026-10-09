@@ -58,7 +58,7 @@ end = section.index("\nendef", start)
 remaining = section[end:]
 # Keep essentials: LuCI, firewall, MTWiFi driver and configuration; no optional addons.
 section = (section[:start] +
-           "  DEVICE_PACKAGES := luci-ssl luci-app-firewall luci-app-mtwifi-cfg kmod-mt_wifi " +
+           "  DEVICE_PACKAGES := luci-ssl luci-app-firewall kmod-mt_wifi " +
            "-kmod-usb3 -kmod-usb-ledtrig-usbport -automount -autosamba" +
            remaining)
 profile.write_text(text[:m.start()] + section + text[m.end():], encoding="utf-8")
@@ -69,6 +69,7 @@ for required in (
     "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_viettel_nr3053=y",
     "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_viettel_32x6=y",
     "CONFIG_PACKAGE_kmod-mt_wifi=y",
+    "CONFIG_PACKAGE_mtwifi-cfg-ucode=y",
 ):
     assert config.count(required) == 1, ("pinned defconfig unexpected", required)
 config = config.replace(
@@ -78,6 +79,9 @@ config = config.replace(
 # Disable only known optional features; no WiFi driver, boot, DHCP, DNS or firewall removal.
 optional = {
     "luci-app-nr3053-throughwall", "luci-i18n-nr3053-throughwall-vi",
+    # Legacy LuCI mtwifi-cfg requires missing host-build dependencies;
+    # preserve mtwifi-cfg-ucode and kmod-mt_wifi wireless runtime.
+    "luci-app-mtwifi-cfg", "luci-i18n-mtwifi-cfg-vi",
     "luci-app-turboacc-mtk", "luci-app-eqos-mtk", "luci-i18n-eqos-mtk-vi",
     "luci-app-ddns", "luci-i18n-ddns-vi", "ddns-scripts",
     "ddns-scripts-cloudflare", "ddns-scripts-noip", "bndstrg",
@@ -134,10 +138,11 @@ expected = ["CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_viettel_nr3053=y"]
 assert targets == expected, ("NR3053_ONLY_DEVICE_FAILED", targets)
 for value in ("CONFIG_TARGET_MULTI_PROFILE=y",
               "CONFIG_PACKAGE_kmod-mt_wifi=y",
+              "CONFIG_PACKAGE_mtwifi-cfg-ucode=y",
               "CONFIG_MTK_MT_WIFI_DRIVER_VERSION_7673=y",
               'CONFIG_MTK_MT_WIFI_FIRMWARE_PATH_MT7981="mt7981-fw-20250408"'):
     assert value in config, ("REQUIRED_WIFI_CONFIG_DROPPED", value)
-for pkg in ("luci-app-nr3053-throughwall", "luci-theme-aurora",
+for pkg in ("luci-app-mtwifi-cfg", "luci-app-nr3053-throughwall", "luci-theme-aurora",
             "luci-app-aurora-config"):
     assert "CONFIG_PACKAGE_" + pkg + "=y" not in config, ("UNSAFE_OR_UNUSED_PACKAGE_SELECTED", pkg)
 import os
