@@ -152,13 +152,13 @@ class PortalActiveAckReplayTests(unittest.TestCase):
     def test_heartbeat_uses_idempotent_captive_firewall_ensure(self):
         reconcile = HEARTBEAT[
             HEARTBEAT.index("portal_runtime_reconcile(){"):
-            HEARTBEAT.index("\\ndelay=20")
+            HEARTBEAT.index("\ndelay=20")
         ]
         self.assertIn("/usr/lib/wiflow/portal-firewall ensure", reconcile)
         self.assertNotIn("/usr/lib/wiflow/portal-firewall enable", reconcile)
         firewall = (FILES / "usr/lib/wiflow/portal-firewall").read_text()
         begin = firewall.index("ensure(){")
-        end = firewall.index("\\ndisable(){", begin)
+        end = firewall.index("\ndisable(){", begin)
         ensure = firewall[begin:end]
         self.assertIn("portal_nft_ready", ensure)
         self.assertIn("wiflow_portal_prerouting", ensure)
