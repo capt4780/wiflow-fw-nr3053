@@ -135,6 +135,7 @@ def inspect(path: Path):
         wireless_boot_generation = (
             "/sbin/wifi config" in boot_text
             and "/sbin/kmodloader" in boot_text
+            and boot_text.index("/sbin/wifi config") < boot_text.index("/sbin/kmodloader")
         )
         firstboot_errors = []
         if not all(firstboot_files.values()):
