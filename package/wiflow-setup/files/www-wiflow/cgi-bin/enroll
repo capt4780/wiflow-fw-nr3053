@@ -1,6 +1,8 @@
 #!/bin/sh
 . /usr/lib/wiflow/common.sh
-check_gate_session >/dev/null 2>&1 || redirect '/'
+. /usr/lib/wiflow/owner-claim.sh
+claim_gate="$(check_gate_session 2>/dev/null || true)"
+[ -n "$claim_gate" ] || redirect '/'
 [ "${REQUEST_METHOD:-}" = POST ] || redirect '/enroll.html'
 [ "${HTTP_ORIGIN:-}" = 'http://10.0.0.1' ] || redirect '/enroll.html?error=1'
 # The authenticated first-owner enrollment flow can originate on either
@@ -19,6 +21,8 @@ p="$(param password 2>/dev/null || true)"
 p2="$(param confirm_password 2>/dev/null || true)"
 [ -n "$p" ] && [ "$p" = "$p2" ] || redirect '/enroll.html?error=1'
 [ "$u" = wiflow ] || redirect '/enroll.html?error=1'
+# One physical WPS approval, bound to this Gate session and IP.
+owner_claim_consume "$claim_gate" "$REMOTE_ADDR" || redirect '/enroll.html?physical=1'
 setup_set_login "$u" "$p" || redirect '/enroll.html?error=1'
 session="$(make_session)" || redirect '/login.html'
 t="${session%%|*}"

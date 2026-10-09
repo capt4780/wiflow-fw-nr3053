@@ -1,0 +1,13 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+. /usr/lib/wiflow/owner-claim.sh
+header_json
+[ "$REQUEST_METHOD" = POST ] || { echo '{"ok":false,"error":"method"}'; exit 0; }
+[ "$HTTP_ORIGIN" = 'http://10.0.0.1' ] || { echo '{"ok":false,"error":"origin"}'; exit 0; }
+claim_gate="$(check_gate_session 2>/dev/null || true)"
+[ -n "$claim_gate" ] || { echo '{"ok":false,"error":"gate_required"}'; exit 0; }
+if owner_claim_arm "$claim_gate" "$REMOTE_ADDR"; then
+  echo '{"ok":true,"action":"press_wps_then_enroll","expires_in_seconds":60}'
+else
+  echo '{"ok":false,"error":"pending_or_unavailable"}'
+fi

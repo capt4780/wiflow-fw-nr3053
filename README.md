@@ -75,3 +75,9 @@ The Wiflow guest zone must never inherit an unconditional `guest -> WAN` forward
 - `.github/workflows/postbuild-reference-audit.yml` — compare new images to golden reference.
 
 **NO FLASH:** all artifact/report success statuses explicitly preserve `flash_authorization=BLOCK`. The repository does not provide a tested recovery procedure or final firmware.
+
+
+### Candidate physical WPS first-owner claim (NO FLASH)
+The permanent Gate verifier accepts both original device PIN and WIFDIDNR3053. A Gate pass is not owner authentication. For first-owner enrollment only, a Gate-authenticated client must arm a claim bound to its Gate session and client IP, press the physical NR3053 WPS GPIO button (not Reset) within 60 seconds, then submit enrollment within 90 seconds of that press. Approval is single-use and transient; ordinary login after enrollment is unchanged.
+
+**BLOCK:** button hotplug event and timing still require E5 hardware verification. Open guest Wi-Fi and plaintext HTTP credentials/cookies remain exposed to on-network interception; this step does not constitute secure provisioning. Concurrent malicious guests can deny service or compete for the armed request. Do not merge or flash until safe enrollment transport, recovery, and device tests are addressed.
