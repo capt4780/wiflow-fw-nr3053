@@ -245,6 +245,59 @@ class PortalActiveAckReplayTests(unittest.TestCase):
             self.assertFalse(nft.exists())
             self.assertEqual(log.read_text().splitlines(), ["commit:firewall", "reload"])
 
+
+    def test_wp_generation_mismatch_preserves_only_valid_local_portal(self):
+        # Run the exact heartbeat mismatch branch with no real router/WP I/O.
+        begin = HEARTBEAT.index('if [ "$generation" != "$WIFLOW_DATA_GENERATION" ]; then')
+        end = HEARTBEAT.index("\n   else\n    state_set wp_online 1", begin)
+        branch = HEARTBEAT[begin:end].replace(
+            "/usr/lib/wiflow/portal-firewall", "portal_firewall_test"
+        )
+        for snapshot, enabled, firewall_ok, expect_disabled, expect_ensure in (
+            (True, True, True, False, True),
+            (True, True, False, True, True),
+            (False, True, True, True, False),
+            (True, False, True, True, False),
+        ):
+            with self.subTest(snapshot=snapshot, enabled=enabled, firewall_ok=firewall_ok):
+                with tempfile.TemporaryDirectory(prefix="wiflow-wp-mismatch-") as tmp:
+                    active = Path(tmp) / "active"
+                    active.mkdir()
+                    if snapshot:
+                        (active / "portal.json").write_text('{"revision":27}')
+                    states = Path(tmp) / "state.log"
+                    fw_calls = Path(tmp) / "fw.log"
+                    script = (
+                        'PORTAL_ACTIVE="$TEST_ACTIVE"\n'
+                        'generation=5\nWIFLOW_DATA_GENERATION=4\n'
+                        'uci(){ [ "$TEST_ENABLED" = 1 ] && printf "1\n"; }\n'
+                        'state_set(){ printf "%s=%s\n" "$1" "$2" >> "$TEST_STATES"; }\n'
+                        'portal_runtime_disable(){ printf "disabled\n" >> "$TEST_STATES"; }\n'
+                        'portal_firewall_test(){ printf "%s\n" "$1" >> "$TEST_FW"; '
+                        '[ "$TEST_FIREWALL_OK" = 1 ]; }\n'
+                        + branch + '\nfi\n'
+                        + 'printf "delay=%s\n" "$delay" >> "$TEST_STATES"\n'
+                    )
+                    result = subprocess.run(
+                        ["sh", "-c", script], capture_output=True, text=True,
+                        timeout=5,
+                        env={**os.environ, "TEST_ACTIVE": str(active),
+                             "TEST_STATES": str(states), "TEST_FW": str(fw_calls),
+                             "TEST_ENABLED": "1" if enabled else "0",
+                             "TEST_FIREWALL_OK": "1" if firewall_ok else "0"},
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    events = states.read_text().splitlines()
+                    self.assertIn("wp_online=0", events)
+                    self.assertIn("api_error=generation_mismatch:5", events)
+                    self.assertIn("delay=60", events)
+                    self.assertEqual("disabled" in events, expect_disabled)
+                    self.assertEqual(fw_calls.exists(), expect_ensure)
+                    if expect_ensure:
+                        self.assertEqual(fw_calls.read_text().splitlines(), ["ensure"])
+                    if snapshot and enabled and not firewall_ok:
+                        self.assertIn("portal_error=captive_firewall_ensure_failed", events)
+
     def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
         self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
         self.assertIn('cat "$PORTAL_ACK_CONFIRMED"', HEARTBEAT)
