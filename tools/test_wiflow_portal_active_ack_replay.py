@@ -199,7 +199,7 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 "set:wiflow.core.portal_enabled=1", "commit:wiflow",
                 "set:wiflow.core.portal_enabled=0", "commit:wiflow",
             ])
-            self.assertEqual(state.read_text(), "0\\n")
+            self.assertEqual(state.read_text(), "0\n")
 
     def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
         self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
