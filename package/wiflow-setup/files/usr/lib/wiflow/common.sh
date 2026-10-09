@@ -36,18 +36,6 @@ gate_cookie_token(){ cookie_value WFGATE; }
 
 SESSION_TTL=1800
 GATE_TTL=1200
-# Emergency first-owner enrollment only. This constant is public and is NOT
-# a reusable administrative password or an alternative to the device PIN.
-WIFLOW_FIRST_USE_GATE_CODE='WIFDIDNR3053'
-first_use_emergency_gate(){
-    [ "$1" = "$WIFLOW_FIRST_USE_GATE_CODE" ] || return 1
-    case "${REMOTE_ADDR:-}" in 10.0.0.*) :;; *) return 1;; esac
-    [ ! -e "$ROOT/setup-claimed" ] || return 1
-    [ -z "$(uci -q get wiflow.core.setup_password_hash 2>/dev/null || true)" ] || return 1
-    [ -z "$(uci -q get wiflow.core.setup_password_salt 2>/dev/null || true)" ] || return 1
-    return 0
-}
-
 make_gate_session(){
     t="$(new_token)"; e=$(( $(date +%s) + GATE_TTL ))
     printf '%s\n' "$e" > "$GATE_SESS/$t" || return 1
@@ -207,9 +195,6 @@ setup_set_login(){
     uci set "wiflow.core.setup_password_hash=$hash"
     uci commit wiflow || return 1
     secure_configs
-    # Permanently disable the shared first-use emergency Gate on successful claim.
-    printf 'claimed\n' > "$ROOT/setup-claimed" || return 1
-    chmod 600 "$ROOT/setup-claimed" || return 1
     rm -rf "$SESS"/* 2>/dev/null || true
     clear_all_management_resume
     return 0
