@@ -14,7 +14,18 @@ fail(){
  if [ -n "$(device_token)" ]; then body="{\"revision\":${rev:-0},\"status\":\"failed\",\"error\":\"$(json_escape "$msg")\",\"data_generation\":$WIFLOW_DATA_GENERATION}"; out="/tmp/wiflow-portal-ack.$$"; wiflow_post "$out" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 || true; rm -f "$out"; fi
  logger -t wiflow-portal-sync "status=failed revision=${rev:-0} error=$msg" 2>/dev/null || true; exit 1
 }
-RESP="/tmp/wiflow-portal-manifest.$$"; rm -f "$RESP"; umask 077
+# WP can miss the first active ACK even when the local atomic swap succeeded.
+# Replay an idempotent ACK for the same verified revision at every sync check.
+# A transport failure must not undo a valid local Portal snapshot.
+ack_active_revision(){
+ ack="/tmp/wiflow-portal-ack.$"
+ body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"
+ if ! wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1; then
+  logger -t wiflow-portal-sync "status=active ack=retry_needed revision=$REV" 2>/dev/null || true
+ fi
+ rm -f "$ack"
+}
+RESP="/tmp/wiflow-portal-manifest.$"; rm -f "$RESP"; umask 077
 wiflow_get "$RESP" "$WIFLOW_PORTAL_API/manifest" >/dev/null 2>&1 || fail 'manifest_transport'
 ok="$(jsonfilter -i "$RESP" -e '@.ok' 2>/dev/null || true)"; [ "$ok" = true ] || [ "$ok" = 1 ] || fail 'manifest_rejected'
 generation="$(jsonfilter -i "$RESP" -e '@.data_generation' 2>/dev/null || true)"; [ "$generation" = "$WIFLOW_DATA_GENERATION" ] || fail 'manifest_generation'
@@ -39,7 +50,9 @@ if [ "$current" -eq "$REV" ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then
  active_gen="$(jsonfilter -i "$PORTAL_ACTIVE/portal.json" -e '@.data_generation' 2>/dev/null || true)"
  active_rev="$(jsonfilter -i "$PORTAL_ACTIVE/portal.json" -e '@.revision' 2>/dev/null || true)"
  if [ "$active_gen" = "$WIFLOW_DATA_GENERATION" ] && [ "$active_rev" = "$REV" ]; then
-  uci set wiflow.core.portal_sync_status='active'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true; rm -f "$RESP"; exit 0
+  uci set wiflow.core.portal_sync_status='active'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true
+  ack_active_revision
+  rm -f "$RESP"; exit 0
  fi
 fi
 mkdir -p "$PORTAL_REVISIONS" || fail 'storage_unavailable'
@@ -104,5 +117,6 @@ if ! mv -Tf "$LINK" "$PORTAL_ACTIVE"; then
 fi
 for d in "$PORTAL_REVISIONS"/rev-*; do [ -e "$d" ] || continue; [ "$d" = "$DEST" ] || rm -rf "$d"; done; rm -rf "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* 2>/dev/null || true
 uci set "wiflow.core.portal_revision=$REV"; uci set wiflow.core.portal_sync_status='active'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true; secure_configs; /usr/lib/wiflow/portal-firewall refresh >/dev/null 2>&1 || true
-ack="/tmp/wiflow-portal-ack.$$"; body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"; wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 || true; rm -f "$ack" "$RESP"; logger -t wiflow-portal-sync "status=active revision=$REV mode=$mode" 2>/dev/null || true
+ack_active_revision
+rm -f "$RESP"; logger -t wiflow-portal-sync "status=active revision=$REV mode=$mode" 2>/dev/null || true
 exit 0
