@@ -1,0 +1,77 @@
+name: NR3053 Base Rootfs Audit
+
+# Inspection of public base firmware only: NEVER authorizes flashing.
+# Runs once on creation against the verified successful base run;
+# future successful upstream base builds trigger their own rootfs audit.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/rootfs-audit.yml"
+      - "tools/audit_nr3053_rootfs.py"
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "NR3053 Clean ImmortalWrt Base Build"
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install read-only SquashFS tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq squashfs-tools
+      - name: Download validated base-build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nr3053-public-base-NOT-FOR-FLASHING
+          run-id: ${{ github.event.workflow_run.id || 37825631862 }}
+          github-token: ${{ github.token }}
+          path: image
+      - name: Compare image with NR3053 Golden Reference and inspect rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(image/*viettel_nr3053*sysupgrade.itb)
+          test "${#images[@]}" -eq 1
+          test -s "${images[0]}"
+          python3 -m py_compile tools/check_nr3053_fit_reference.py tools/audit_nr3053_rootfs.py
+          python3 tools/check_nr3053_fit_reference.py "${images[0]}" > fit-report.json
+          python3 tools/audit_nr3053_rootfs.py "${images[0]}" --output rootfs-report.json
+          python3 - <<'PY'
+          import json
+          fit=json.load(open("fit-report.json"))
+          root=json.load(open("rootfs-report.json"))
+          assert fit["structural_gate"] in ("PASS","WARN")
+          assert not fit["errors"]
+          assert root["rootfs_audit"]=="PASS"
+          assert root["flash_authorization"]=="BLOCK"
+          assert not root["unexpected_radio_writers"]
+          assert root["mtwifi_modules"]
+          assert not root["wiflow_runtime_candidates"]
+          print("NR3053_BASE_ROOTFS_INSPECTED_FIT_PASS_MT_WIFI_PASS_NO_FLASH")
+          print("ROOTFS_KEY_PATHS="+str(root["present"]))
+          print("ROOTFS_MTWIFI_MODULES="+str(root["mtwifi_modules"]))
+          print("ROOTFS_KEY_PACKAGES="+str(root["key_packages"]))
+          PY
+      - name: Preserve rootfs and FIT audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-base-rootfs-inspection-NOT-FOR-FLASHING
+          path: |
+            fit-report.json
+            rootfs-report.json
+          if-no-files-found: warn
+          retention-days: 7
