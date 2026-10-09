@@ -9,6 +9,7 @@ on:
     paths:
       - ".github/workflows/rootfs-audit.yml"
       - "tools/audit_nr3053_rootfs.py"
+      - "tools/test_nr3053_boot_order.py"
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -26,6 +27,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Run first-boot command-order regression tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py' -v
       - name: Install read-only SquashFS tools
         run: |
           set -euo pipefail
