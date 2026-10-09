@@ -8,7 +8,7 @@ OUT=/tmp/wiflow-scan.out
 for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do
     [ "$(radio_band "$r")" = "$band" ] || continue
     tmp="/tmp/wiflow-scan-$r.$$"
-    ( iwinfo "$r" scan > "$tmp" 2>/dev/null ) & p=$!
+    ( /usr/bin/iwinfo-ucode "$r" scan > "$tmp" 2>/dev/null ) & p=$!
     ( sleep 7; kill "$p" 2>/dev/null ) & w=$!
     wait "$p" 2>/dev/null || true
     kill "$w" 2>/dev/null || true

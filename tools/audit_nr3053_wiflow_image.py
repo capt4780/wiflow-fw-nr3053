@@ -14,6 +14,7 @@ import tempfile
 from check_nr3053_fit_reference import fdt_nodes, read_image, u32
 
 REQUIRED_FILES = (
+    "usr/bin/iwinfo-ucode",
     "usr/lib/wiflow/bootstrap",
     "usr/lib/wiflow/common.sh",
     "usr/lib/wiflow/gate-code.sh",
@@ -144,7 +145,7 @@ def audit(path: Path) -> dict:
             raise ValueError("unsquashfs missing from audit runner")
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
-             "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
+             "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
              "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
