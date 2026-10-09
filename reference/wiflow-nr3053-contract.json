@@ -63,7 +63,7 @@
       "normal_code": "last_six_numeric_digits_of_device_id",
       "emergency_code": "WIFDIDNR3053",
       "emergency_lifetime": "permanent",
-      "emergency_scope": "management_subnet_10.0.0.0/24",
+      "emergency_scope": "management_and_guest_subnets_10.0.0.0/24_10.10.10.0/24",
       "accepted_by": [
         "wiflow_setup_gate",
         "luci_gate"
@@ -71,7 +71,7 @@
       "account_login_after_gate": "unchanged",
       "failed_attempts_before_lock": 5,
       "lock_seconds": 60,
-      "public_static_code_security_risk": "BLOCK_FOR_RELEASE_PENDING_TARGET_NETWORK_AND_ACCOUNT_VERIFICATION"
+      "public_static_code_security_risk": "BLOCK_FOR_RELEASE_PENDING_ROOT_ACCOUNT_ROTATION_FIRST_OWNER_AND_GUEST_NETWORK_VERIFICATION"
     }
   },
   "porting": {

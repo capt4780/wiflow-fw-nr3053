@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from check_nr3053_fit_reference import fdt_nodes, read_image, u32
+from provision_nr3053_root_shadow import inspect_root_shadow
 
 REQUIRED_FILES = (
     "usr/bin/iwinfo-ucode",
@@ -36,6 +37,7 @@ REQUIRED_FILES = (
     "www-wiflow-portal/template-image.html",
     "www-wiflow-portal/template-video.html",
     "www-wiflow-portal/template-website.html",
+    "www-wiflow-portal/cgi-bin/portal",
 )
 
 
@@ -131,6 +133,36 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     return problems
 
 
+def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
+    """Verify the built captive CGI enforces the reviewed HTTP mutation gate.
+
+    This is static SquashFS policy evidence, NOT a live grant/packet test.
+    """
+    path = fs / "www-wiflow-portal/cgi-bin/portal"
+    if not path.is_file():
+        return ["captive authorization CGI missing from compiled rootfs"]
+    source = path.read_text(encoding="utf-8", errors="replace")
+    marker = 'case "$action" in\n authorize|event)'
+    successor = '\ncase "$action" in\n authorize)'
+    if source.count(marker) != 1 or successor not in source:
+        return ["captive authorization action guard absent"]
+    start = source.index(marker)
+    end = source.index(successor, start)
+    guard = source[start:end]
+    required = (
+        "authorize|event)",
+        '[ "${REQUEST_METHOD:-}" != POST ]',
+        "Status: 405 Method Not Allowed",
+        '[ -z "$BODY" ]',
+        "Status: 400 Bad Request",
+    )
+    if any(piece not in guard for piece in required):
+        return ["captive authorization POST/body-only gate missing"]
+    if 'authorize-session "$sid" "$cid"' not in source[end:]:
+        return ["captive authorization backend flow changed unexpectedly"]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -152,7 +184,7 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal", "etc/shadow"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
@@ -160,6 +192,15 @@ def audit(path: Path) -> dict:
         fs = root / "fs"
         missing = [p for p in REQUIRED_FILES if not (fs / p).is_file()]
         issues = [f"missing Wiflow image file: {p}" for p in missing]
+        # This is an image-level root credential check, not a login test.
+        # A source package audit cannot attest the actual built /etc/shadow.
+        shadow = fs / "etc/shadow"
+        if not shadow.is_file():
+            issues.append("root account shadow missing from built image")
+        else:
+            shadow_gate, reason = inspect_root_shadow(shadow.read_text(errors="replace"))
+            if shadow_gate != "PASS":
+                issues.append("root shadow unsafe: " + reason)
         if not missing:
             login = (fs / "usr/lib/wiflow/common.sh").read_text(errors="replace")
             gate = (fs / "www-wiflow/cgi-bin/gate").read_text(errors="replace")
@@ -194,6 +235,7 @@ def audit(path: Path) -> dict:
             if "tcp dport 8081 drop" not in luci_nft:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
+            issues.extend(audit_captive_mutation_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
@@ -203,6 +245,11 @@ def audit(path: Path) -> dict:
             "device_recovery_tested": False,
             "files_checked": len(REQUIRED_FILES),
             "found_files": len(REQUIRED_FILES) - len(missing),
+            "root_shadow_gate": (
+                inspect_root_shadow(shadow.read_text(errors="replace"))[0]
+                if shadow.is_file() else "BLOCK"
+            ),
+            "root_login_tested": False,
             "errors": issues,
         }
 
