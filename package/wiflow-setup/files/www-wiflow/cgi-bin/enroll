@@ -3,7 +3,10 @@
 check_gate_session >/dev/null 2>&1 || redirect '/'
 [ "${REQUEST_METHOD:-}" = POST ] || redirect '/enroll.html'
 [ "${HTTP_ORIGIN:-}" = 'http://10.0.0.1' ] || redirect '/enroll.html?error=1'
-case "${REMOTE_ADDR:-}" in 10.0.0.*) :;; *) redirect '/enroll.html?error=1';; esac
+# The authenticated first-owner enrollment flow can originate on either
+# local management or Wiflow guest Wi-Fi; the Gate cookie and same-origin check
+# above remain mandatory. Do not accept arbitrary WAN/other subnet clients.
+case "${REMOTE_ADDR:-}" in 10.0.0.*|10.10.10.*) :;; *) redirect '/enroll.html?error=1';; esac
 # First claim is serialized to prevent multiple passwords racing.
 lock=/tmp/wiflow-setup-enrollment.lock
 mkdir "$lock" 2>/dev/null || redirect '/enroll.html?error=1'
