@@ -89,6 +89,33 @@ jobs:
           assert fit["flash_authorization"]=="BLOCK",fit
           print("WIFLOW_NR3053_APK_SOURCE_IMAGE_STATIC_INSPECTION_PASS_NO_FLASH")
           PY
+      - name: Capture reproducible failure context
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          mkdir -p failure-report
+          {
+            echo "RUN_ID=${GITHUB_RUN_ID}"
+            echo "HEAD_SHA=${GITHUB_SHA}"
+            echo "WIFLOW_SOURCE_BUILD=${WIFLOW_SOURCE_BUILD}"
+            echo "STATE=BUILD_OR_OFFLINE_AUDIT_FAILED"
+            echo "FLASH_AUTHORIZATION=BLOCK"
+            echo "SOURCE=PUBLIC_NR3053_EXPERIMENTAL"
+          } > failure-report/STATUS.txt
+          df -h > failure-report/disk.txt
+          free -h > failure-report/memory.txt
+          find output -maxdepth 1 -type f -printf '%f %s bytes\\n' 2>/dev/null > failure-report/output-files.txt || true
+          cp output/*audit.json output/golden-compare.json failure-report/ 2>/dev/null || true
+          echo "NR3053_FAILURE_EVIDENCE_STORED"
+      - name: Preserve failure diagnostics (no firmware on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-wiflow-failure-diagnostics
+          path: failure-report/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload engineering-only image and diagnostic reports
         if: success()
         uses: actions/upload-artifact@v4
