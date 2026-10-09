@@ -58,7 +58,7 @@ if media_name_unique 'same.webp'; then exit 13; fi
                 self.assertEqual(outcome.returncode, 0, outcome.stderr)
 
     def test_validation_and_uniqueness_precede_stage_download(self):
-        start = SOURCE.index('seen=\\'|\\'; seen_names=\\'|\\'; i=0')
+        start = SOURCE.index("seen='|'; seen_names='|'; i=0")
         validation = SOURCE.index('media_name_valid "$name" || fail')
         unique = SOURCE.index('media_name_unique "$name" || fail')
         download = SOURCE.index('out="$STAGE/media/$name"; wiflow_get')
