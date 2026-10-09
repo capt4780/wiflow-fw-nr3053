@@ -439,8 +439,9 @@ ensure_guest_network(){
     uci set firewall.wiflow_guest_private_dns.src='wiflow_guest'
     uci set firewall.wiflow_guest_private_dns.dest='wan'
     uci set firewall.wiflow_guest_private_dns.dest_port='853'
+    # Android Private DNS uses DoT over TCP/853; UDP/853 is not part of the
+    # pre-authorized contract and would open an additional WAN tunnel path.
     uci add_list firewall.wiflow_guest_private_dns.proto='tcp'
-    uci add_list firewall.wiflow_guest_private_dns.proto='udp'
     uci set firewall.wiflow_guest_private_dns.target='ACCEPT'
 
     uci -q delete firewall.wiflow_guest_dhcp >/dev/null 2>&1 || true
