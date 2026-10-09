@@ -1,4 +1,20 @@
 #!/bin/sh
+# An accepted Gate PIN is not an admin credential. Never grant even a
+# temporary LuCI backend nft exception while the built root account has a
+# missing, empty, locked, plaintext or non-SHA512-looking password field.
+# This is a fail-closed shape check only, NOT proof of password strength,
+# owner commissioning, or a release-approval replacement.
+wiflow_root_shadow_hash_present(){
+    wf_shadow="$1"
+    [ -f "$wf_shadow" ] && [ ! -L "$wf_shadow" ] || return 1
+    awk -F: '
+      $1 == "root" {
+        found++
+        if (NF == 9 && substr($2, 1, 3) == "$6$" && length($2) > 90 && $2 !~ /[[:space:]]/) acceptable++
+      }
+      END { exit !(found == 1 && acceptable == 1) }
+    ' "$wf_shadow"
+}
 ROOT=/etc/wiflow
 . /usr/lib/wiflow/gate-code.sh
 read_body(){ n="${CONTENT_LENGTH:-0}"; case "$n" in ''|*[!0-9]*) n=0;; esac; [ "$n" -le 1024 ] || n=1024; BODY="$(dd bs=1 count="$n" 2>/dev/null)"; }
@@ -19,6 +35,8 @@ case "$count" in ''|*[!0-9]*) count=0;; esac; case "$until" in ''|*[!0-9]*) unti
     if [ "$now" -lt "$until" ]; then sleep 1; redirect '/?error=1'; fi
     if ! wiflow_gate_code_allowed "$pin" "$want"; then count=$((count+1)); if [ "$count" -ge 5 ]; then count=0; until=$((now+60)); fi; printf '%s %s\n' "$count" "$until" > "$ff"; sleep 1; redirect '/?error=1'; fi
 rm -f "$ff"
+# Do not expose root/shadow details to an untrusted Gate client.
+wiflow_root_shadow_hash_present /etc/shadow || redirect '/?error=1'
 nft list set inet fw4 wiflow_luci_allowed4 >/dev/null 2>&1 || { /etc/init.d/firewall reload >/dev/null 2>&1 || true; sleep 1; }
 nft add element inet fw4 wiflow_luci_allowed4 "{ $client timeout 20m }" >/dev/null 2>&1 || redirect '/?error=1'
 redirect 'http://10.0.0.2:8081/cgi-bin/luci/'

@@ -1,7 +1,7 @@
 """Executed regressions for the permanent NR3053 shared Gate verifier.
 
 The verifier opens the first security Gate, not Setup/LuCI account login.
-Only management-side emergency use is permitted. These tests are E3 host
+Emergency Gate is available on management or Wiflow guest IPs. Tests are E3 host
 checks, NOT tests of NR3053 runtime or network filtering.
 """
 import os
@@ -39,8 +39,16 @@ class PermanentGateTests(unittest.TestCase):
         self.assertEqual(self.try_code("WIFDIDNR3053", expected=""), 0)
         self.assertNotEqual(self.try_code("221262", expected=""), 0)
 
-    def test_emergency_rejected_outside_management_network(self):
-        for addr in ("10.10.10.17", "192.168.1.23", "172.16.0.4", "", "127.0.0.1"):
+    def test_emergency_always_available_for_wiflow_guest(self):
+        for ip in ("10.10.10.3", "10.10.10.17", "10.10.10.249"):
+            for enrolled in (False, True):
+                with self.subTest(ip=ip, enrolled=enrolled):
+                    self.assertEqual(self.try_code("WIFDIDNR3053", remote=ip,
+                                                   enrolled=enrolled), 0)
+
+    def test_emergency_rejected_outside_management_and_guest(self):
+        for addr in ("192.168.1.23", "172.16.0.4", "", "127.0.0.1",
+                     "10.10.11.5", "8.8.8.8"):
             with self.subTest(address=addr):
                 self.assertNotEqual(self.try_code("WIFDIDNR3053", remote=addr), 0)
 

@@ -77,6 +77,30 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertIn("wiflow_gate_code_allowed", SETUPGATE.read_text())
         self.assertIn("wiflow_gate_code_allowed", LUCIGATE.read_text())
 
+    def test_guest_emergency_code_passes_both_shared_gate_handlers(self):
+        verifier = VERIFIER.read_text(encoding="utf-8")
+        for ip in ("10.10.10.12", "10.10.10.100", "10.10.10.249"):
+            for entered in ("WIFDIDNR3053", "221262"):
+                with self.subTest(ip=ip, entered=entered):
+                    r = subprocess.run(
+                        ["sh", "-c",
+                         verifier + '\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
+                        env={**os.environ, "REMOTE_ADDR": ip,
+                             "ENTERED": entered, "PIN": "221262"},
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    self.assertEqual(r.returncode, 0, r.stderr)
+        for handler in (SETUPGATE, LUCIGATE):
+            script = handler.read_text(encoding="utf-8")
+            self.assertIn('. /usr/lib/wiflow/gate-code.sh', script)
+            self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', script)
+            self.assertIn('[ "${REQUEST_METHOD:-}" = POST ]', script)
+
+    def test_public_emergency_does_not_expose_direct_luci_backend(self):
+        self.test_luci_true_backend_remains_guarded()
+        self.assertIn('check_gate_session', ENROLL.read_text(encoding="utf-8"))
+        self.assertIn('setup_set_login', ENROLL.read_text(encoding="utf-8"))
+
     def test_guest_first_enrollment_keeps_gate_and_origin_protection(self):
         enroll = ENROLL.read_text()
         auth = 'check_gate_session >/dev/null 2>&1 || redirect \'/\''

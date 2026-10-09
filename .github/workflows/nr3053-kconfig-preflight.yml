@@ -41,6 +41,28 @@ jobs:
       - name: Real pinned NR3053 and Wiflow Kconfig only (NO FIRMWARE)
         shell: bash
         run: bash scripts/build-nr3053-base.sh
+      - name: Inspect staged root shadow from real pinned ImmortalWrt (NO IMAGE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # On feature branches without root provisioning this test is not
+          # available; when the helper exists it must validate the real,
+          # pinned upstream overlay and cannot pass on an empty/locked root.
+          if [[ -f tools/provision_nr3053_root_shadow.py ]]; then
+            PYTHONPATH=tools python3 - <<'PY'
+          from pathlib import Path
+          from provision_nr3053_root_shadow import inspect_root_shadow
+          import os
+          overlay = Path(os.environ["RUNNER_TEMP"])/"nr3053-clean-upstream"/"files/etc/shadow"
+          assert overlay.is_file(), "ROOT_SHADOW_OVERLAY_NOT_STAGED"
+          gate, reason = inspect_root_shadow(overlay.read_text())
+          assert gate == "PASS", ("PINNED_ROOT_HASH_PREFLIGHT_FAIL", reason)
+          assert overlay.stat().st_mode & 0o077 == 0, "ROOT_SHADOW_PERMISSIONS_UNSAFE"
+          print("NR3053_PINNED_ROOT_SHADOW_PROVISION_PASS_NO_IMAGE_NO_FLASH")
+          PY
+          else
+            echo "ROOT_SHADOW_POLICY_NOT_PRESENT_IN_THIS_SOURCE_REVISION"
+          fi
       - name: Confirm no build artifacts are published
         shell: bash
         run: |
