@@ -23,7 +23,7 @@ class NR3053MtwifiProfileTests(unittest.TestCase):
     def test_explicitly_disable_old_gui_after_source_config(self):
         self.assertIn('"luci-app-mtwifi-cfg", "luci-i18n-mtwifi-cfg-vi",', SRC)
         self.assertIn('for pkg in ("luci-app-mtwifi-cfg",', SRC)
-        self.assertIn('"CONFIG_PACKAGE_" + name + " is not set"', SRC)
+        self.assertIn('"# CONFIG_PACKAGE_" + name + " is not set"', SRC)
 
     def test_radio_driver_and_ucode_remain_required(self):
         self.assertEqual(SRC.count('"CONFIG_PACKAGE_kmod-mt_wifi=y"'), 2)
