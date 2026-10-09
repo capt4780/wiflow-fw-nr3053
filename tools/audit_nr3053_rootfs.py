@@ -21,14 +21,15 @@ from check_nr3053_fit_reference import fdt_nodes, read_image, u32
 def wifi_command_precedes_module_load(boot_text: str) -> bool:
     """Check executable shell lines only (ignore mentions in comments)."""
     wifi = re.search(
-        r"(?m)^[ \\t]*(?:\\[[^\\n]*?\\][ \\t]*&&[ \\t]*)?/sbin/wifi[ \\t]+config[ \\t]*(?:#.*)?$",
+        r"(?m)^[ \t]*(?:\[[^\n]*?\][ \t]*&&[ \t]*)?/sbin/wifi[ \t]+config[ \t]*(?:#.*)?$",
         boot_text,
     )
     load = re.search(
-        r"(?m)^[ \\t]*/sbin/kmodloader[ \\t]*(?:#.*)?$",
+        r"(?m)^[ \t]*/sbin/kmodloader[ \t]*(?:#.*)?$",
         boot_text,
     )
     return bool(wifi and load and wifi.start() < load.start())
+
 
 
 def inspect(path: Path):
