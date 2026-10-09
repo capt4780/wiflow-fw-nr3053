@@ -24,7 +24,7 @@ def production_ack_function():
 
 
 def production_heartbeat_functions():
-    begin = HEARTBEAT.index("portal_runtime_disable(){")
+    begin = HEARTBEAT.index("portal_runtime_set_enabled(){")
     end = HEARTBEAT.index("\ndelay=20", begin)
     return HEARTBEAT[begin:end].replace(
         "/usr/lib/wiflow/portal-sync", "portal_sync_test"
@@ -164,6 +164,42 @@ class PortalActiveAckReplayTests(unittest.TestCase):
         self.assertIn("wiflow_portal_prerouting", ensure)
         self.assertIn("wiflow_portal_forward", ensure)
         self.assertIn("enable", ensure)
+
+    def test_uci_state_committed_only_on_transition(self):
+        # Execute the actual production state helper, not a Python emulator.
+        with tempfile.TemporaryDirectory(prefix="wiflow-uci-no-flash-write-") as tmp:
+            state = Path(tmp) / "state"
+            writes = Path(tmp) / "writes"
+            prefix = (
+                'UCI_STATE="$TEST_UCI_STATE"\n'
+                'UCI_WRITES="$TEST_UCI_WRITES"\n'
+                'uci(){\n'
+                ' case "$1" in\n'
+                '  -q) cat "$UCI_STATE" 2>/dev/null || true;;\n'
+                '  set) printf "%s\\n" "${2##*=}" > "$UCI_STATE"; '
+                'printf "set:%s\\n" "$2" >> "$UCI_WRITES";;\n'
+                '  commit) printf "commit:%s\\n" "$2" >> "$UCI_WRITES";;\n'
+                ' esac\n'
+                '}\n'
+            )
+            helper = production_heartbeat_functions()
+            script = (prefix + helper +
+                '\nportal_runtime_set_enabled 1\n'
+                'portal_runtime_set_enabled 1\n'
+                'portal_runtime_set_enabled 0\n'
+                'portal_runtime_set_enabled 0\n')
+            result = subprocess.run(
+                ["sh", "-c", script], capture_output=True, text=True,
+                env={**os.environ, "TEST_UCI_STATE": str(state),
+                     "TEST_UCI_WRITES": str(writes)},
+                timeout=5, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(writes.read_text().splitlines(), [
+                "set:wiflow.core.portal_enabled=1", "commit:wiflow",
+                "set:wiflow.core.portal_enabled=0", "commit:wiflow",
+            ])
+            self.assertEqual(state.read_text(), "0\\n")
 
     def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
         self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
