@@ -52,5 +52,38 @@ class WebsiteAddressTests(unittest.TestCase):
         self.assertIn('flush set inet fw4 wiflow_portal_web4', source)
 
 
+    def test_resolver_excludes_private_answers_end_to_end(self):
+        # Execute BOTH source functions with a fake busybox-style nslookup;
+        # no DNS network or router access. Protects against a wiring regression.
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        src = self.source
+        start = src.index("wiflow_public_ipv4(){")
+        end = src.index("\nrefresh(){", start)
+        actual = src[start:end]
+        stubs = r'''
+portal_active_config(){ printf '/tmp/test-portal'; }
+uci(){ printf 'website'; }
+jsonfilter(){ printf 'https://promo.example/offer'; }
+website_url_valid(){ case "$1" in https://*) return 0;; *) return 1;; esac; }
+website_host_from_url(){ printf 'promo.example'; }
+nslookup(){ cat "$DNS_RESPONSES"; }
+'''
+        with TemporaryDirectory(prefix="wiflow-web-dns-test-") as d:
+            answer = Path(d) / "answers"
+            for answers, expected_success, expected_ips in (
+                (("192.168.1.1", "10.0.0.1", "8.8.8.8", "1.1.1.1"), True, {"1.1.1.1", "8.8.8.8"}),
+                (("127.0.0.1", "192.168.2.1", "100.64.2.3"), False, set()),
+                (("104.16.132.229",), True, {"104.16.132.229"}),
+            ):
+                answer.write_text("Name: promo.example\n" + "".join(
+                    f"Address {i+1}: {ip}\n" for i, ip in enumerate(answers)))
+                run = subprocess.run(
+                    ["sh", "-c", stubs + actual + "\nresolve_website_ips"],
+                    env={**os.environ, "DNS_RESPONSES": str(answer)},
+                    capture_output=True, text=True, timeout=5)
+                self.assertEqual(run.returncode == 0, expected_success, run.stderr)
+                self.assertEqual(set(run.stdout.splitlines()), expected_ips)
+
 if __name__ == "__main__":
     unittest.main()

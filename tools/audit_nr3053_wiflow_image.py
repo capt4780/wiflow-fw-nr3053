@@ -112,6 +112,10 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
             problems.append(f"captive redirect exception missing: {target}")
     if "ip saddr 10.10.10.0/24 tcp dport 80 redirect to :2080" not in texts["captive"]:
         problems.append("guest captive fallback redirect missing")
+    # The compiled rootfs must include the public-only DNS filter, not just
+    # the GitHub source; never allow a private DNS rebinding preauth exception.
+    if "wiflow_public_ipv4(){" not in texts["captive"] or 'wiflow_public_ipv4 "$ip"' not in texts["captive"]:
+        problems.append("Website preauth DNS public-only filter missing from compiled rootfs")
     guard = texts["luci_guard"].splitlines()
     if guard != [
         "ip daddr 10.0.0.2 tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept",
