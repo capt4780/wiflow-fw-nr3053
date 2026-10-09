@@ -34,6 +34,7 @@ REQUIRED_FILES = (
     "www-wiflow/enroll.html",
     "usr/lib/wiflow/owner-claim.sh",
     "etc/rc.wps/00-wiflow-first-owner",
+    "etc/rc.button/wps",
     "www-wiflow-luci-gate/cgi-bin/unlock",
     "www-wiflow-luci-gate/index.html",
     "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
@@ -165,6 +166,7 @@ def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
         "arm": "www-wiflow/cgi-bin/claim-arm",
         "claim": "usr/lib/wiflow/owner-claim.sh",
         "button": "etc/rc.wps/00-wiflow-first-owner",
+        "dispatcher": "etc/rc.button/wps",
         "init": "etc/init.d/wiflow-setup",
     }
     texts = {}
@@ -196,6 +198,11 @@ def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
             '[ "${ACTION:-}" = released ]',
             "owner_claim_wps",
         ),
+        "dispatcher": (
+            '[ "$ACTION" = "pressed" ] && exit 5',
+            "for script in /etc/rc.wps/*",
+            '[ -x "$script" ] || continue',
+        ),
         "init": (
             "START=96",
             "/usr/lib/wiflow/bootstrap",
@@ -213,7 +220,8 @@ def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
     for rel in ("www-wiflow/cgi-bin/enroll", "www-wiflow/cgi-bin/claim-arm",
                 "www-wiflow/cgi-bin/gate", "www-wiflow-luci-gate/cgi-bin/unlock",
                 "etc/init.d/wiflow-setup",
-                "etc/rc.wps/00-wiflow-first-owner"):
+                "etc/rc.wps/00-wiflow-first-owner",
+                "etc/rc.button/wps"):
         script = fs / rel
         if not script.is_file() or not (script.stat().st_mode & stat.S_IXUSR):
             problems.append(f"missing executable CGI/init permission: {rel}")
@@ -248,7 +256,7 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "etc/rc.d", "etc/rc.wps", "etc/shadow", "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "etc/rc.d", "etc/rc.wps", "etc/rc.button/wps", "etc/shadow", "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:

@@ -26,6 +26,17 @@ class FirstOwnerImageAuditTests(unittest.TestCase):
             target = self.root / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(SRC / rel, target)
+        dispatcher = self.root / "etc/rc.button/wps"
+        dispatcher.parent.mkdir(parents=True, exist_ok=True)
+        dispatcher.write_text(
+            '#!/bin/sh\n'
+            '[ "$ACTION" = "pressed" ] && exit 5\n'
+            'for script in /etc/rc.wps/*; do\n'
+            '\t[ -x "$script" ] || continue\n'
+            '\t"$script" && break\n'
+            'done\n'
+        )
+        dispatcher.chmod(0o755)
         rc = self.root / "etc/rc.d"
         rc.mkdir(parents=True, exist_ok=True)
         (rc / "S96wiflow-setup").symlink_to("../init.d/wiflow-setup")
@@ -51,6 +62,17 @@ class FirstOwnerImageAuditTests(unittest.TestCase):
     def test_non_executable_wps_handler_is_block(self):
         (self.root / "etc/rc.wps/00-wiflow-first-owner").chmod(0o644)
         self.assertTrue(any("executable" in x for x in
+                            audit_first_owner_and_boot_rootfs(self.root)))
+
+    def test_missing_upstream_wps_dispatcher_is_block(self):
+        (self.root / "etc/rc.button/wps").unlink()
+        self.assertTrue(any("rc.button/wps" in x for x in
+                            audit_first_owner_and_boot_rootfs(self.root)))
+
+    def test_dispatcher_without_wps_loop_is_block(self):
+        p = self.root / "etc/rc.button/wps"
+        p.write_text("#!/bin/sh\nexit 0\n")
+        self.assertTrue(any("dispatcher" in x for x in
                             audit_first_owner_and_boot_rootfs(self.root)))
 
     def test_legacy_enrollment_without_one_use_claim_is_block(self):
