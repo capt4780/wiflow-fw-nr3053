@@ -7,6 +7,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/build-nr3053-wiflow.yml"
+      - "package/wiflow-setup/**"
+      - "scripts/build-nr3053-base.sh"
+      - "tools/audit_nr3053_wiflow_image.py"
   workflow_dispatch:
 
 permissions:
