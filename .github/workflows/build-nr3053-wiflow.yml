@@ -1,0 +1,97 @@
+name: NR3053 Wiflow Experimental APK Source Build
+
+# Engineering-only: compiles the public device runtime into an NR3053 image.
+# Neither CI success nor an emitted .itb authorizes flashing.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-nr3053-wiflow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nr3053-wiflow-public-experimental
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Compile APK-native Wiflow package into pinned NR3053 (NO FLASH)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      WIFLOW_SOURCE_BUILD: "1"
+    steps:
+      - name: Checkout pinned public wrapper and reviewed device source
+        uses: actions/checkout@v4
+      - name: Static tests and public source safety before any compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q tools
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+          python3 tools/verify_public_tree.py --repo .
+          test -f package/wiflow-setup/Makefile
+          test -f package/wiflow-setup/files/www-wiflow/cgi-bin/enroll
+          echo "WIFLOW_NR3053_PRE_BUILD_GATES_PASS"
+      - name: Verify runner capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "CPU_COUNT=$(nproc)"
+          free -h
+          df -h "$GITHUB_WORKSPACE"
+          test "$(df -Pk "$GITHUB_WORKSPACE" | awk 'END {print $4}')" -ge 15728640
+      - name: Install pinned ImmortalWrt build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang flex bison g++ gawk gettext git \
+            libncurses-dev libssl-dev python3 python3-setuptools \
+            rsync unzip zlib1g-dev file wget curl libelf-dev \
+            subversion swig time squashfs-tools
+      - name: Compile NR3053 image with source Wiflow APK package selected
+        shell: bash
+        run: bash scripts/build-nr3053-base.sh
+      - name: Inspect the exact compiled FIT and Wiflow rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(output/*viettel_nr3053*sysupgrade.itb)
+          test "${#images[@]}" -eq 1
+          python3 tools/check_nr3053_fit_reference.py "${images[0]}" \
+            --reference reference/nr3053-golden.json \
+            | tee output/golden-compare.json
+          python3 tools/audit_nr3053_rootfs.py "${images[0]}" \
+            --output output/base-rootfs-audit.json
+          python3 tools/audit_nr3053_wiflow_image.py "${images[0]}" \
+            --report output/wiflow-rootfs-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          out=Path("output")
+          fit=json.loads((out/"golden-compare.json").read_text())
+          base=json.loads((out/"base-rootfs-audit.json").read_text())
+          wiflow=json.loads((out/"wiflow-rootfs-audit.json").read_text())
+          assert fit["structural_gate"] in ("PASS","WARN") and not fit["errors"],fit
+          assert base["rootfs_audit"]=="PASS",base
+          assert base["firstboot_static"]["static_gate"]=="PASS",base
+          assert wiflow["static_gate"]=="PASS",wiflow
+          assert wiflow["release_approval"]=="BLOCK",wiflow
+          assert fit["flash_authorization"]=="BLOCK",fit
+          print("WIFLOW_NR3053_APK_SOURCE_IMAGE_STATIC_INSPECTION_PASS_NO_FLASH")
+          PY
+      - name: Upload engineering-only image and diagnostic reports
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-wiflow-experimental-NOT-FOR-FLASHING
+          path: output/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
