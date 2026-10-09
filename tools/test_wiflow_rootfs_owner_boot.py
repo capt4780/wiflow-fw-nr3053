@@ -18,6 +18,11 @@ PARTS = (
 
 
 class FirstOwnerImageAuditTests(unittest.TestCase):
+    def test_package_depends_on_stock_wifi_scripts_dispatcher(self):
+        package = (SRC.parent / "Makefile").read_text()
+        self.assertIn("+wifi-scripts", package,
+                      "WPS rc.button dispatcher must be installed by wifi-scripts")
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="wiflow-rootfs-test-")
         self.addCleanup(self.tmp.cleanup)
