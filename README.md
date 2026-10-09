@@ -15,6 +15,7 @@ This is the single, clean PUBLIC engineering repository for NR3053. **Not a flas
 | First-boot 2.4/5 GHz Wi-Fi and network on physical NR3053 | Dynamic UCI config generation **not executed on the router**; actual management reachability and both bands still unverified | BLOCK |
 | Wiflow Setup, local captive portal, remote WP API integration | Not yet implemented in the public base image | BLOCK |
 | Recovery from failed boot/flash with Wi-Fi-only access | Not demonstrated | BLOCK |
+| Public source / binary / credential leak prevention | [Run 37874211552](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37874211552) — 12 Python tests plus tracked-file scan; private ZIP/ITB, secrets and device media are rejected | PASS |
 | Firmware release / permission to flash | **Not approved** | **BLOCK** |
 
 The base build uses a pinned public ImmortalWrt source commit `e39aded8420d454804a376e63400aff73da66247`, targets the NR3053 only, and removes four unreviewed automatic Wi-Fi calibration writers. It does **not** change the reference device's factory EEPROM, NAND partition declarations or bootloader.
@@ -29,7 +30,7 @@ Rootfs audit observed `lib/modules/6.12.94/mt_wifi.ko`, MT7981 firmware blobs, `
 4. **Guest security/network:** guest isolation with firewall4, DHCP/DNS and pre-authorization Private DNS/bootstrap support without general Internet bypass; allow WordPress to change the guest SSID for 2.4/5 GHz when uplink is Ethernet.
 5. **Compatibility and evidence:** preserve current analytics schema, verify runtime/UI/media parity using a reviewed Wiflow baseline, test reboot, pairing, portal display, guest authorization and rollback on a real target; release only when recovery is proven.
 
-The earlier Wiflow WordPress/PWA package is **not** present in this public-source build. It must be supplied and reviewed before claiming feature parity; private materials must not be made public by default.
+The earlier Wiflow WordPress/PWA package is **not** present in this public-source build. It must be supplied and reviewed before claiming feature parity; private materials must not be made public by default. The file `Wiflow-BASELINE-2026-10-05-PWA-HISTORY-BACK-FULL(7).zip` was located by filename in the user's Project/Library on 2026-10-09, but its actual ZIP bytes were **not authorized for extraction/materialization** from that storage surface. Full compatibility integration is therefore BLOCKED until the ZIP is supplied as a current conversation attachment with readable bytes. No baseline content has been copied into this public repository.
 
 ## Source and inspection files
 
