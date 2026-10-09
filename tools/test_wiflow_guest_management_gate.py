@@ -132,6 +132,26 @@ class GuestManagementGateTests(unittest.TestCase):
             issues = audit_guest_gate_rootfs(fake)
             self.assertTrue(any("redirect exception" in x for x in issues), issues)
 
+    def test_guest_wan_default_is_fail_closed_without_snapshot(self):
+        common = COMMON.read_text()
+        scope = common[common.index("ensure_guest_network(){"):
+                       common.index("ensure_uplink_network(){")]
+        self.assertIn("uci -q delete firewall.wiflow_guest_wan", scope)
+        self.assertNotIn("uci set firewall.wiflow_guest_wan='forwarding'", scope)
+        self.assertIn("firewall.wiflow_guest_private_dns.dest_port='853'", scope)
+        self.assertIn("firewall.wiflow_guest_setup.dest_ip='10.0.0.1'", scope)
+        self.assertIn("firewall.wiflow_guest_gate.dest_ip='10.0.0.2'", scope)
+
+    def test_captive_firewall_owns_guest_forwarding_lifecycle(self):
+        captive = PORTAL.read_text()
+        self.assertIn('[ -f "$PORTAL_ACTIVE/portal.json" ] || { state_set portal_error', captive)
+        self.assertIn('uci set firewall.wiflow_guest_wan=\'forwarding\'', captive)
+        self.assertIn('uci set firewall.wiflow_guest_wan.src=\'wiflow_guest\'', captive)
+        self.assertIn('uci set firewall.wiflow_guest_wan.dest=\'wan\'', captive)
+        self.assertIn('[ -f "$PORTAL_ACTIVE/portal.json" ] || { disable; return 1; }', captive)
+        self.assertIn('uci -q delete firewall.wiflow_guest_wan', captive)
+        self.assertIn('[ "$(uci -q get firewall.wiflow_guest_wan', captive)
+
     def test_no_standalone_ungated_luci_port_in_guest_firewall_rules(self):
         net = COMMON.read_text()
         scoped = net[net.index("ensure_guest_network(){"):net.index("ensure_uplink_network(){")]

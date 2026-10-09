@@ -54,7 +54,13 @@ refresh(){
 }
 
 enable(){
+ # Forwarding must not be opened before a complete local Portal snapshot.
+ [ -f "$PORTAL_ACTIVE/portal.json" ] || { state_set portal_error 'snapshot_missing'; return 1; }
  write_rules || return 1
+ uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
+ uci set firewall.wiflow_guest_wan='forwarding'
+ uci set firewall.wiflow_guest_wan.src='wiflow_guest'
+ uci set firewall.wiflow_guest_wan.dest='wan'
  uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
  uci set firewall.wiflow_guest_portal='rule'; uci set firewall.wiflow_guest_portal.name='Wiflow-Captive-Portal'; uci set firewall.wiflow_guest_portal.src='wiflow_guest'; uci set firewall.wiflow_guest_portal.proto='tcp'; uci set firewall.wiflow_guest_portal.dest_port='2080'; uci set firewall.wiflow_guest_portal.target='ACCEPT'; uci commit firewall || return 1
  /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
@@ -65,17 +71,28 @@ enable(){
 }
 
 ensure(){
- # Fast path: the captive sets/chains already exist. Do NOT reload fw4 here;
- # this command is called from the 2-second mode loop and must be idempotent.
- if portal_nft_ready && /usr/sbin/nft list chain inet fw4 wiflow_portal_prerouting >/dev/null 2>&1 && /usr/sbin/nft list chain inet fw4 wiflow_portal_forward >/dev/null 2>&1; then
+ # No active snapshot means guest Internet must stay closed.
+ [ -f "$PORTAL_ACTIVE/portal.json" ] || { disable; return 1; }
+ # Fast path: both the captive rules AND the forwarding owner must be ready.
+ # Called by the mode loop every 2s; no gratuitous firewall reload.
+ if [ "$(uci -q get firewall.wiflow_guest_wan 2>/dev/null || true)" = forwarding ] && portal_nft_ready && /usr/sbin/nft list chain inet fw4 wiflow_portal_prerouting >/dev/null 2>&1 && /usr/sbin/nft list chain inet fw4 wiflow_portal_forward >/dev/null 2>&1; then
   return 0
  fi
  enable
 }
 
 disable(){
- changed=0; [ -f "$NFT_FILE" ] && changed=1; uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
- rm -f "$NFT_FILE" "$NFT_FILE.tmp"; uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true; uci commit firewall >/dev/null 2>&1 || true
- [ "$changed" = 1 ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
+ changed=0
+ [ -f "$NFT_FILE" ] && changed=1
+ uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
+ uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && changed=1
+ rm -f "$NFT_FILE" "$NFT_FILE.tmp" || return 1
+ uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
+ uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
+ uci commit firewall >/dev/null 2>&1 || return 1
+ if [ "$changed" = 1 ]; then
+  /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
+ fi
+ return 0
 }
 case "$MODE" in enable) enable;; ensure) ensure;; refresh) refresh;; disable) disable;; *) exit 2;; esac

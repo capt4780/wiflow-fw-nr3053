@@ -468,10 +468,9 @@ ensure_guest_network(){
     uci set firewall.wiflow_guest_gate.proto='tcp'
     uci set firewall.wiflow_guest_gate.target='ACCEPT'
 
+    # Fail closed while Portal has no active validated snapshot.
+    # The captive firewall is the SOLE owner of the guest->WAN forwarding.
     uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_wan='forwarding'
-    uci set firewall.wiflow_guest_wan.src='wiflow_guest'
-    uci set firewall.wiflow_guest_wan.dest='wan'
     uci commit firewall
 }
 

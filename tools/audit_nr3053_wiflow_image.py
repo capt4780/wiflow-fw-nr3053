@@ -76,6 +76,26 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     ):
         if expected not in texts["network"]:
             problems.append(f"guest Gate firewall rule missing: {expected}")
+    # Preserve fail-closed guest Internet, even if Portal has not synced yet.
+    guest_source = texts["network"][texts["network"].index("ensure_guest_network(){"):
+                                   texts["network"].index("ensure_uplink_network(){")]
+    if "uci set firewall.wiflow_guest_wan='forwarding'" in guest_source:
+        problems.append("guest WAN forwarding active without Portal snapshot")
+    for required in (
+        "uci -q delete firewall.wiflow_guest_wan",
+        "firewall.wiflow_guest_private_dns.dest_port='853'",
+    ):
+        if required not in guest_source:
+            problems.append(f"guest default forward/Private DNS safety missing: {required}")
+    captive_source = texts["captive"]
+    for required in (
+        '[ -f "$PORTAL_ACTIVE/portal.json" ] || { state_set portal_error',
+        "uci set firewall.wiflow_guest_wan='forwarding'",
+        "uci -q delete firewall.wiflow_guest_wan",
+        '[ -f "$PORTAL_ACTIVE/portal.json" ] || { disable; return 1; }',
+    ):
+        if required not in captive_source:
+            problems.append(f"Portal-owned forwarding lifecycle missing: {required}")
     for target in ("10.0.0.1", "10.0.0.2"):
         expected = f"ip saddr 10.10.10.0/24 ip daddr {target} return"
         if expected not in texts["captive"]:
