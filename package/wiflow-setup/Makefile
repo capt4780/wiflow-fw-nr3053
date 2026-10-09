@@ -25,7 +25,7 @@ define Package/wiflow-setup/conffiles
 endef
 
 define Build/Prepare
-	$(MKDIR) $(PKG_BUILD_DIR)/rootfs
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)/rootfs
 	$(CP) ./files/. $(PKG_BUILD_DIR)/rootfs/
 endef
 
