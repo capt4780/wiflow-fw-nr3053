@@ -5,6 +5,7 @@ packet trace or proof that a human completed the advertisement.
 """
 from pathlib import Path
 import os
+import tempfile
 import subprocess
 import unittest
 
@@ -84,6 +85,27 @@ class CaptiveActionGuardTests(unittest.TestCase):
                 self.assertIn("action.value='authorize'", html)
                 self.assertIn("sid.name='session_id'", html)
                 self.assertIn('data-local-authorize-url="http://10.10.10.1:2080/cgi-bin/portal"', html)
+
+    def test_exact_image_auditor_requires_compiled_guard(self):
+        from audit_nr3053_wiflow_image import audit_captive_mutation_rootfs
+        from shutil import copyfile
+        with tempfile.TemporaryDirectory(prefix="wiflow-captive-audit-") as tmp:
+            target = Path(tmp) / "www-wiflow-portal/cgi-bin/portal"
+            target.parent.mkdir(parents=True)
+            copyfile(PORTAL, target)
+            self.assertEqual(audit_captive_mutation_rootfs(Path(tmp)), [])
+            pristine = target.read_text(encoding="utf-8")
+            for old in ('[ "${REQUEST_METHOD:-}" != POST ]',
+                        '[ "${HTTP_ORIGIN:-}" != \'http://10.10.10.1:2080\' ]'):
+                self.assertIn(old, pristine)
+                target.write_text(pristine.replace(old, "# test mutation"), encoding="utf-8")
+                result = audit_captive_mutation_rootfs(Path(tmp))
+                self.assertTrue(result, old)
+                target.write_text(pristine, encoding="utf-8")
+            target.unlink()
+            self.assertTrue(audit_captive_mutation_rootfs(Path(tmp)))
+
+
 
 
 if __name__ == "__main__":
