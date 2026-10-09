@@ -65,7 +65,9 @@ portal_runtime_reconcile(){
  [ -f "$PORTAL_ACTIVE/portal.json" ] || { portal_runtime_disable; return 1; }
  uci set wiflow.core.portal_enabled='1'
  uci commit wiflow >/dev/null 2>&1 || true
- if ! /usr/lib/wiflow/portal-firewall enable >/dev/null 2>&1; then
+ # Idempotent: avoid firewall reload on every successful WP heartbeat.
+ # portal-firewall ensure still invokes enable when the chains are missing.
+ if ! /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1; then
   portal_runtime_disable
   state_set portal_error 'captive_firewall_enable_failed'
   return 1
