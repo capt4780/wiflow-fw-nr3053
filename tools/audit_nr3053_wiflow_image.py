@@ -178,6 +178,14 @@ def audit_root_shadow_field(fs: Path) -> dict:
 
 
 
+def root_shadow_static_errors(root_audit: dict) -> list[str]:
+    """Return only sanitized findings for image packaging (never credentials)."""
+    if root_audit["root_shadow_static_check"] == "BLOCK":
+        return ["built root credential field unsafe: "
+                + root_audit["root_password_field_state"]]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -208,6 +216,9 @@ def audit(path: Path) -> dict:
         root_audit = audit_root_shadow_field(fs)
         missing = [p for p in REQUIRED_FILES if not (fs / p).is_file()]
         issues = [f"missing Wiflow image file: {p}" for p in missing]
+        # Fail-closed: 22/22 component success must not publish images with
+        # empty, locked, malformed, duplicate or missing root shadow records.
+        issues.extend(root_shadow_static_errors(root_audit))
         if not missing:
             login = (fs / "usr/lib/wiflow/common.sh").read_text(errors="replace")
             gate = (fs / "www-wiflow/cgi-bin/gate").read_text(errors="replace")
