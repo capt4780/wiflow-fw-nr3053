@@ -201,6 +201,50 @@ class PortalActiveAckReplayTests(unittest.TestCase):
             ])
             self.assertEqual(state.read_text(), "0\n")
 
+
+    def test_firewall_disable_does_not_commit_when_already_disabled(self):
+        firewall = (FILES / "usr/lib/wiflow/portal-firewall").read_text()
+        begin = firewall.index("\ndisable(){")
+        end = firewall.index('\ncase "$MODE" in', begin)
+        actual_disable = firewall[begin:end].replace(
+            "/etc/init.d/firewall", "firewall_reload_test"
+        )
+        with tempfile.TemporaryDirectory(prefix="wiflow-firewall-disabled-") as tmp:
+            nft = Path(tmp) / "30-wiflow-captive.nft"
+            log = Path(tmp) / "writes.log"
+            script = (
+                'NFT_FILE="$TEST_NFT_FILE"\n'
+                'uci(){\n'
+                ' case "$1" in\n'
+                '  -q) return 1;;\n'
+                '  commit) printf "commit:%s\n" "$2" >> "$TEST_LOG";;\n'
+                ' esac\n'
+                '}\n'
+                'firewall_reload_test(){ printf "reload\n" >> "$TEST_LOG"; }\n'
+                + actual_disable + "\ndisable\n"
+            )
+            env = {**os.environ, "TEST_NFT_FILE": str(nft), "TEST_LOG": str(log)}
+            no_change = subprocess.run(
+                ["sh", "-c", script], capture_output=True, text=True,
+                env=env, timeout=5,
+            )
+            self.assertEqual(no_change.returncode, 0, no_change.stderr)
+            self.assertFalse(log.exists(), "no UCI commit/reload on already-disabled Portal")
+            tmp_nft = Path(str(nft) + ".tmp")
+            tmp_nft.write_text("stale")
+            repeat = subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True, timeout=5)
+            self.assertEqual(repeat.returncode, 0, repeat.stderr)
+            self.assertFalse(tmp_nft.exists(), "stale temporary rule must be cleaned")
+            self.assertFalse(log.exists())
+            nft.write_text("active")
+            transition = subprocess.run(
+                ["sh", "-c", script], capture_output=True, text=True,
+                env=env, timeout=5,
+            )
+            self.assertEqual(transition.returncode, 0, transition.stderr)
+            self.assertFalse(nft.exists())
+            self.assertEqual(log.read_text().splitlines(), ["commit:firewall", "reload"])
+
     def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
         self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
         self.assertIn('cat "$PORTAL_ACK_CONFIRMED"', HEARTBEAT)
