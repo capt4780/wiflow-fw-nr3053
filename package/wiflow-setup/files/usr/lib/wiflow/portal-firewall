@@ -23,7 +23,6 @@ chain wiflow_portal_forward {
  type filter hook forward priority -10; policy accept;
  ip saddr . ether saddr @wiflow_portal_authed return
  ip saddr 10.10.10.0/24 tcp dport 853 accept
- ip saddr 10.10.10.0/24 udp dport 853 accept
  ip saddr 10.10.10.0/24 ip daddr @wiflow_portal_web4 tcp dport { 80, 443 } accept
  ip saddr 10.10.10.0/24 reject
 }

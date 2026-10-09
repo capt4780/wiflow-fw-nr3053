@@ -26,12 +26,15 @@ class NR3053BehaviorContractTests(unittest.TestCase):
             "firewall.wiflow_guest_private_dns.dest_port='853'",
             "firewall.wiflow_guest_dns.dest_port='53'",
             "ip saddr 10.10.10.0/24 tcp dport 853 accept",
-            "ip saddr 10.10.10.0/24 udp dport 853 accept",
+            "uci add_list firewall.wiflow_guest_private_dns.proto=\'tcp\'",
             "ip saddr 10.10.10.0/24 reject",
         ):
             with self.subTest(field=field):
                 self.assertIn(field, self.common + self.portal_firewall)
         self.assertIn("wiflow_portal_authed", self.portal_firewall)
+        # An unauthenticated guest must not gain a DoQ/UDP tunnel via port 853.
+        self.assertNotIn("uci add_list firewall.wiflow_guest_private_dns.proto=\'udp\'", self.common)
+        self.assertNotIn("ip saddr 10.10.10.0/24 udp dport 853 accept", self.portal_firewall)
 
     def test_guest_ssid_remote_command_updates_both_radios(self):
         self.assertIn("change_guest_ssid)", self.remote)
