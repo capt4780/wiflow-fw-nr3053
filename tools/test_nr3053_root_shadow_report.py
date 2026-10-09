@@ -68,6 +68,35 @@ class BuiltRootShadowFieldTests(unittest.TestCase):
                 self.assertNotIn("1234", str(result))
                 self.assertNotIn("secret", str(result))
 
+    def test_symlinked_shadow_or_parent_escape_is_blocked(self):
+        # These links can otherwise trick an extracted-image audit into
+        # inspecting the CI host's credential file rather than FIT contents.
+        with tempfile.TemporaryDirectory(prefix="nr3053-shadow-link-") as temp:
+            fs = Path(temp) / "rootfs"
+            outside = Path(temp) / "outside"
+            fs.mkdir()
+            outside.mkdir()
+            (outside / "shadow").write_text(GOOD, encoding="utf-8")
+            etc = fs / "etc"
+            etc.mkdir()
+            shadow = etc / "shadow"
+            shadow.symlink_to(outside / "shadow")
+            for location in ("shadow symlink", "etc directory escape"):
+                with self.subTest(location=location):
+                    result = audit_root_shadow_field(fs)
+                    self.assertEqual(result["root_password_field_state"],
+                                     "SYMLINK_OR_OUTSIDE_ROOTFS")
+                    self.assertEqual(result["root_shadow_static_check"], "BLOCK")
+                    self.assertEqual(result["root_credential_release_gate"], "BLOCK")
+                    self.assertEqual(root_shadow_static_errors(result),
+                                     ["built root credential field unsafe: "
+                                      "SYMLINK_OR_OUTSIDE_ROOTFS"])
+                    self.assertNotIn("$6$", str(result))
+                if location == "shadow symlink":
+                    shadow.unlink()
+                    etc.rmdir()
+                    etc.symlink_to(outside, target_is_directory=True)
+
     def test_extra_accounts_do_not_change_root_classification(self):
         result = self.inspect("daemon:*:0:0:99999:7:::\n" + GOOD)
         self.assertEqual(result["root_password_field_state"],
