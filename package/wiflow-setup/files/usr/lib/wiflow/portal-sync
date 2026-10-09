@@ -45,13 +45,26 @@ fi
 mkdir -p "$PORTAL_REVISIONS" || fail 'storage_unavailable'
 STAGE="$PORTAL_RUNTIME/.staging-$$-$REV"; rm -rf "$STAGE" 2>/dev/null || true; mkdir -p "$STAGE/media" || fail 'staging_create_failed'; MAN="$STAGE/manifest.list"; : > "$MAN"
 uci set wiflow.core.portal_sync_status='syncing'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true
-seen='|'; i=0
+# Media paths live in one shared stage directory across all roles.
+# Reject ambiguous or reused names BEFORE download: a second role must never
+# overwrite a previously SHA-256-validated media file before activation.
+media_name_valid(){
+ case "$1" in ''|.|..) return 1;; esac
+ printf '%s' "$1" | grep -Eq '^[A-Za-z0-9._-]{1,120}$'
+}
+media_name_unique(){
+ case "$seen_names" in *"|$1|"*) return 1;; esac
+ seen_names="$seen_names$1|"
+}
+seen='|'; seen_names='|'; i=0
 while [ "$i" -lt 12 ]; do
  role="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].role" 2>/dev/null || true)"; [ -n "$role" ] || break
  name="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].name" 2>/dev/null || true)"; url="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].download_url" 2>/dev/null || true)"; hash="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].sha256" 2>/dev/null || true)"; size="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].size" 2>/dev/null || true)"
  case "$role" in image_landscape|image_portrait|video_landscape|video_portrait|popup_1|popup_2|popup_3|popup_4|popup_5) :;; *) fail 'media_role';; esac
  case "$seen" in *"|$role|"*) fail 'media_duplicate';; esac; seen="$seen$role|"
- printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'; case "$url" in "$WIFLOW_PORTAL_API"/media/*) :;; *) fail 'media_url';; esac
+ media_name_valid "$name" || fail 'media_name'
+ media_name_unique "$name" || fail 'media_name_duplicate'
+ case "$url" in "$WIFLOW_PORTAL_API"/media/*) :;; *) fail 'media_url';; esac
  printf '%s' "$hash" | grep -Eq '^[A-Fa-f0-9]{64}$' || fail 'media_hash'; case "$size" in ''|*[!0-9]*) fail 'media_size';; esac; [ "$size" -gt 0 ] && [ "$size" -le 157286400 ] || fail 'media_size'
  out="$STAGE/media/$name"; wiflow_get "$out" "$url" >/dev/null 2>&1 || fail "download_$role"; got_size="$(wc -c < "$out" 2>/dev/null | tr -d ' ')"; [ "$got_size" = "$size" ] || fail "size_$role"; got_hash="$(sha256sum "$out" | awk '{print $1}')"; [ "$got_hash" = "$hash" ] || fail "hash_$role"; chmod 644 "$out" 2>/dev/null || true; printf '%s|%s\n' "$role" "$name" >> "$MAN"; i=$((i+1))
 done
