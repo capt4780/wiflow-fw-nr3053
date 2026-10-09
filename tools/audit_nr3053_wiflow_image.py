@@ -153,11 +153,11 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
         "authorize|event)",
         '[ "${REQUEST_METHOD:-}" != POST ]',
         "Status: 405 Method Not Allowed",
-        '[ "${HTTP_ORIGIN:-}" != \'http://10.10.10.1:2080\' ]',
-        "Status: 403 Forbidden",
+        '[ -z "$BODY" ]',
+        "Status: 400 Bad Request",
     )
     if any(piece not in guard for piece in required):
-        return ["captive authorization POST/Origin rejection missing"]
+        return ["captive authorization POST/body-only gate missing"]
     if 'authorize-session "$sid" "$cid"' not in source[end:]:
         return ["captive authorization backend flow changed unexpectedly"]
     return []

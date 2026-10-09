@@ -23,21 +23,23 @@ class CaptiveActionGuardTests(unittest.TestCase):
         end = cls.source.index('\ncase "$action" in\n authorize)', start)
         cls.guard = cls.source[start:end]
 
-    def run_guard(self, action, method, origin):
-        script = 'action="$TEST_ACTION"\n' + self.guard + '\nprintf "GUARD_OK\\n"\n'
+    def run_guard(self, action, method, origin, body="action=authorize&session_id=test"):
+        script = 'action="$TEST_ACTION"\nBODY="$TEST_BODY"\n' + self.guard + '\nprintf "GUARD_OK\\n"\n'
         return subprocess.run(
             ["sh", "-c", script],
             env={**os.environ, "TEST_ACTION": action, "REQUEST_METHOD": method,
-                 "HTTP_ORIGIN": origin},
+                 "HTTP_ORIGIN": origin, "TEST_BODY": body},
             capture_output=True, text=True, timeout=5,
         )
 
-    def test_all_local_mutations_accept_only_origin_verified_post(self):
+    def test_all_local_mutations_accept_post_independent_of_origin(self):
         for action in ("authorize", "event"):
-            with self.subTest(action=action):
-                result = self.run_guard(action, "POST", "http://10.10.10.1:2080")
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, "GUARD_OK\n")
+            for origin in ("http://10.10.10.1:2080", "", "null",
+                           "http://example.org"):
+                with self.subTest(action=action, origin=origin):
+                    result = self.run_guard(action, "POST", origin)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, "GUARD_OK\n")
 
     def test_get_and_head_cannot_authorize_via_query_string(self):
         for method in ("GET", "HEAD", "DELETE", ""):
@@ -49,15 +51,12 @@ class CaptiveActionGuardTests(unittest.TestCase):
                 self.assertNotIn("GUARD_OK", result.stdout)
                 self.assertIn("Allow: POST", result.stdout)
 
-    def test_cross_origin_post_and_missing_origin_fail_closed(self):
-        for origin in ("", "null", "https://10.10.10.1:2080",
-                       "http://10.10.10.1", "http://10.10.10.1:2081",
-                       "http://10.10.10.1:2080.evil.invalid",
-                       "http://10.0.0.1", "http://example.org"):
-            with self.subTest(origin=origin):
-                result = self.run_guard("authorize", "POST", origin)
+    def test_post_with_empty_body_fails_even_with_query_string(self):
+        for action in ("authorize", "event"):
+            with self.subTest(action=action):
+                result = self.run_guard(action, "POST", "", body="")
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn("403 Forbidden", result.stdout)
+                self.assertIn("400 Bad Request", result.stdout)
                 self.assertNotIn("GUARD_OK", result.stdout)
 
     def test_preauth_portal_view_is_not_blocked(self):
@@ -96,7 +95,7 @@ class CaptiveActionGuardTests(unittest.TestCase):
             self.assertEqual(audit_captive_mutation_rootfs(Path(tmp)), [])
             pristine = target.read_text(encoding="utf-8")
             for old in ('[ "${REQUEST_METHOD:-}" != POST ]',
-                        '[ "${HTTP_ORIGIN:-}" != \'http://10.10.10.1:2080\' ]'):
+                        '[ -z "$BODY" ]'):
                 self.assertIn(old, pristine)
                 target.write_text(pristine.replace(old, "# test mutation"), encoding="utf-8")
                 result = audit_captive_mutation_rootfs(Path(tmp))
