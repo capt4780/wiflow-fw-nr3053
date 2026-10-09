@@ -1,0 +1,30 @@
+name: Public Source Safety Gate
+
+# No private Wiflow application source or router binary may enter public Git.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Python tooling and host regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q tools
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+      - name: Prevent publishing private or binary project data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_public_tree.py --repo .
+          echo "WIFLOW_PUBLIC_SOURCE_ONLY_PASS"
