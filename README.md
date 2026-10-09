@@ -1,6 +1,6 @@
 # Wiflow firmware — Viettel NR3053
 
-This is the single, clean PUBLIC engineering repository for NR3053. **Not a flash-ready Wiflow release.** Public upstream and open build/test glue only. Do not commit account data, API/device tokens, private media, private application baselines, or hardcoded recovery credentials.
+This is the public source and engineering-build repository for NR3053. **Not a flash-ready Wiflow release.** Original Wiflow NR3053 source and test/build glue are provided under the [MIT License](LICENSE), subject to separate third-party upstream licenses. Never commit account data, API/device tokens, private media or application baseline archives. The openly documented fixed emergency Gate `WIFDIDNR3053` is a deliberate project requirement, **not a secret or substitute for account authentication**.
 
 ## Verified evidence — 2026-10-09
 
@@ -13,18 +13,24 @@ This is the single, clean PUBLIC engineering repository for NR3053. **Not a flas
 | Actual built SquashFS / init / radio | [Run 37872278328](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37872278328) — inspected extracted rootfs and driver | PASS |
 | First-boot LAN/WAN and Wi-Fi **static generation paths** | [Run 37873707260](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873707260): real SquashFS contains board_detect, config_generate, NR3053 LAN1–3/WAN board mapping and `/sbin/wifi config` before kmodloader | PASS (static only) |
 | First-boot 2.4/5 GHz Wi-Fi and network on physical NR3053 | Dynamic UCI config generation **not executed on the router**; actual management reachability and both bands still unverified | BLOCK |
-| Wiflow Setup, local captive portal, remote WP API integration | Not yet implemented in the public base image | BLOCK |
+| Wiflow Setup, local captive portal, remote WP API integration | NR3053 experimental source staged and Kconfig-selected ([experimental build](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37876660880)); no final integrated image or device-runtime verification yet | BLOCK (runtime) |
 | Recovery from failed boot/flash with Wi-Fi-only access | Not demonstrated | BLOCK |
 | Public source / binary / credential leak prevention | [Run 37874211552](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37874211552) — 12 Python tests plus tracked-file scan; private ZIP/ITB, secrets and device media are rejected | PASS |
 | Uploaded Wiflow WP/IPK baseline provenance + protocol metadata | User-uploaded 2026-10-05 baseline verified locally: WP/IPK hashes match manifest; both use generation 4, API v1, snapshot schema 2 | PASS (inspection) |
-| Private IPK-to-APK source port | NR3053 identity/model corrected in private staging; shell syntax passed, but package not compiled and no live router test | WARN (pre-build source only) |
+| Public IPK-to-APK source port | 43 package text/config files imported, 1 status metadata record; NR3053 ID/model and package selection verified; [source tests](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37878145010) passed | PASS (source only) |
 | Wiflow revision-media immutability and shared emergency Gate | WP media for historical revisions still require immutable snapshots. The permanently enabled public string `WIFDIDNR3053` is implemented in both management Gates but hardware network isolation and downstream account safety remain unverified | BLOCK (release) |
-| Public protocol and source-leak checks | [Run 37875222828](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37875222828) — 18 regressions including protocol consistency and source-leak checks | PASS |
+| Public protocol and source-leak checks | [Latest baseline contract run](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37878981111) covers permanent Gate, source leak checks, DoT preauth, atomic media activation, and dual-band guest SSID source invariants | PASS (source) |
 | Firmware release / permission to flash | **Not approved** | **BLOCK** |
 
 The base build uses a pinned public ImmortalWrt source commit `e39aded8420d454804a376e63400aff73da66247`, targets the NR3053 only, and removes four unreviewed automatic Wi-Fi calibration writers. It does **not** change the reference device's factory EEPROM, NAND partition declarations or bootloader.
 
 Rootfs audit observed `lib/modules/6.12.94/mt_wifi.ko`, MT7981 firmware blobs, `dnsmasq-full`, `firewall4`, `uhttpd`, `rpcd`, `luci`, and the **APK package database** (ImmortalWrt 25.12). [Read-only first-boot audit](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/37873707260) additionally confirms boot-time UCI configuration scripts and correct NR3053 interface mapping are present, explaining the missing pre-populated `network`/`wireless` configs. The latest audit also executed **four host regression tests** for real boot command ordering and comment/reversed-order rejection, all passing. This is source/firmware **static evidence only**; it does not prove live 2.4/5 GHz Wi-Fi, first-boot success, guest isolation, management recovery or Captive Portal on a real device.
+
+## Management access and no-Ethernet installation limitation
+
+The source currently **disables stock radio APs**, creates an **unencrypted Wiflow guest SSID**, leases client addresses in `10.10.10.0/24`, and explicitly allows those guest clients to reach the Gate pages at `10.0.0.1:80` and `10.0.0.2:80`. By contrast, the hardcoded emergency Gate `WIFDIDNR3053` is currently accepted only for requests whose source address is `10.0.0.x`.
+
+**BLOCK — wireless-only first enrollment:** A user connected solely to the Wiflow guest SSID receives `10.10.10.x` and therefore cannot use the emergency Gate, even though the Gate page can load. This is not solved by an otherwise successful firmware build; it requires an explicit safe decision about management-network access or physically authorized initial enrollment. Do not broaden root/LuCI access from the open guest SSID by accident. The ordinary six-digit device PIN remains enabled, but the device ID is not displayed before login. The default LuCI root credential and true hardware recovery path also require verification.
 
 ## Work remaining — source-of-truth boundaries
 
