@@ -97,7 +97,18 @@ while true; do
    generation="$(jsonfilter -i "$resp" -e '@.data_generation' 2>/dev/null || true)"
    if [ "$generation" != "$WIFLOW_DATA_GENERATION" ]; then
     state_set wp_online 0; state_set api_error "generation_mismatch:$generation"; delay=60
-    portal_runtime_disable
+    # A WP rollout/API mismatch must not destroy an already-approved, valid
+    # local Portal snapshot. Never accept incompatible remote control data.
+    # Still fail closed if no active snapshot or captive firewall is broken.
+    if [ -f "$PORTAL_ACTIVE/portal.json" ] &&
+       [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || true)" = 1 ]; then
+     if ! /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1; then
+      portal_runtime_disable
+      state_set portal_error 'captive_firewall_ensure_failed'
+     fi
+    else
+     portal_runtime_disable
+    fi
    else
     state_set wp_online 1; state_set wp_last_ok "$(date +%s)"; state_set api_error ''; delay=20
     account_public_id="$(jsonfilter -i "$resp" -e '@.account_public_id' 2>/dev/null || true)"
