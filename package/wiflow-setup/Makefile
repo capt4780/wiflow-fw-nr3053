@@ -25,16 +25,16 @@ define Package/wiflow-setup/conffiles
 endef
 
 define Build/Prepare
-	$(MKDIR) $(PKG_BUILD_DIR)/rootfs
-	$(CP) ./files/. $(PKG_BUILD_DIR)/rootfs/
+	mkdir -p "$(PKG_BUILD_DIR)/rootfs"
+	cp -a ./files/. "$(PKG_BUILD_DIR)/rootfs/"
 endef
 
 define Build/Compile
 endef
 
 define Package/wiflow-setup/install
-	$(INSTALL_DIR) $(1)
-	$(CP) $(PKG_BUILD_DIR)/rootfs/. $(1)/
+	mkdir -p "$(1)"
+	cp -a "$(PKG_BUILD_DIR)/rootfs/." "$(1)/"
 endef
 
 $(eval $(call BuildPackage,wiflow-setup))
