@@ -82,7 +82,7 @@ rm -f "$MAN"; chmod 644 "$STAGE/portal.json" 2>/dev/null || true
 # Use an immutable, fresh directory for each activation. Never remove the
 # currently active revision (including a same-number repair) before the swap.
 # The process id is only a local staging suffix, not a revision identifier.
-DEST="$PORTAL_REVISIONS/rev-$REV-$"
+DEST="$PORTAL_REVISIONS/rev-$REV-$$"
 [ ! -e "$DEST" ] && [ ! -L "$DEST" ] || fail 'revision_destination_occupied'
 # A legacy real-directory active cannot be replaced by a symlink atomically.
 # Fail safely instead of deleting the live Portal before replacement.
@@ -91,7 +91,7 @@ if [ -e "$PORTAL_ACTIVE" ] && [ ! -L "$PORTAL_ACTIVE" ]; then
 fi
 mv "$STAGE" "$DEST" || fail 'revision_prepare'
 STAGE=''
-LINK="$PORTAL_RUNTIME/.active-$"
+LINK="$PORTAL_RUNTIME/.active-$$"
 rm -f "$LINK"
 if ! ln -s "revisions/${DEST##*/}" "$LINK"; then
  rm -rf "$DEST" 2>/dev/null || true
