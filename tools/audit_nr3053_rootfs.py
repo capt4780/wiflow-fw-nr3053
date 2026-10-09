@@ -35,7 +35,7 @@ def inspect(path: Path):
         fs = td / "fs"
         squashfs = td / "image.squashfs"
         squashfs.write_bytes(payload)
-        command = ["unsquashfs", "-no-progress", "-d", str(fs), str(squashfs)]
+        # Extract only read-only system trees; never create /dev character nodes\n        # as an unprivileged CI runner. This is intentional, not error suppression.\n        command = ["unsquashfs", "-no-progress", "-d", str(fs),\n                   str(squashfs), "bin", "sbin", "etc", "lib", "usr", "www"]
         probe = subprocess.run(["unsquashfs", "-s", str(squashfs)],
                                capture_output=True, text=True, timeout=30)
         print("SQUASHFS_HEADER_PROBE=" + json.dumps({
