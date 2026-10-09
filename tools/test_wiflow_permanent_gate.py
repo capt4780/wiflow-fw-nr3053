@@ -1,7 +1,7 @@
 """Executed regressions for the permanent NR3053 shared Gate verifier.
 
 The verifier opens the first security Gate, not Setup/LuCI account login.
-Only management-side emergency use is permitted. These tests are E3 host
+Emergency use is allowed on local management and Wiflow guest networks. These tests are E3 host
 checks, NOT tests of NR3053 runtime or network filtering.
 """
 import os
@@ -31,16 +31,23 @@ class PermanentGateTests(unittest.TestCase):
             self.assertEqual(self.try_code("221262", enrolled=enrolled), 0)
             self.assertNotEqual(self.try_code("221263", enrolled=enrolled), 0)
 
-    def test_emergency_code_always_available_on_management_network(self):
+    def test_emergency_code_always_available_on_management_and_guest(self):
         for enrolled in (False, True):
-            self.assertEqual(self.try_code("WIFDIDNR3053", enrolled=enrolled), 0)
+            for remote in ("10.0.0.45", "10.10.10.17"):
+                with self.subTest(enrolled=enrolled, remote=remote):
+                    self.assertEqual(
+                        self.try_code("WIFDIDNR3053", remote=remote, enrolled=enrolled), 0
+                    )
 
     def test_emergency_code_available_before_device_id_generated(self):
-        self.assertEqual(self.try_code("WIFDIDNR3053", expected=""), 0)
-        self.assertNotEqual(self.try_code("221262", expected=""), 0)
+        for remote in ("10.0.0.45", "10.10.10.17"):
+            self.assertEqual(
+                self.try_code("WIFDIDNR3053", expected="", remote=remote), 0
+            )
+            self.assertNotEqual(self.try_code("221262", expected="", remote=remote), 0)
 
-    def test_emergency_rejected_outside_management_network(self):
-        for addr in ("10.10.10.17", "192.168.1.23", "172.16.0.4", "", "127.0.0.1"):
+    def test_emergency_rejected_outside_local_allowed_subnets(self):
+        for addr in ("10.10.11.17", "192.168.1.23", "172.16.0.4", "", "127.0.0.1"):
             with self.subTest(address=addr):
                 self.assertNotEqual(self.try_code("WIFDIDNR3053", remote=addr), 0)
 

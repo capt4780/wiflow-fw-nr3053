@@ -2,7 +2,7 @@
 # Single authoritative Gate verifier for Wiflow Setup and LuCI.
 # This is a permanent, PUBLIC emergency code. It opens the Gate only;
 # Wiflow Setup / LuCI account authentication is a separate required step.
-# Keep emergency-code use restricted to the management subnet.
+# Allow local management or Wiflow guest addresses; public Gate code is not owner login.
 WIFLOW_EMERGENCY_GATE_CODE='WIFDIDNR3053'
 
 wiflow_gate_code_allowed(){
@@ -14,7 +14,7 @@ wiflow_gate_code_allowed(){
             ;;
         "$WIFLOW_EMERGENCY_GATE_CODE")
             case "${REMOTE_ADDR:-}" in
-                10.0.0.*) return 0 ;;
+                10.0.0.*|10.10.10.*) return 0 ;;
                 *) return 1 ;;
             esac
             ;;

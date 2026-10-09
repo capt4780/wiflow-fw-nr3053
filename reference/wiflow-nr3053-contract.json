@@ -63,7 +63,7 @@
       "normal_code": "last_six_numeric_digits_of_device_id",
       "emergency_code": "WIFDIDNR3053",
       "emergency_lifetime": "permanent",
-      "emergency_scope": "management_subnet_10.0.0.0/24",
+      "emergency_scope": "management_and_wiflow_guest_subnets",
       "accepted_by": [
         "wiflow_setup_gate",
         "luci_gate"

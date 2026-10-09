@@ -77,6 +77,19 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertIn("wiflow_gate_code_allowed", SETUPGATE.read_text())
         self.assertIn("wiflow_gate_code_allowed", LUCIGATE.read_text())
 
+    def test_guest_emergency_code_passes_both_gate_handlers(self):
+        verifier = VERIFIER.read_text()
+        for ip in ("10.10.10.100", "10.10.10.249"):
+            run = subprocess.run(
+                ["sh", "-c", verifier + '\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
+                env={**os.environ, "REMOTE_ADDR": ip,
+                     "ENTERED": "WIFDIDNR3053", "PIN": ""},
+                capture_output=True, text=True, timeout=5,
+            )
+            self.assertEqual(run.returncode, 0, f"{ip}: {run.stderr}")
+        self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', SETUPGATE.read_text())
+        self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', LUCIGATE.read_text())
+
     def test_guest_first_enrollment_keeps_gate_and_origin_protection(self):
         enroll = ENROLL.read_text()
         auth = 'check_gate_session >/dev/null 2>&1 || redirect \'/\''
