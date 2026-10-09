@@ -17,6 +17,7 @@ BOOT = SRC / "usr/lib/wiflow/bootstrap"
 LUCIGATE = SRC / "www-wiflow-luci-gate/cgi-bin/unlock"
 SETUPGATE = SRC / "www-wiflow/cgi-bin/gate"
 VERIFIER = SRC / "usr/lib/wiflow/gate-code.sh"
+ENROLL = SRC / "www-wiflow/cgi-bin/enroll"
 LUCINFT = SRC / "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft"
 
 
@@ -72,6 +73,37 @@ class GuestManagementGateTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, f"{ip}: {run.stderr}")
         self.assertIn("wiflow_gate_code_allowed", SETUPGATE.read_text())
         self.assertIn("wiflow_gate_code_allowed", LUCIGATE.read_text())
+
+    def test_guest_first_enrollment_keeps_gate_and_origin_protection(self):
+        enroll = ENROLL.read_text()
+        auth = 'check_gate_session >/dev/null 2>&1 || redirect \'/\''
+        origin = '[ "${HTTP_ORIGIN:-}" = \'http://10.0.0.1\' ]'
+        allow = next(
+            line for line in enroll.splitlines()
+            if 'case "${REMOTE_ADDR:-}" in' in line
+        )
+        self.assertIn('10.0.0.*|10.10.10.*)', allow)
+        self.assertLess(enroll.index(auth), enroll.index(origin))
+        self.assertLess(enroll.index(origin), enroll.index(allow))
+        self.assertLess(enroll.index(allow), enroll.index('lock=/tmp/wiflow-setup-enrollment.lock'))
+        self.assertIn('[ -z "$current" ] || redirect \'/login.html\'', enroll)
+        self.assertIn('setup_set_login "$u" "$p"', enroll)
+        for addr in ("10.0.0.2", "10.10.10.100", "10.10.10.249"):
+            with self.subTest(client=addr):
+                trial = subprocess.run(
+                    ["sh", "-c", 'redirect(){ exit 55; }; ' + allow],
+                    env={**os.environ, "REMOTE_ADDR": addr},
+                    capture_output=True, text=True, timeout=5,
+                )
+                self.assertEqual(trial.returncode, 0, trial.stderr)
+        for addr in ("192.168.1.10", "10.10.11.100", "8.8.8.8", ""):
+            with self.subTest(client=addr):
+                trial = subprocess.run(
+                    ["sh", "-c", 'redirect(){ exit 55; }; ' + allow],
+                    env={**os.environ, "REMOTE_ADDR": addr},
+                    capture_output=True, text=True, timeout=5,
+                )
+                self.assertEqual(trial.returncode, 55, trial.stderr)
 
     def test_no_standalone_ungated_luci_port_in_guest_firewall_rules(self):
         net = COMMON.read_text()
