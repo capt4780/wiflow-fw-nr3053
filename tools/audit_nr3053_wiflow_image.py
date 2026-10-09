@@ -16,6 +16,7 @@ from check_nr3053_fit_reference import fdt_nodes, read_image, u32
 REQUIRED_FILES = (
     "usr/lib/wiflow/bootstrap",
     "usr/lib/wiflow/common.sh",
+    "usr/lib/wiflow/gate-code.sh",
     "usr/lib/wiflow/portal-sync",
     "usr/lib/wiflow/portal-firewall",
     "usr/lib/wiflow/portal-client",
@@ -24,8 +25,13 @@ REQUIRED_FILES = (
     "etc/config/wiflow",
     "www-wiflow/cgi-bin/api",
     "www-wiflow/cgi-bin/gate",
+    "www-wiflow/cgi-bin/login",
+    "www-wiflow/index.html",
     "www-wiflow/cgi-bin/enroll",
     "www-wiflow-luci-gate/cgi-bin/unlock",
+    "www-wiflow-luci-gate/index.html",
+    "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
+    "usr/share/nftables.d/table-pre/25-wiflow-luci-gate-set.nft",
     "www-wiflow-portal/template-image.html",
     "www-wiflow-portal/template-video.html",
     "www-wiflow-portal/template-website.html",
@@ -52,7 +58,7 @@ def audit(path: Path) -> dict:
             raise ValueError("unsquashfs missing from audit runner")
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
-             "usr/lib/wiflow", "etc/init.d/wiflow-setup", "etc/config/wiflow",
+             "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
              "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
@@ -71,7 +77,29 @@ def audit(path: Path) -> dict:
                 issues.append("insecure default Wiflow setup password present")
             for filename, script in (("Setup Gate", gate), ("LuCI Gate", unlock)):
                 if "247365" in script or "master=" in script:
-                    issues.append("static web recovery backdoor in " + filename)
+                    issues.append("legacy Gate code present in " + filename)
+                if ". /usr/lib/wiflow/gate-code.sh" not in script:
+                    issues.append("shared Gate verifier not sourced by " + filename)
+                if 'wiflow_gate_code_allowed "$pin" "$want"' not in script:
+                    issues.append("shared Gate verifier not enforced by " + filename)
+            gate_source = (fs / "usr/lib/wiflow/gate-code.sh").read_text(errors="replace")
+            if "WIFLOW_EMERGENCY_GATE_CODE='WIFDIDNR3053'" not in gate_source:
+                issues.append("wrong permanent emergency Gate policy")
+            setup_form = (fs / "www-wiflow/index.html").read_text(errors="replace")
+            luci_form = (fs / "www-wiflow-luci-gate/index.html").read_text(errors="replace")
+            for filename, form in (("Setup Gate", setup_form), ("LuCI Gate", luci_form)):
+                if 'pattern="([0-9]{6}|WIFDIDNR3053)"' not in form:
+                    issues.append(filename + " form does not accept both PIN formats")
+            guest_enroll = (fs / "www-wiflow/cgi-bin/enroll").read_text(errors="replace")
+            if '10.0.0.*|10.10.10.*)' not in guest_enroll:
+                issues.append("post-Gate Setup enrollment blocks guest IPs")
+            if 'check_gate_session >/dev/null 2>&1' not in guest_enroll:
+                issues.append("Setup enrollment skips Gate cookie validation")
+            luci_nft = (fs / "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft").read_text(errors="replace")
+            if "tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept" not in luci_nft:
+                issues.append("LuCI gated-backend allowlist missing")
+            if "tcp dport 8081 drop" not in luci_nft:
+                issues.append("LuCI gated-backend deny missing")
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
