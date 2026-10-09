@@ -1,0 +1,39 @@
+# Generated build outputs (GitHub Actions artifacts, never Git source)
+output/
+out/
+build/
+dist/
+tmp/
+.cache/
+__pycache__/
+*.py[cod]
+
+# Firmware and proprietary project archives (must not enter this public repo)
+*.itb
+*.ipk
+*.apk
+*.img
+*.bin
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# Private credentials, WordPress deployments, backup data
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+private/
+secrets/
+backups/
+backup/
+wp-content/
+device-media/
+restore/
