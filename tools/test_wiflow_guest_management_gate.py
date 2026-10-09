@@ -79,7 +79,7 @@ class GuestManagementGateTests(unittest.TestCase):
 
     def test_guest_first_enrollment_keeps_gate_and_origin_protection(self):
         enroll = ENROLL.read_text()
-        auth = 'check_gate_session >/dev/null 2>&1 || redirect \'/\''
+        auth = 'claim_gate="$(check_gate_session 2>/dev/null || true)"'
         origin = '[ "${HTTP_ORIGIN:-}" = \'http://10.0.0.1\' ]'
         allow = next(
             line for line in enroll.splitlines()
@@ -90,6 +90,9 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertLess(enroll.index(origin), enroll.index(allow))
         self.assertLess(enroll.index(allow), enroll.index('lock=/tmp/wiflow-setup-enrollment.lock'))
         self.assertIn('[ -z "$current" ] || redirect \'/login.html\'', enroll)
+        self.assertIn('owner_claim_consume "$claim_gate" "$REMOTE_ADDR"', enroll)
+        self.assertLess(enroll.index('owner_claim_consume "$claim_gate"'),
+                        enroll.index('setup_set_login "$u" "$p"'))
         self.assertIn('setup_set_login "$u" "$p"', enroll)
         for addr in ("10.0.0.2", "10.10.10.100", "10.10.10.249"):
             with self.subTest(client=addr):

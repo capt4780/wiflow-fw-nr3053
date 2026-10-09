@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pinned ImmortalWrt wifi-scripts: /etc/rc.button/wps calls /etc/rc.wps/*
+# on ACTION=released. Do not replace the stock WPS button dispatcher.
+# Return nonzero when no first-owner claim exists so other WPS handlers run.
+[ "${BUTTON:-}" = wps ] && [ "${ACTION:-}" = released ] || exit 1
+# WPS long holds belong to stock wireless configuration handlers.
+case "${SEEN:-}" in ''|*[!0-9]*) exit 1 ;; esac
+[ "$SEEN" -lt 3 ] || exit 1
+[ -r /usr/lib/wiflow/owner-claim.sh ] || exit 1
+. /usr/lib/wiflow/owner-claim.sh
+owner_claim_wps
