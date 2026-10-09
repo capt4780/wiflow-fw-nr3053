@@ -36,6 +36,14 @@ class RootShadowProvisioningTests(unittest.TestCase):
             self.assertNotIn("root:::", actual)
             self.assertNotIn("root:1234:", actual)
 
+    def test_other_sha512_password_does_not_masquerade_as_factory_default(self):
+        hashed = subprocess.run(
+            ["openssl", "passwd", "-6", "-salt", "WiflowNR3053", "not-the-default"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        shadow = ROOT_LINE.replace("root::", "root:" + hashed + ":", 1)
+        self.assertEqual(inspect_root_shadow(shadow)[0], "BLOCK")
+
     def test_upstream_drift_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             upstream = Path(tmp) / "upstream"

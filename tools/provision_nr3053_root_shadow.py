@@ -30,7 +30,19 @@ def inspect_root_shadow(text: str) -> tuple[str, str]:
     # digest; do not count empty, !-locked, '*' or plaintext root as PASS.
     if not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", encoded):
         return "BLOCK", "root password empty, disabled or not SHA-512 crypt"
-    return "PASS", "root has nonempty SHA-512 crypt digest (default remains weak)"
+    # The user's specified factory login is root/1234. Validate the hash
+    # *against that actual contract*, not merely the digest's regex shape.
+    salt = encoded.split("$")[2]
+    try:
+        expected = subprocess.run(
+            ["openssl", "passwd", "-6", "-salt", salt, DEFAULT_USER_PASSWORD],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "BLOCK", "cannot validate factory default root crypt digest"
+    if encoded != expected:
+        return "BLOCK", "root hash does not match declared factory default"
+    return "PASS", "root/1234 SHA-512 crypt verified (weak public default)"
 
 
 def provision(upstream: Path, output: Path) -> None:
