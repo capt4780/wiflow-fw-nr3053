@@ -38,6 +38,69 @@ REQUIRED_FILES = (
 )
 
 
+
+def audit_guest_gate_rootfs(fs: Path) -> list[str]:
+    """Assert the BUILT SquashFS contains the declared guest management policy.
+
+    This checks source files embedded in the firmware, not actual nft or
+    network packet behavior on the target device.
+    """
+    files = {
+        "network": "usr/lib/wiflow/common.sh",
+        "captive": "usr/lib/wiflow/portal-firewall",
+        "bootstrap": "usr/lib/wiflow/bootstrap",
+        "luci_guard": "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
+        "luci_gate": "www-wiflow-luci-gate/cgi-bin/unlock",
+        "setup_gate": "www-wiflow/cgi-bin/gate",
+    }
+    texts = {}
+    problems = []
+    for name, rel in files.items():
+        path = fs / rel
+        if not path.is_file():
+            problems.append(f"missing guest Gate component: {rel}")
+        else:
+            texts[name] = path.read_text(encoding="utf-8", errors="replace")
+    if problems:
+        return problems
+    for expected in (
+        "uci set firewall.wiflow_guest.input='REJECT'",
+        "uci set firewall.wiflow_guest_setup.src='wiflow_guest'",
+        "uci set firewall.wiflow_guest_setup.dest_ip='10.0.0.1'",
+        "uci set firewall.wiflow_guest_setup.dest_port='80'",
+        "uci set firewall.wiflow_guest_setup.target='ACCEPT'",
+        "uci set firewall.wiflow_guest_gate.src='wiflow_guest'",
+        "uci set firewall.wiflow_guest_gate.dest_ip='10.0.0.2'",
+        "uci set firewall.wiflow_guest_gate.dest_port='80'",
+        "uci set firewall.wiflow_guest_gate.target='ACCEPT'",
+    ):
+        if expected not in texts["network"]:
+            problems.append(f"guest Gate firewall rule missing: {expected}")
+    for target in ("10.0.0.1", "10.0.0.2"):
+        expected = f"ip saddr 10.10.10.0/24 ip daddr {target} return"
+        if expected not in texts["captive"]:
+            problems.append(f"captive redirect exception missing: {target}")
+    if "ip saddr 10.10.10.0/24 tcp dport 80 redirect to :2080" not in texts["captive"]:
+        problems.append("guest captive fallback redirect missing")
+    guard = texts["luci_guard"].splitlines()
+    if guard != [
+        "ip daddr 10.0.0.2 tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept",
+        "ip daddr 10.0.0.2 tcp dport 8081 drop",
+    ]:
+        problems.append("LuCI post-Gate input guard differs from reviewed policy")
+    for key, token in (
+        ("bootstrap", "uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80'"),
+        ("bootstrap", "uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80'"),
+        ("bootstrap", "uci add_list uhttpd.main.listen_http='10.0.0.2:8081'"),
+        ("luci_gate", 'wiflow_gate_code_allowed "$pin" "$want"'),
+        ("setup_gate", 'wiflow_gate_code_allowed "$pin" "$want"'),
+        ("luci_gate", "nft add element inet fw4 wiflow_luci_allowed4"),
+    ):
+        if token not in texts[key]:
+            problems.append(f"guest Gate web/gating path missing: {key}: {token}")
+    return problems
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -100,6 +163,7 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend allowlist missing")
             if "tcp dport 8081 drop" not in luci_nft:
                 issues.append("LuCI gated-backend deny missing")
+            issues.extend(audit_guest_gate_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
