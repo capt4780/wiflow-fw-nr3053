@@ -104,7 +104,7 @@ uci(){
                         enroll.index('setup_set_login "$u" "$p"'))
         self.assertIn('owner_claim_arm "$claim_gate" "$REMOTE_ADDR"', arm)
         self.assertIn("[ \"$HTTP_ORIGIN\" = 'http://10.0.0.1' ]", arm)
-        self.assertIn('[ "$BUTTON" = wps ]', button)
+        self.assertIn('[ "${BUTTON:-}" = wps ]', button)
         self.assertIn('[ "${ACTION:-}" = released ]', button)
         self.assertIn('owner_claim_wps', button)
         self.assertNotIn("|| true", button)

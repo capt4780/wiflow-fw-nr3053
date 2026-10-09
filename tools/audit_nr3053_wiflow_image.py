@@ -192,8 +192,8 @@ def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
             "owner_claim_wps(){", "owner_claim_consume(){",
         ),
         "button": (
-            '[ "$BUTTON" = wps ]',
-            '[ "$ACTION" = released ]',
+            '[ "${BUTTON:-}" = wps ]',
+            '[ "${ACTION:-}" = released ]',
             "owner_claim_wps",
         ),
         "init": (
