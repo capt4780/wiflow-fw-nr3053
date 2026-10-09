@@ -13,6 +13,23 @@ validate_session(){
 }
 [ "${REQUEST_METHOD:-GET}" = POST ] && read_body || BODY=''
 action="$(param action 2>/dev/null || true)"
+# Authorization and telemetry are state-changing operations. GET
+# query parameters must never grant Internet access. The confirmation must
+# be an actual POST form body; an empty POST must not fall back to QUERY_STRING
+# through common.sh:param(). No strict Origin check: some captive browsers and
+# intercepted probe flows omit/change Origin. Session/IP/firewall checks remain.
+case "$action" in
+ authorize|event)
+  if [ "${REQUEST_METHOD:-}" != POST ]; then
+   printf 'Status: 405 Method Not Allowed\r\nAllow: POST\r\nCache-Control: no-store\r\n\r\n'
+   exit 0
+  fi
+  if [ -z "$BODY" ]; then
+   printf 'Status: 400 Bad Request\r\nCache-Control: no-store\r\n\r\n'
+   exit 0
+  fi
+  ;;
+esac
 case "$action" in
  authorize)
   sid="$(param session_id 2>/dev/null || true)"; validate_session "$sid" || { printf 'Status: 403 Forbidden\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
