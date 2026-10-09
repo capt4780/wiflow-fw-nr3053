@@ -84,7 +84,7 @@ class GuestManagementGateTests(unittest.TestCase):
                 with self.subTest(ip=ip, entered=entered):
                     r = subprocess.run(
                         ["sh", "-c",
-                         verifier + '\\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
+                         verifier + '\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
                         env={**os.environ, "REMOTE_ADDR": ip,
                              "ENTERED": entered, "PIN": "221262"},
                         capture_output=True, text=True, timeout=5,
