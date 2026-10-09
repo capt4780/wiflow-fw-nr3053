@@ -1,1 +1,24 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wiflow - Thiết lập đăng nhập</title><link rel="stylesheet" href="/assets/setup-v1.css"></head><body><main class="wf-shell wf-auth-shell"><section class="wf-card wf-auth-card"><h1 class="wf-title">Thiết lập tài khoản</h1><div id="err" class="wf-error" hidden>Mật khẩu không hợp lệ hoặc không trùng khớp.</div><form method="post" action="/cgi-bin/enroll" autocomplete="off"><label for="username">Tài khoản</label><input id="username" class="wf-input" name="username" value="wiflow" readonly required><label for="password">Mật khẩu mới (tối thiểu 12 ký tự)</label><input id="password" class="wf-input" name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required><label for="confirm_password">Nhập lại mật khẩu</label><input id="confirm_password" class="wf-input" name="confirm_password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required><button class="wf-btn primary wf-full" type="submit">Thiết lập</button></form></section></main><script>fetch('/cgi-bin/gate-status',{cache:'no-store',credentials:'same-origin'}).then(r=>r.json()).then(x=>{if(x.authenticated)location.replace('/setup.html');else if(!x.unlocked)location.replace('/');else if(!x.setup_required)location.replace('/login.html')}).catch(()=>location.replace('/'));if(location.search.includes('error=1'))document.getElementById('err').hidden=false;</script></body></html>
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wiflow - Thiết lập đăng nhập</title><link rel="stylesheet" href="/assets/setup-v1.css"></head>
+<body><main class="wf-shell wf-auth-shell"><section class="wf-card wf-auth-card">
+<h1 class="wf-title">Thiết lập tài khoản</h1>
+<div id="err" class="wf-error" hidden>Không thể thiết lập: kiểm tra mật khẩu hoặc xác minh lại bằng nút WPS vật lý.</div>
+<p>Lần đầu thiết lập, bạn phải có mặt cạnh NR3053. Nhấn ngắn rồi thả nút <strong>WPS</strong>, không nhấn Reset.</p>
+<button id="arm" class="wf-btn wf-full" type="button">1. Bắt đầu xác minh</button>
+<p id="claim-status" role="status" aria-live="polite">Bắt đầu xác minh, sau đó nhấn ngắn rồi thả WPS trên router trong vòng 60 giây.</p>
+<form method="post" action="/cgi-bin/enroll" autocomplete="off">
+<label for="username">Tài khoản</label><input id="username" class="wf-input" name="username" value="wiflow" readonly required>
+<label for="password">Mật khẩu mới (tối thiểu 12 ký tự)</label><input id="password" class="wf-input" name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+<label for="confirm_password">Nhập lại mật khẩu</label><input id="confirm_password" class="wf-input" name="confirm_password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+<button id="enroll-submit" class="wf-btn primary wf-full" type="submit" disabled>2. Sau khi nhấn WPS — Thiết lập</button>
+</form></section></main>
+<script>
+fetch('/cgi-bin/gate-status',{cache:'no-store',credentials:'same-origin'}).then(r=>r.json()).then(x=>{if(x.authenticated)location.replace('/setup.html');else if(!x.unlocked)location.replace('/');else if(!x.setup_required)location.replace('/login.html')}).catch(()=>location.replace('/'));
+if(location.search.includes('error=1')||location.search.includes('physical=1'))document.getElementById('err').hidden=false;
+const arm=document.getElementById('arm'), submit=document.getElementById('enroll-submit'), status=document.getElementById('claim-status');
+arm.addEventListener('click',async()=>{arm.disabled=true;submit.disabled=true;status.textContent='Đang mở yêu cầu...';
+try{const r=await fetch('/cgi-bin/claim-arm',{method:'POST',credentials:'same-origin',cache:'no-store'}),x=await r.json();if(!x.ok)throw Error(x.error);
+submit.disabled=false;status.textContent='Hãy nhấn WPS trên NR3053 trong 60 giây, sau đó chọn Thiết lập. Nếu hết hạn, bắt đầu lại.';
+}catch(e){status.textContent='Không thể bắt đầu; kiểm tra kết nối hoặc phiên thiết lập khác rồi thử lại.';}
+finally{arm.disabled=false;}});
+</script></body></html>

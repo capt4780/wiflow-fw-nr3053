@@ -22,6 +22,9 @@ REQUIRED_FILES = (
     "usr/lib/wiflow/portal-firewall",
     "usr/lib/wiflow/portal-client",
     "usr/lib/wiflow/heartbeat-loop",
+    "usr/lib/wiflow/owner-claim.sh",
+    "etc/rc.wps/00-wiflow-first-owner",
+    "www-wiflow/cgi-bin/claim-arm",
     "etc/init.d/wiflow-setup",
     "etc/config/wiflow",
     "www-wiflow/cgi-bin/api",
@@ -151,7 +154,7 @@ def audit(path: Path) -> dict:
             raise ValueError("unsquashfs missing from audit runner")
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
-             "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
+             "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/rc.wps", "etc/init.d/wiflow-setup", "etc/config/wiflow",
              "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
@@ -186,8 +189,20 @@ def audit(path: Path) -> dict:
             guest_enroll = (fs / "www-wiflow/cgi-bin/enroll").read_text(errors="replace")
             if '10.0.0.*|10.10.10.*)' not in guest_enroll:
                 issues.append("post-Gate Setup enrollment blocks guest IPs")
-            if 'check_gate_session >/dev/null 2>&1' not in guest_enroll:
+            if 'claim_gate="$(check_gate_session' not in guest_enroll:
                 issues.append("Setup enrollment skips Gate cookie validation")
+            if 'owner_claim_consume "$claim_gate" "$REMOTE_ADDR"' not in guest_enroll or (
+                'setup_set_login "$u" "$p"' in guest_enroll and
+                guest_enroll.index('owner_claim_consume "$claim_gate" "$REMOTE_ADDR"')
+                > guest_enroll.index('setup_set_login "$u" "$p"')
+            ):
+                issues.append("physical WPS authorization missing before first account claim")
+            arm = (fs / "www-wiflow/cgi-bin/claim-arm").read_text(errors="replace")
+            wps = (fs / "etc/rc.wps/00-wiflow-first-owner").read_text(errors="replace")
+            if 'owner_claim_arm "$claim_gate" "$REMOTE_ADDR"' not in arm:
+                issues.append("first-owner arm endpoint not bound to Gate session/IP")
+            if '[ "${ACTION:-}" = released ]' not in wps or 'owner_claim_wps' not in wps:
+                issues.append("physical WPS release hook absent or unverified")
             luci_nft = (fs / "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft").read_text(errors="replace")
             if "tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept" not in luci_nft:
                 issues.append("LuCI gated-backend allowlist missing")
