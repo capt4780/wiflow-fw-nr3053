@@ -1,0 +1,11 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+check_gate_session >/dev/null 2>&1 || redirect '/'
+[ "${REQUEST_METHOD:-}" = POST ] || redirect '/login.html'
+read_body
+u="$(param username 2>/dev/null || true)"; p="$(param password 2>/dev/null || true)"
+client="${REMOTE_ADDR:-unknown}"; safe="$(printf '%s' "$client" | tr -cd '0-9A-Za-z_.-' | tr '.' '_')"; ff="/tmp/wiflow-login-$safe"; now="$(date +%s)"; count=0; until=0
+[ -f "$ff" ] && read count until < "$ff" 2>/dev/null || true; case "$count" in ''|*[!0-9]*) count=0;; esac; case "$until" in ''|*[!0-9]*) until=0;; esac
+[ "$now" -ge "$until" ] || { sleep 1; redirect '/login.html?error=1'; }
+if setup_check_login "$u" "$p"; then rm -f "$ff"; s="$(make_session)" || redirect '/login.html?error=1'; t="${s%%|*}"; printf 'Status: 302 Found\r\nLocation: /setup.html\r\nSet-Cookie: WFSESSION=%s; Path=/; HttpOnly; SameSite=Strict\r\nCache-Control: no-store\r\n\r\n' "$t"; exit 0; fi
+count=$((count+1)); if [ "$count" -ge 5 ]; then count=0; until=$((now+300)); fi; printf '%s %s\n' "$count" "$until" > "$ff"; sleep 1; redirect '/login.html?error=1'

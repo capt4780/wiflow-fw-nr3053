@@ -1,0 +1,18 @@
+{
+  "phase": "PUBLIC_SOURCE_CANDIDATE_ONLY",
+  "release": "BLOCK",
+  "source_files": 43,
+  "shell_syntax_pass": 26,
+  "binary_in_public_source": false,
+  "default_password_removed": true,
+  "remote_emergency_bypass_removed": true,
+  "device_model": "Viettel NR3053",
+  "fonts_and_logo_assets_removed": true,
+  "remaining_gates": [
+    "First-boot management/wifi hardware E5",
+    "Gate recovery physically protected",
+    "WP immutable media revisions",
+    "Actual APK compile",
+    "Captive portal runtime E5"
+  ]
+}

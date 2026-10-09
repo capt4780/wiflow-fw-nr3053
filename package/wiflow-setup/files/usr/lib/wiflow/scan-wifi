@@ -1,0 +1,30 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+band="${1:-5g}"
+case "$band" in 2g|5g) :;; *) exit 2;; esac
+OUT=/tmp/wiflow-scan.out
+: > "$OUT"
+for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do
+    [ "$(radio_band "$r")" = "$band" ] || continue
+    tmp="/tmp/wiflow-scan-$r.$$"
+    ( iwinfo "$r" scan > "$tmp" 2>/dev/null ) & p=$!
+    ( sleep 7; kill "$p" 2>/dev/null ) & w=$!
+    wait "$p" 2>/dev/null || true
+    kill "$w" 2>/dev/null || true
+    awk -v radio="$r" -v band="$band" '
+      /Cell [0-9]+ - Address:/ {b=$0; sub(/^.*Address: /,"",b); gsub(/[[:space:]]+$/,"",b)}
+      /ESSID: / {s=$0; sub(/^.*ESSID: \"/,"",s); sub(/\".*$/,"",s)}
+      /Encryption: / {
+        e=$0; sub(/^.*Encryption: /,"",e); enc="psk2";
+        if(e ~ /none|None/) enc="none";
+        else if(e ~ /WPA3|SAE/) enc="sae-mixed";
+        else if(e ~ /WPA[^2]/) enc="psk";
+        if(s!="") {print radio "\t" band "\t" s "\t" b "\t" enc; s=""; b=""}
+      }
+    ' "$tmp" >> "$OUT" 2>/dev/null || true
+    rm -f "$tmp"
+done
+# Keep same SSID on different BSSID entries; only remove exact duplicate radio+SSID+BSSID.
+awk -F '\t' '!seen[$1 FS $3 FS $4]++ && $3!="" {print}' "$OUT" > "$OUT.uniq" 2>/dev/null || true
+mv "$OUT.uniq" "$OUT" 2>/dev/null || true

@@ -1,0 +1,22 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+check_gate_session >/dev/null 2>&1 || redirect '/'
+[ "${REQUEST_METHOD:-}" = POST ] || redirect '/enroll.html'
+[ "${HTTP_ORIGIN:-}" = 'http://10.0.0.1' ] || redirect '/enroll.html?error=1'
+case "${REMOTE_ADDR:-}" in 10.0.0.*) :;; *) redirect '/enroll.html?error=1';; esac
+# First claim is serialized to prevent multiple passwords racing.
+lock=/tmp/wiflow-setup-enrollment.lock
+mkdir "$lock" 2>/dev/null || redirect '/enroll.html?error=1'
+trap 'rmdir "$lock" 2>/dev/null || true' EXIT
+current="$(uci -q get wiflow.core.setup_password_hash 2>/dev/null || true)"
+[ -z "$current" ] || redirect '/login.html'
+read_body
+u="$(param username 2>/dev/null || true)"
+p="$(param password 2>/dev/null || true)"
+p2="$(param confirm_password 2>/dev/null || true)"
+[ -n "$p" ] && [ "$p" = "$p2" ] || redirect '/enroll.html?error=1'
+[ "$u" = wiflow ] || redirect '/enroll.html?error=1'
+setup_set_login "$u" "$p" || redirect '/enroll.html?error=1'
+session="$(make_session)" || redirect '/login.html'
+t="${session%%|*}"
+printf 'Status: 302 Found\r\nLocation: /setup.html\r\nSet-Cookie: WFSESSION=%s; Path=/; HttpOnly; SameSite=Strict\r\nCache-Control: no-store\r\n\r\n' "$t"

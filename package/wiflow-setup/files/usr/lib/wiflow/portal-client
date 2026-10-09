@@ -1,0 +1,129 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+mode="${1:-}"
+value="${2:-}"
+expected_client="${3:-}"
+
+log_client_event(){
+    event="$1"; sid="${2:-}"; code="${3:-}"
+    shash="$(printf '%s' "$sid" | sha256sum | awk '{print substr($1,1,12)}')"
+    logger -t wiflow-portal "event=$event session=$shash code=$code" 2>/dev/null || true
+}
+
+lock_path=''
+acquire_session_lock(){
+    sid="$1"; safe="$(printf '%s' "$sid" | tr -cd 'A-Za-z0-9._-')"; [ -n "$safe" ] || return 1
+    lock_path="/tmp/wiflow-client-lock-$safe"
+    tries=0
+    while ! mkdir "$lock_path" 2>/dev/null; do
+        owner="$(cat "$lock_path/pid" 2>/dev/null || true)"
+        case "$owner" in ''|*[!0-9]*) owner=0;; esac
+        if [ "$owner" -eq 0 ] || ! kill -0 "$owner" 2>/dev/null; then rm -rf "$lock_path" 2>/dev/null || true; continue; fi
+        tries=$((tries+1)); [ "$tries" -lt 5 ] || return 1; sleep 1
+    done
+    printf '%s\n' "$$" > "$lock_path/pid" 2>/dev/null || true
+    return 0
+}
+release_session_lock(){ [ -n "$lock_path" ] && rm -rf "$lock_path" 2>/dev/null || true; lock_path=''; }
+
+flush_captive_conntrack(){
+    ipx="$1"
+    command -v conntrack >/dev/null 2>&1 || return 0
+    conntrack -D -s "$ipx" -p tcp --dport 80 >/dev/null 2>&1 || true
+}
+
+case "$mode" in
+ensure)
+    ip="$value"; valid_guest_ip "$ip" || exit 2
+    mac="$(guest_mac_for_ip "$ip" 2>/dev/null || true)"; [ -n "$mac" ] || exit 1
+    f="$(client_file_for_mac "$mac")" || exit 1; now="$(date +%s)"
+    cid=''; sid=''; oldip=''; connected=''; authorized=0; last=''; absent=0
+    if [ -f "$f" ]; then
+        IFS='|' read -r _mac cid sid oldip connected authorized last absent < "$f" 2>/dev/null || true
+        [ -n "${sid:-}" ] || rm -f "$f"
+    fi
+    if [ ! -f "$f" ]; then
+        cid="$(client_id_for_mac "$mac")"; sid="$(new_token | cut -c1-24)"; connected="$now"; authorized=0
+        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0 || exit 1
+        event_enqueue connected "$cid" "$sid" "$now" || true
+        log_client_event connected "$sid" ok
+    else
+        if [ "${authorized:-0}" != 0 ]; then
+            [ -z "$oldip" ] || [ "$oldip" = "$ip" ] || portal_nft_del "$oldip" "$mac"
+            if ! portal_nft_add "$ip" "$mac"; then log_client_event policy_restore_failed "$sid" nft; fi
+        fi
+        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0 || exit 1
+    fi
+
+    # Stage 3 is a REAL router-side grant. Validate WAN + captive firewall,
+    # then place this exact IP/MAC pair in the grant set. The grant set is not
+    # used by forwarding rules, therefore Internet remains closed until CTA.
+    if [ "${authorized:-0}" = 0 ] && ! portal_nft_pair_granted "$ip" "$mac"; then
+        if portal_nft_ready && internet_probe_fast; then
+            if portal_nft_grant_add "$ip" "$mac"; then
+                : > "$HEARTBEAT_KICK" 2>/dev/null || true
+                log_client_event access_granted "$sid" verified
+            else
+                log_client_event access_grant_failed "$sid" nft
+            fi
+        fi
+    fi
+    printf '%s|%s\n' "$cid" "$sid"
+    ;;
+authorize-session)
+    sid="$value"; [ -n "$sid" ] || exit 2
+    acquire_session_lock "$sid" || { log_client_event authorize_busy "$sid" lock; exit 3; }
+    trap 'release_session_lock' EXIT HUP INT TERM
+    f="$(client_find_file_by_session "$sid" 2>/dev/null || true)"; [ -n "$f" ] && [ -f "$f" ] || { log_client_event authorize_failed "$sid" session_missing; exit 1; }
+    IFS='|' read -r mac cid stored_sid ip connected authorized last absent < "$f" 2>/dev/null || exit 1
+    [ "$stored_sid" = "$sid" ] || exit 1
+    [ -z "$expected_client" ] || [ "$expected_client" = "$cid" ] || { log_client_event authorize_failed "$sid" client_mismatch; exit 1; }
+    valid_guest_ip "$ip" || { log_client_event authorize_failed "$sid" invalid_ip; exit 1; }
+    portal_nft_ready || { log_client_event authorize_failed "$sid" firewall_unavailable; exit 1; }
+    portal_nft_pair_granted "$ip" "$mac" || { log_client_event authorize_failed "$sid" grant_missing; exit 6; }
+
+    # All heavy checks are complete before READY_TO_OPEN. CTA is atomic:
+    # add exact IP+MAC to the authorized bypass set and return immediately.
+    if [ "${authorized:-0}" != 0 ] && portal_nft_pair_authorized "$ip" "$mac"; then exit 0; fi
+    now="$(date +%s)"
+    portal_nft_add "$ip" "$mac" || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
+    portal_nft_pair_authorized "$ip" "$mac" || { log_client_event authorize_failed "$sid" policy_verify; exit 5; }
+    portal_nft_grant_del "$ip" "$mac"
+
+    # Persist authorization before clearing stale captive NAT state so any
+    # immediate Android connectivity re-probe is recognized as authorized.
+    newly_authorized=0
+    if [ "${authorized:-0}" = 0 ]; then authorized="$now"; newly_authorized=1; fi
+    client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0 || exit 1
+
+    # A pre-auth HTTP probe may still have a conntrack/NAT entry redirected to
+    # :2080. Remove it best-effort so the next probe is evaluated against the
+    # new authorized set immediately. No hard conntrack dependency is added.
+    flush_captive_conntrack "$ip"
+
+    [ "$newly_authorized" = 0 ] || event_enqueue authorized "$cid" "$sid" "$now" || true
+    : > "$HEARTBEAT_KICK" 2>/dev/null || true
+    log_client_event authorized "$sid" policy_applied_immediately
+    exit 0
+    ;;
+revoke-session)
+    sid="$value"; [ -n "$sid" ] || exit 2
+    acquire_session_lock "$sid" || exit 3
+    trap 'release_session_lock' EXIT HUP INT TERM
+    f="$(client_find_file_by_session "$sid" 2>/dev/null || true)"; [ -n "$f" ] && [ -f "$f" ] || exit 0
+    IFS='|' read -r mac cid stored_sid ip connected authorized last absent < "$f" 2>/dev/null || exit 0
+    portal_nft_del "$ip" "$mac"
+    portal_nft_grant_del "$ip" "$mac"
+    now="$(date +%s)"; client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" 0 "$now" "${absent:-0}" || true
+    : > "$HEARTBEAT_KICK" 2>/dev/null || true
+    log_client_event revoked "$sid" ok
+    ;;
+is-authorized)
+    sid="$value"; f="$(client_find_file_by_session "$sid" 2>/dev/null || true)"; [ -n "$f" ] && [ -f "$f" ] || exit 1
+    IFS='|' read -r mac _cid _sid ip _connected authorized _last _absent < "$f" 2>/dev/null || exit 1
+    [ "${authorized:-0}" != 0 ] || exit 1
+    portal_nft_pair_authorized "$ip" "$mac"
+    ;;
+*) exit 2;;
+esac

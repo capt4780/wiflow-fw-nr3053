@@ -1,0 +1,81 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+MODE="${1:-disable}"
+NFT_DIR=/usr/share/nftables.d/table-post
+NFT_FILE="$NFT_DIR/30-wiflow-captive.nft"
+
+write_rules(){
+ mkdir -p "$NFT_DIR" || return 1
+ cat > "$NFT_FILE.tmp" <<'NFT'
+set wiflow_portal_authed { type ipv4_addr . ether_addr; flags timeout; timeout 30d; }
+set wiflow_portal_granted { type ipv4_addr . ether_addr; flags timeout; timeout 30m; }
+set wiflow_portal_web4 { type ipv4_addr; }
+chain wiflow_portal_prerouting {
+ type nat hook prerouting priority -110; policy accept;
+ ip saddr 10.10.10.0/24 ip daddr 10.0.0.1 return
+ ip saddr 10.10.10.0/24 ip daddr 10.0.0.2 return
+ ip saddr . ether saddr @wiflow_portal_authed return
+ ip saddr 10.10.10.0/24 ip daddr @wiflow_portal_web4 return
+ ip saddr 10.10.10.0/24 tcp dport 80 redirect to :2080
+}
+chain wiflow_portal_forward {
+ type filter hook forward priority -10; policy accept;
+ ip saddr . ether saddr @wiflow_portal_authed return
+ ip saddr 10.10.10.0/24 tcp dport 853 accept
+ ip saddr 10.10.10.0/24 udp dport 853 accept
+ ip saddr 10.10.10.0/24 ip daddr @wiflow_portal_web4 tcp dport { 80, 443 } accept
+ ip saddr 10.10.10.0/24 reject
+}
+NFT
+ mv "$NFT_FILE.tmp" "$NFT_FILE" || return 1
+ chmod 600 "$NFT_FILE" 2>/dev/null || true
+}
+
+resolve_website_ips(){
+ cfg="$(portal_active_config)"; [ -n "$cfg" ] || return 1
+ mode="$(uci -q get wiflow.core.portal_mode 2>/dev/null || true)"; case "$mode" in website|image|video) :;; *) mode="$(jsonfilter -i "$cfg" -e '@.mode' 2>/dev/null || true)";; esac; [ "$mode" = website ] || return 1
+ url="$(jsonfilter -i "$cfg" -e '@.website_url' 2>/dev/null || true)"; website_url_valid "$url" || return 1
+ host="$(website_host_from_url "$url")"; [ -n "$host" ] || return 1
+ tmp="/tmp/wiflow-web-dns.$$"; : > "$tmp"
+ nslookup "$host" 2>/dev/null | awk '/^Name:[[:space:]]*/{seen=1;next} seen&&/^Address[[:space:]]*[0-9]*:[[:space:]]*/{ip=$0;sub(/^Address[[:space:]]*[0-9]*:[[:space:]]*/,"",ip);print ip} seen&&/^Address:[[:space:]]*/{ip=$0;sub(/^Address:[[:space:]]*/,"",ip);print ip}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sort -u > "$tmp" 2>/dev/null || true
+ [ -s "$tmp" ] || { rm -f "$tmp"; return 1; }
+ cat "$tmp"; rm -f "$tmp"
+}
+
+refresh(){
+ /usr/sbin/nft list set inet fw4 wiflow_portal_web4 >/dev/null 2>&1 || return 1
+ /usr/sbin/nft flush set inet fw4 wiflow_portal_web4 >/dev/null 2>&1 || return 1
+ ips="$(resolve_website_ips 2>/dev/null || true)"
+ [ -n "$ips" ] || { state_set website_walled_garden 0; return 0; }
+ for ip in $ips; do printf 'add element inet fw4 wiflow_portal_web4 { %s }\n' "$ip" | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1; done
+ state_set website_walled_garden 1
+ return 0
+}
+
+enable(){
+ write_rules || return 1
+ uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
+ uci set firewall.wiflow_guest_portal='rule'; uci set firewall.wiflow_guest_portal.name='Wiflow-Captive-Portal'; uci set firewall.wiflow_guest_portal.src='wiflow_guest'; uci set firewall.wiflow_guest_portal.proto='tcp'; uci set firewall.wiflow_guest_portal.dest_port='2080'; uci set firewall.wiflow_guest_portal.target='ACCEPT'; uci commit firewall || return 1
+ /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
+ portal_nft_ready || return 1
+ refresh || true
+ state_set portal_error ''
+ return 0
+}
+
+ensure(){
+ # Fast path: the captive sets/chains already exist. Do NOT reload fw4 here;
+ # this command is called from the 2-second mode loop and must be idempotent.
+ if portal_nft_ready && /usr/sbin/nft list chain inet fw4 wiflow_portal_prerouting >/dev/null 2>&1 && /usr/sbin/nft list chain inet fw4 wiflow_portal_forward >/dev/null 2>&1; then
+  return 0
+ fi
+ enable
+}
+
+disable(){
+ changed=0; [ -f "$NFT_FILE" ] && changed=1; uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
+ rm -f "$NFT_FILE" "$NFT_FILE.tmp"; uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true; uci commit firewall >/dev/null 2>&1 || true
+ [ "$changed" = 1 ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
+}
+case "$MODE" in enable) enable;; ensure) ensure;; refresh) refresh;; disable) disable;; *) exit 2;; esac

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Wiflow</title>
+  <link rel="stylesheet" href="/assets/setup-v1.css">
+</head>
+<body>
+  <main class="wf-shell wf-app-shell">
+    <section class="wf-card wf-app-card">
+      <span class="wf-app-logo wf-logo-text">Wiflow</span>
+      <div id="deviceIdBar" class="device-id"><span>ID thiết bị</span><strong class="wf-inline-busy">Đang tải<span class="wf-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></strong></div>
+      <div id="app" class="content"><div class="status is-busy" role="status" aria-live="polite"><span>Đang tải</span><span class="wf-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div></div>
+      <div class="wf-app-footer"><a class="wf-link" href="/cgi-bin/logout">Đăng xuất</a></div>
+    </section>
+  </main>
+  <div id="wifiModal" class="modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-label="Kết nối WiFi">
+      <label id="manualSsidWrap" class="is-hidden">Tên WiFi<input id="wifiSsid" autocomplete="off"></label>
+      <label>Mật khẩu WiFi<input id="wifiPassword" type="password" autocomplete="new-password"></label>
+      <div id="guestWrap" class="is-hidden"><label>Tên WiFi khách<input id="guestSsid" value="Wiflow" autocomplete="off"></label></div>
+      <div id="wifiModalError" class="error" hidden></div>
+      <div class="row"><button class="secondary" id="wifiCancel">Hủy</button><button id="wifiConnect">Kết nối</button></div>
+    </div>
+  </div>
+  <script src="/assets/setup-v1.js"></script>
+</body>
+</html>

@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Wiflow WiFi</title>
+<style>
+
+
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;touch-action:pan-x pan-y}
+body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
+.cp-stage button,.cp-stage a{ -webkit-tap-highlight-color:transparent; }
+.cp-stage{--type-line-title:1.3;--type-line-body:1.62;--type-line-control:1.2;--control-height:44px;--control-font-size:16px;--control-font-weight:600;--control-radius:999px;--control-pad-x:16px;--brand-primary:#424242;--brand-primary-hover:#343434;--brand-secondary:#6F6F6F;--brand-secondary-hover:#4E4E4E;--brand-on-primary:#FFFFFF;--dialog-bg:#F8F8F8;--dialog-text:#292929;--dialog-muted:#707070;--dialog-cancel-bg:#EAEAEA;--dialog-cancel-text:#424242;--dialog-shadow:rgba(0,0,0,.18);--dialog-backdrop:rgba(0,0,0,.42);--terms-backdrop:rgba(0,0,0,.54);--dialog-divider:rgba(0,0,0,.10);position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:#000;isolation:isolate}
+.cp-media-stage,.cp-video-stage,.cp-image-stage,.cp-website-stage{position:absolute;inset:0;z-index:0;width:100%;height:100%;overflow:hidden;background:#000}
+.cp-website-stage{background:#fff}
+.cp-website-frame{display:block;width:100%;height:100%;border:0;background:#fff}
+.cp-video,.cp-image{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:center center;pointer-events:none}.cp-video{opacity:0}.cp-image{opacity:1}
+.cp-video{opacity:0;transition:opacity .4s cubic-bezier(.22,.61,.36,1);will-change:opacity;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.cp-video.is-visual-reset{transition:none!important;opacity:0!important}
+.cp-video.is-active{opacity:1}
+.cp-bottom-shade{position:fixed;left:0;right:0;bottom:0;z-index:5;height:clamp(210px,32vh,340px);pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.06) 24%,rgba(0,0,0,.23) 55%,rgba(0,0,0,.47) 82%,rgba(0,0,0,.62) 100%)}
+.cp-cta-wrap{--cta-icon-size:21px;--cta-cell-size:22px;--cta-gap:7px;--cta-height:47px;--cta-pad-left:12px;--cta-pad-right:19px;--cta-edge:max(clamp(14px,3vmin,32px),env(safe-area-inset-right,0px),env(safe-area-inset-bottom,0px));position:fixed;right:var(--cta-edge);left:auto;bottom:var(--cta-edge);z-index:6;transform:none;display:flex;justify-content:flex-end;pointer-events:none;width:auto;max-width:90vw}
+.cp-cta{appearance:none;-webkit-appearance:none;pointer-events:auto;position:relative;isolation:isolate;overflow:hidden;width:max-content;max-width:90vw;height:var(--cta-height);margin:0;padding:0 var(--cta-pad-right) 0 var(--cta-pad-left);border:1px solid rgba(255,255,255,.24);border-radius:var(--control-radius);background:rgba(255,255,255,.20);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.12);backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);display:grid;grid-template-columns:var(--cta-cell-size) auto;align-items:center;justify-content:center;gap:var(--cta-gap);font-family:inherit;font-weight:var(--control-font-weight);font-size:var(--control-font-size);line-height:var(--type-line-control);letter-spacing:0;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .16s ease,background-color .16s ease,box-shadow .16s ease}
+.cp-cta::before{content:"";position:absolute;z-index:0;top:-105%;bottom:-105%;left:-62%;width:82%;pointer-events:none;background:linear-gradient(115deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.008) 10%,rgba(255,255,255,.025) 22%,rgba(255,255,255,.065) 32%,rgba(255,255,255,.14) 40%,rgba(255,255,255,.24) 46%,rgba(255,255,255,.34) 50%,rgba(255,255,255,.24) 54%,rgba(255,255,255,.14) 60%,rgba(255,255,255,.065) 68%,rgba(255,255,255,.025) 78%,rgba(255,255,255,.008) 90%,rgba(255,255,255,0) 100%);filter:blur(17px);transform:translateX(-285%) skewX(-12deg);animation:cp-cta-light-sweep 2.85s cubic-bezier(.45,0,.55,1) infinite;will-change:transform}
+@keyframes cp-cta-light-sweep{0%{transform:translateX(-285%) skewX(-12deg)}100%{transform:translateX(390%) skewX(-12deg)}}
+.cp-cta-border-orbit{position:absolute;z-index:1;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.cp-cta-orbit-gradient{filter:blur(.46px) drop-shadow(0 0 3.5px rgba(255,255,255,.28))}
+.cp-cta-orbit-segment{fill:none;stroke:#fff;stroke-width:1.72;stroke-opacity:var(--cp-cta-seg-alpha);vector-effect:non-scaling-stroke;stroke-linecap:butt;stroke-dasharray:.447 99.553;will-change:stroke-dashoffset}
+.cp-cta>*:not(.cp-cta-border-orbit){position:relative;z-index:2}
+.cp-cta:hover{background:rgba(255,255,255,.30);box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.cp-cta:active{transform:scale(.985);background:rgba(255,255,255,.34)}
+.cp-cta:focus,.cp-cta:focus-visible{outline:none;outline-offset:0}
+.cp-cta:disabled{cursor:default;opacity:.72;filter:saturate(.8);transform:none}
+.cp-cta-icon{display:flex;width:var(--cta-cell-size);height:var(--cta-cell-size);align-items:center;justify-content:center;color:currentColor;line-height:0}
+.cp-cta-icon svg{display:block;width:var(--cta-icon-size);height:var(--cta-icon-size)}
+.cp-cta-icon--wifi{align-self:center;transform:translateY(-1px)}
+.cp-cta-icon--wifi svg{transform:none}
+.cp-cta-label{display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp-audio-toggle{--audio-edge:max(clamp(14px,3vmin,32px),env(safe-area-inset-top,0px),env(safe-area-inset-right,0px));appearance:none;-webkit-appearance:none;position:fixed;top:var(--audio-edge);right:var(--audio-edge);z-index:7;isolation:isolate;overflow:hidden;width:var(--control-height);height:var(--control-height);padding:0;border:0;border-radius:var(--control-radius);background:rgba(255,255,255,.20);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.12);backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);display:grid;place-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .16s ease,background-color .16s ease,box-shadow .16s ease}
+.cp-audio-toggle::before{content:"";position:absolute;z-index:0;top:-105%;bottom:-105%;left:-62%;width:82%;pointer-events:none;background:linear-gradient(115deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.008) 10%,rgba(255,255,255,.025) 22%,rgba(255,255,255,.065) 32%,rgba(255,255,255,.14) 40%,rgba(255,255,255,.24) 46%,rgba(255,255,255,.34) 50%,rgba(255,255,255,.24) 54%,rgba(255,255,255,.14) 60%,rgba(255,255,255,.065) 68%,rgba(255,255,255,.025) 78%,rgba(255,255,255,.008) 90%,rgba(255,255,255,0) 100%);filter:blur(17px);transform:translateX(-285%) skewX(-12deg);animation:cp-cta-light-sweep 2.85s cubic-bezier(.45,0,.55,1) infinite;will-change:transform}
+.cp-audio-toggle>*{position:relative;z-index:1}
+.cp-audio-toggle:hover{background:rgba(255,255,255,.30);box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.cp-audio-toggle:active{transform:scale(.985);background:rgba(255,255,255,.34)}
+.cp-audio-toggle:focus,.cp-audio-toggle:focus-visible{outline:none;outline-offset:0}
+.cp-audio-icon{display:grid;place-items:center;width:24px;height:24px;line-height:0}
+.cp-audio-icon svg{display:block;width:22px;height:22px}
+.cp-audio-icon--on{display:none}
+.cp-audio-toggle[data-audio-state="on"] .cp-audio-icon--on{display:grid}
+.cp-audio-toggle[data-audio-state="on"] .cp-audio-icon--off{display:none}
+@media (prefers-reduced-motion:reduce){.cp-cta::before,.cp-audio-toggle::before{animation:none;opacity:0}}
+.cp-modal[hidden]{display:none}
+.cp-modal{--modal-edge:clamp(14px,3vmin,24px);position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;height:100dvh;padding:var(--modal-edge);overflow:hidden}
+.cp-modal-backdrop{position:absolute;inset:0;border:0;background:var(--dialog-backdrop);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);cursor:pointer}
+.cp-modal-card{position:relative;z-index:1;flex:0 1 auto;width:min(430px,calc(100vw - (var(--modal-edge) * 2)));max-width:100%;max-height:min(88vh,720px);max-height:min(88dvh,720px);margin:auto;overflow:hidden;border-radius:24px;background:var(--dialog-bg);color:var(--dialog-text);box-shadow:0 22px 70px var(--dialog-shadow);transform-origin:center center}
+@keyframes cp-modal-backdrop-in{from{opacity:0}to{opacity:1}}
+@keyframes cp-modal-card-in{from{opacity:0;transform:translate3d(0,10px,0) scale(.975)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@keyframes cp-modal-video-backdrop-in{from{opacity:0;backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0)}to{opacity:1;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}}
+@keyframes cp-modal-video-card-in{from{opacity:0;transform:translate3d(0,12px,0) scale(.97)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+.cp-modal:not([hidden]) .cp-modal-backdrop{animation:cp-modal-backdrop-in .28s cubic-bezier(.22,1,.36,1) both}
+.cp-modal:not([hidden]) .cp-modal-card{animation:cp-modal-card-in .34s cubic-bezier(.22,1,.36,1) both}
+.cp-modal.is-video-transition:not([hidden]) .cp-modal-backdrop{animation:cp-modal-video-backdrop-in 1s cubic-bezier(.22,.61,.36,1) both}
+.cp-modal.is-video-transition:not([hidden]) .cp-modal-card{animation:cp-modal-video-card-in .72s cubic-bezier(.22,1,.36,1) .16s both}
+@media (prefers-reduced-motion:reduce){.cp-video{transition:none}.cp-modal:not([hidden]) .cp-modal-backdrop,.cp-modal:not([hidden]) .cp-modal-card{animation:none}}
+.cp-modal-slider{position:relative;width:100%;background:#EAEAEA}
+.cp-modal-track{display:flex;width:100%;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-x}
+.cp-modal-track::-webkit-scrollbar{display:none}
+.cp-modal-slide{flex:0 0 100%;width:100%;aspect-ratio:4/3;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden}
+.cp-modal-slide img{display:block;width:100%;height:100%;object-fit:cover;object-position:center center;user-select:none;-webkit-user-drag:none}
+.cp-modal-dots{position:absolute;left:50%;bottom:10px;z-index:2;display:flex;gap:6px;transform:translateX(-50%);padding:5px 7px;border-radius:999px;background:rgba(18,18,18,.08);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);pointer-events:none}
+.cp-modal-dot{width:6px;height:6px;padding:0;border:0;border-radius:999px;background:rgba(248,246,242,.32);transition:width .18s ease,background-color .18s ease}
+.cp-modal-dot[aria-current="true"]{width:16px;background:rgba(248,246,242,.72)}
+.cp-modal-content{padding:20px 24px 24px;text-align:center}
+.cp-modal-title{margin:0;font-family:inherit;font-weight:600;font-size:24px;line-height:1.25;letter-spacing:-.015em;text-align:center}
+.cp-modal-body{margin:12px 0 0;color:var(--dialog-muted);font-family:inherit;font-weight:400;font-size:15px;line-height:1.4;text-align:center}
+.cp-modal-terms{appearance:none;-webkit-appearance:none;padding:0;border:0;background:none;color:var(--brand-secondary);font-family:inherit;font-size:inherit;line-height:inherit;font-weight:600;text-decoration:none;cursor:pointer}
+.cp-modal-terms:hover,.cp-modal-terms:focus-visible{color:var(--brand-secondary-hover);text-decoration:none}
+.cp-modal-terms:focus,.cp-modal-terms:focus-visible{outline:none;outline-offset:0}
+.cp-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px}
+.cp-modal-btn{height:var(--control-height);padding:0 var(--control-pad-x);border:0;border-radius:var(--control-radius);font-family:inherit;font-weight:var(--control-font-weight);font-size:var(--control-font-size);line-height:var(--type-line-control);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s ease,filter .15s ease,opacity .15s ease}
+.cp-modal-btn:active{transform:scale(.985)}
+.cp-modal-btn:focus,.cp-modal-btn:focus-visible{outline:none;outline-offset:0}
+.cp-modal-btn--cancel{background:var(--dialog-cancel-bg);color:var(--dialog-cancel-text)}
+.cp-modal-btn--confirm{background:var(--brand-primary);color:var(--brand-on-primary);box-shadow:0 8px 22px rgba(0,0,0,.12)}
+.cp-modal-btn--confirm:focus,.cp-modal-btn--confirm:focus-visible{outline:none;outline-offset:0;box-shadow:0 8px 22px rgba(0,0,0,.12)}
+.cp-modal-btn--confirm:hover{background:var(--brand-primary-hover)}
+.cp-modal-btn:disabled{cursor:default;opacity:.62;transform:none}
+.cp-terms-modal[hidden]{display:none}
+.cp-terms-modal{--terms-edge:clamp(14px,3vmin,24px);position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;height:100dvh;padding:var(--terms-edge);overflow:hidden}
+.cp-terms-backdrop{position:absolute;inset:0;border:0;background:var(--terms-backdrop);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);cursor:pointer}
+.cp-terms-card{position:relative;z-index:1;display:flex;flex-direction:column;width:min(620px,calc(100vw - (var(--terms-edge) * 2)));max-height:min(88vh,780px);max-height:min(88dvh,780px);overflow:hidden;border-radius:24px;background:var(--dialog-bg);color:var(--dialog-text);box-shadow:0 26px 86px rgba(0,0,0,.28)}
+.cp-terms-head{display:flex;align-items:flex-start;gap:14px;padding:20px 22px 14px;border-bottom:1px solid var(--dialog-divider)}
+.cp-terms-heading{min-width:0;flex:1}
+.cp-terms-title{margin:0;font-family:inherit;font-weight:600;font-size:24px;line-height:1.25;letter-spacing:-.015em}
+.cp-terms-subtitle{margin:3px 0 0;color:var(--dialog-text);font-family:inherit;font-weight:600;font-size:16px;line-height:1.35}
+.cp-terms-close{flex:0 0 auto;width:36px;height:36px;padding:0;border:0;border-radius:999px;background:var(--dialog-cancel-bg);color:var(--dialog-cancel-text);display:grid;place-items:center;cursor:pointer}
+.cp-terms-close svg{width:18px;height:18px}
+.cp-terms-body{overflow:auto;overscroll-behavior:contain;padding:18px 22px 22px;-webkit-overflow-scrolling:touch}
+.cp-terms-intro{margin:0 0 16px;color:var(--dialog-muted);font-family:inherit;font-weight:400;font-size:14px;line-height:var(--type-line-body)}
+.cp-terms-section{margin:0 0 16px}
+.cp-terms-section:last-child{margin-bottom:0}
+.cp-terms-section h3{margin:0 0 6px;font-family:inherit;font-weight:600;font-size:15px;line-height:1.5}
+.cp-terms-section p{margin:0;color:var(--dialog-muted);font-family:inherit;font-weight:400;font-size:14px;line-height:var(--type-line-body)}
+.cp-terms-footer{padding:14px 22px 20px;border-top:1px solid var(--dialog-divider)}
+.cp-terms-done{width:100%;height:var(--control-height);padding:0 var(--control-pad-x);border:0;border-radius:var(--control-radius);background:var(--brand-primary);color:var(--brand-on-primary);font-family:inherit;font-weight:var(--control-font-weight);font-size:var(--control-font-size);line-height:var(--type-line-control);cursor:pointer}
+.cp-terms-done:hover{background:var(--brand-primary-hover)}
+@media (max-width:599px){.cp-terms-modal{--terms-edge:14px}.cp-terms-card{border-radius:22px}.cp-terms-head{padding:18px 18px 12px}.cp-terms-title{font-size:22px}.cp-terms-subtitle{font-size:15px;margin-top:3px}.cp-terms-body{padding:16px 18px 18px}.cp-terms-section{margin-bottom:14px}.cp-terms-section h3{font-size:14px;line-height:1.5}.cp-terms-section p,.cp-terms-intro{font-size:13px;line-height:var(--type-line-body)}.cp-terms-footer{padding:12px 18px 18px}}
+.cp-runtime-error{position:absolute;z-index:7;left:50%;bottom:calc(var(--cta-edge,20px) + 62px);transform:translateX(-50%);max-width:min(88vw,520px);margin:0;padding:9px 13px;border-radius:12px;background:rgba(42,42,42,.92);color:#fff;font-family:inherit;font-weight:600;font-size:13px;line-height:1.5;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.18)}
+@media (max-width:599px){.cp-modal{--modal-edge:16px}.cp-modal-card{width:min(380px,calc(100vw - 32px));border-radius:22px}.cp-modal-content{padding:18px 20px 20px}.cp-modal-title{font-size:22px}.cp-modal-body{font-size:14px}.cp-modal-actions{margin-top:18px}}
+@media (orientation:landscape) and (max-height:620px){.cp-modal{--modal-edge:14px}.cp-modal-card{width:min(430px,calc(100vw - 28px));max-height:calc(100dvh - 28px)}.cp-modal-content{padding:16px 18px 18px}.cp-modal-title{font-size:21px}.cp-modal-body{font-size:13px}.cp-modal-actions{margin-top:16px}}
+/* Mobile portrait/default: compact but comfortably tappable. */
+@media (orientation:portrait){.cp-cta-wrap{right:auto;left:50%;bottom:5%;transform:translateX(-50%);justify-content:center}}
+@media (max-width:599px) and (orientation:portrait){.cp-stage{--control-font-size:16px;--control-height:44px;--control-pad-x:14px}.cp-cta-wrap{--cta-icon-size:21px;--cta-cell-size:22px;--cta-gap:6px;--cta-height:47px;--cta-pad-left:11px;--cta-pad-right:17px}}
+/* Mobile landscape: preserve vertical space. */
+@media (max-width:899px) and (orientation:landscape) and (max-height:599px){.cp-stage{--control-font-size:15px;--control-height:40px;--control-pad-x:12px}.cp-cta-wrap{--cta-icon-size:19px;--cta-cell-size:20px;--cta-gap:5px;--cta-height:43px;--cta-pad-left:10px;--cta-pad-right:16px}}
+/* Tablet portrait. */
+@media (min-width:600px) and (max-width:1199px) and (orientation:portrait){.cp-stage{--control-font-size:18px;--control-height:46px;--control-pad-x:16px}.cp-cta-wrap{--cta-icon-size:23px;--cta-cell-size:24px;--cta-gap:7px;--cta-height:49px;--cta-pad-left:12px;--cta-pad-right:19px}}
+/* Tablet landscape. */
+@media (min-width:600px) and (max-width:1199px) and (orientation:landscape){.cp-stage{--control-font-size:17px;--control-height:43px;--control-pad-x:15px}.cp-cta-wrap{--cta-icon-size:22px;--cta-cell-size:23px;--cta-gap:7px;--cta-height:46px;--cta-pad-left:11px;--cta-pad-right:18px}}
+/* PC portrait / tall desktop windows. */
+@media (min-width:1024px) and (orientation:portrait){.cp-stage{--control-font-size:19px;--control-height:48px;--control-pad-x:18px}.cp-cta-wrap{--cta-icon-size:24px;--cta-cell-size:25px;--cta-gap:7px;--cta-height:51px;--cta-pad-left:13px;--cta-pad-right:21px}}
+/* PC landscape. */
+@media (min-width:1200px) and (orientation:landscape){.cp-stage{--control-font-size:19px;--control-height:47px;--control-pad-x:18px}.cp-cta-wrap{--cta-icon-size:24px;--cta-cell-size:25px;--cta-gap:7px;--cta-height:51px;--cta-pad-left:13px;--cta-pad-right:21px}}
+/* Very short landscape screens: cap CTA footprint without changing ownership/layout. */
+@media (orientation:landscape) and (max-height:480px){.cp-stage{--control-font-size:15px;--control-height:40px;--control-pad-x:12px}.cp-cta-wrap{--cta-icon-size:19px;--cta-cell-size:20px;--cta-gap:5px;--cta-height:43px;--cta-pad-left:10px;--cta-pad-right:16px}}
+</style>
+</head>
+<body>
+<main class="cp-stage" data-captive-template="captive-portal" data-portal-mode="video" data-preview="0" data-local-session-id="__SESSION_ID__" data-local-authorize-url="http://10.10.10.1:2080/cgi-bin/portal" data-analytics-url="" data-analytics-token="">
+    <div class="cp-media-stage" aria-hidden="true">
+        <div class="cp-video-stage" data-video-stage>
+      <video class="cp-video" data-bg-video playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
+    </div>
+      </div>
+  <script type="application/json" data-media-config>{"mode":"video","videos":{"landscape":["/runtime/active/media/video_landscape.mp4"],"portrait":["/runtime/active/media/video_portrait.mp4"]},"images":{"landscape":["/runtime/active/media/image_landscape.webp"],"portrait":["/runtime/active/media/image_portrait.webp"]}}</script>
+  
+    <button class="cp-audio-toggle" type="button" data-action="toggle-audio" data-audio-state="muted" aria-label="Bật âm thanh" aria-pressed="false">
+    <span class="cp-audio-icon cp-audio-icon--off" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H3v6h3l5 4z"/>
+        <path d="m17 9 4 4"/>
+        <path d="m21 9-4 4"/>
+      </svg>
+    </span>
+    <span class="cp-audio-icon cp-audio-icon--on" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5 6 9H3v6h3l5 4z"/>
+        <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+        <path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+      </svg>
+    </span>
+  </button>
+  
+  <div class="cp-bottom-shade" aria-hidden="true"></div>
+
+  <footer class="cp-cta-wrap" aria-label="Kết nối Internet">
+    <button class="cp-cta" type="button" data-action="internet-access" aria-label="Kết nối Internet">
+      <svg class="cp-cta-border-orbit" data-cta-border-orbit aria-hidden="true" focusable="false">
+        <g class="cp-cta-orbit-gradient">
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="0.0000" pathLength="100" stroke-dashoffset="0.0000" style="--cp-cta-seg-alpha:0.0000" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-0.4375" pathLength="100" stroke-dashoffset="-0.4375" style="--cp-cta-seg-alpha:0.0001" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-0.8750" pathLength="100" stroke-dashoffset="-0.8750" style="--cp-cta-seg-alpha:0.0004" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-1.3125" pathLength="100" stroke-dashoffset="-1.3125" style="--cp-cta-seg-alpha:0.0009" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-1.7500" pathLength="100" stroke-dashoffset="-1.7500" style="--cp-cta-seg-alpha:0.0016" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-2.1875" pathLength="100" stroke-dashoffset="-2.1875" style="--cp-cta-seg-alpha:0.0024" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-2.6250" pathLength="100" stroke-dashoffset="-2.6250" style="--cp-cta-seg-alpha:0.0035" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-3.0625" pathLength="100" stroke-dashoffset="-3.0625" style="--cp-cta-seg-alpha:0.0048" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-3.5000" pathLength="100" stroke-dashoffset="-3.5000" style="--cp-cta-seg-alpha:0.0062" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-3.9375" pathLength="100" stroke-dashoffset="-3.9375" style="--cp-cta-seg-alpha:0.0079" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-4.3750" pathLength="100" stroke-dashoffset="-4.3750" style="--cp-cta-seg-alpha:0.0097" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-4.8125" pathLength="100" stroke-dashoffset="-4.8125" style="--cp-cta-seg-alpha:0.0118" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-5.2500" pathLength="100" stroke-dashoffset="-5.2500" style="--cp-cta-seg-alpha:0.0140" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-5.6875" pathLength="100" stroke-dashoffset="-5.6875" style="--cp-cta-seg-alpha:0.0164" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-6.1250" pathLength="100" stroke-dashoffset="-6.1250" style="--cp-cta-seg-alpha:0.0190" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-6.5625" pathLength="100" stroke-dashoffset="-6.5625" style="--cp-cta-seg-alpha:0.0218" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-7.0000" pathLength="100" stroke-dashoffset="-7.0000" style="--cp-cta-seg-alpha:0.0248" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-7.4375" pathLength="100" stroke-dashoffset="-7.4375" style="--cp-cta-seg-alpha:0.0279" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-7.8750" pathLength="100" stroke-dashoffset="-7.8750" style="--cp-cta-seg-alpha:0.0313" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-8.3125" pathLength="100" stroke-dashoffset="-8.3125" style="--cp-cta-seg-alpha:0.0348" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-8.7500" pathLength="100" stroke-dashoffset="-8.7500" style="--cp-cta-seg-alpha:0.0385" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-9.1875" pathLength="100" stroke-dashoffset="-9.1875" style="--cp-cta-seg-alpha:0.0424" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-9.6250" pathLength="100" stroke-dashoffset="-9.6250" style="--cp-cta-seg-alpha:0.0465" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-10.0625" pathLength="100" stroke-dashoffset="-10.0625" style="--cp-cta-seg-alpha:0.0507" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-10.5000" pathLength="100" stroke-dashoffset="-10.5000" style="--cp-cta-seg-alpha:0.0552" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-10.9375" pathLength="100" stroke-dashoffset="-10.9375" style="--cp-cta-seg-alpha:0.0598" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-11.3750" pathLength="100" stroke-dashoffset="-11.3750" style="--cp-cta-seg-alpha:0.0645" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-11.8125" pathLength="100" stroke-dashoffset="-11.8125" style="--cp-cta-seg-alpha:0.0695" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-12.2500" pathLength="100" stroke-dashoffset="-12.2500" style="--cp-cta-seg-alpha:0.0746" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-12.6875" pathLength="100" stroke-dashoffset="-12.6875" style="--cp-cta-seg-alpha:0.0799" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-13.1250" pathLength="100" stroke-dashoffset="-13.1250" style="--cp-cta-seg-alpha:0.0853" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-13.5625" pathLength="100" stroke-dashoffset="-13.5625" style="--cp-cta-seg-alpha:0.0909" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-14.0000" pathLength="100" stroke-dashoffset="-14.0000" style="--cp-cta-seg-alpha:0.0967" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-14.4375" pathLength="100" stroke-dashoffset="-14.4375" style="--cp-cta-seg-alpha:0.1026" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-14.8750" pathLength="100" stroke-dashoffset="-14.8750" style="--cp-cta-seg-alpha:0.1086" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-15.3125" pathLength="100" stroke-dashoffset="-15.3125" style="--cp-cta-seg-alpha:0.1149" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-15.7500" pathLength="100" stroke-dashoffset="-15.7500" style="--cp-cta-seg-alpha:0.1212" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-16.1875" pathLength="100" stroke-dashoffset="-16.1875" style="--cp-cta-seg-alpha:0.1278" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-16.6250" pathLength="100" stroke-dashoffset="-16.6250" style="--cp-cta-seg-alpha:0.1344" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-17.0625" pathLength="100" stroke-dashoffset="-17.0625" style="--cp-cta-seg-alpha:0.1412" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-17.5000" pathLength="100" stroke-dashoffset="-17.5000" style="--cp-cta-seg-alpha:0.1482" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-17.9375" pathLength="100" stroke-dashoffset="-17.9375" style="--cp-cta-seg-alpha:0.1553" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-18.3750" pathLength="100" stroke-dashoffset="-18.3750" style="--cp-cta-seg-alpha:0.1625" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-18.8125" pathLength="100" stroke-dashoffset="-18.8125" style="--cp-cta-seg-alpha:0.1699" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-19.2500" pathLength="100" stroke-dashoffset="-19.2500" style="--cp-cta-seg-alpha:0.1773" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-19.6875" pathLength="100" stroke-dashoffset="-19.6875" style="--cp-cta-seg-alpha:0.1850" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-20.1250" pathLength="100" stroke-dashoffset="-20.1250" style="--cp-cta-seg-alpha:0.1927" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-20.5625" pathLength="100" stroke-dashoffset="-20.5625" style="--cp-cta-seg-alpha:0.2005" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-21.0000" pathLength="100" stroke-dashoffset="-21.0000" style="--cp-cta-seg-alpha:0.2085" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-21.4375" pathLength="100" stroke-dashoffset="-21.4375" style="--cp-cta-seg-alpha:0.2166" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-21.8750" pathLength="100" stroke-dashoffset="-21.8750" style="--cp-cta-seg-alpha:0.2248" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-22.3125" pathLength="100" stroke-dashoffset="-22.3125" style="--cp-cta-seg-alpha:0.2331" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-22.7500" pathLength="100" stroke-dashoffset="-22.7500" style="--cp-cta-seg-alpha:0.2415" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-23.1875" pathLength="100" stroke-dashoffset="-23.1875" style="--cp-cta-seg-alpha:0.2500" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-23.6250" pathLength="100" stroke-dashoffset="-23.6250" style="--cp-cta-seg-alpha:0.2586" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-24.0625" pathLength="100" stroke-dashoffset="-24.0625" style="--cp-cta-seg-alpha:0.2673" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-24.5000" pathLength="100" stroke-dashoffset="-24.5000" style="--cp-cta-seg-alpha:0.2761" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-24.9375" pathLength="100" stroke-dashoffset="-24.9375" style="--cp-cta-seg-alpha:0.2850" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-25.3750" pathLength="100" stroke-dashoffset="-25.3750" style="--cp-cta-seg-alpha:0.2939" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-25.8125" pathLength="100" stroke-dashoffset="-25.8125" style="--cp-cta-seg-alpha:0.3030" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-26.2500" pathLength="100" stroke-dashoffset="-26.2500" style="--cp-cta-seg-alpha:0.3121" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-26.6875" pathLength="100" stroke-dashoffset="-26.6875" style="--cp-cta-seg-alpha:0.3213" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-27.1250" pathLength="100" stroke-dashoffset="-27.1250" style="--cp-cta-seg-alpha:0.3305" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-27.5625" pathLength="100" stroke-dashoffset="-27.5625" style="--cp-cta-seg-alpha:0.3399" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-28.0000" pathLength="100" stroke-dashoffset="-28.0000" style="--cp-cta-seg-alpha:0.3493" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-28.4375" pathLength="100" stroke-dashoffset="-28.4375" style="--cp-cta-seg-alpha:0.3587" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-28.8750" pathLength="100" stroke-dashoffset="-28.8750" style="--cp-cta-seg-alpha:0.3682" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-29.3125" pathLength="100" stroke-dashoffset="-29.3125" style="--cp-cta-seg-alpha:0.3778" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-29.7500" pathLength="100" stroke-dashoffset="-29.7500" style="--cp-cta-seg-alpha:0.3874" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-30.1875" pathLength="100" stroke-dashoffset="-30.1875" style="--cp-cta-seg-alpha:0.3970" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-30.6250" pathLength="100" stroke-dashoffset="-30.6250" style="--cp-cta-seg-alpha:0.4067" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-31.0625" pathLength="100" stroke-dashoffset="-31.0625" style="--cp-cta-seg-alpha:0.4164" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-31.5000" pathLength="100" stroke-dashoffset="-31.5000" style="--cp-cta-seg-alpha:0.4262" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-31.9375" pathLength="100" stroke-dashoffset="-31.9375" style="--cp-cta-seg-alpha:0.4360" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-32.3750" pathLength="100" stroke-dashoffset="-32.3750" style="--cp-cta-seg-alpha:0.4458" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-32.8125" pathLength="100" stroke-dashoffset="-32.8125" style="--cp-cta-seg-alpha:0.4556" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-33.2500" pathLength="100" stroke-dashoffset="-33.2500" style="--cp-cta-seg-alpha:0.4655" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-33.6875" pathLength="100" stroke-dashoffset="-33.6875" style="--cp-cta-seg-alpha:0.4753" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-34.1250" pathLength="100" stroke-dashoffset="-34.1250" style="--cp-cta-seg-alpha:0.4852" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-34.5625" pathLength="100" stroke-dashoffset="-34.5625" style="--cp-cta-seg-alpha:0.4951" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-35.0000" pathLength="100" stroke-dashoffset="-35.0000" style="--cp-cta-seg-alpha:0.5049" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-35.4375" pathLength="100" stroke-dashoffset="-35.4375" style="--cp-cta-seg-alpha:0.5148" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-35.8750" pathLength="100" stroke-dashoffset="-35.8750" style="--cp-cta-seg-alpha:0.5247" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-36.3125" pathLength="100" stroke-dashoffset="-36.3125" style="--cp-cta-seg-alpha:0.5345" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-36.7500" pathLength="100" stroke-dashoffset="-36.7500" style="--cp-cta-seg-alpha:0.5444" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-37.1875" pathLength="100" stroke-dashoffset="-37.1875" style="--cp-cta-seg-alpha:0.5542" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-37.6250" pathLength="100" stroke-dashoffset="-37.6250" style="--cp-cta-seg-alpha:0.5640" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-38.0625" pathLength="100" stroke-dashoffset="-38.0625" style="--cp-cta-seg-alpha:0.5738" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-38.5000" pathLength="100" stroke-dashoffset="-38.5000" style="--cp-cta-seg-alpha:0.5836" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-38.9375" pathLength="100" stroke-dashoffset="-38.9375" style="--cp-cta-seg-alpha:0.5933" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-39.3750" pathLength="100" stroke-dashoffset="-39.3750" style="--cp-cta-seg-alpha:0.6030" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-39.8125" pathLength="100" stroke-dashoffset="-39.8125" style="--cp-cta-seg-alpha:0.6126" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-40.2500" pathLength="100" stroke-dashoffset="-40.2500" style="--cp-cta-seg-alpha:0.6222" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-40.6875" pathLength="100" stroke-dashoffset="-40.6875" style="--cp-cta-seg-alpha:0.6318" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-41.1250" pathLength="100" stroke-dashoffset="-41.1250" style="--cp-cta-seg-alpha:0.6413" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-41.5625" pathLength="100" stroke-dashoffset="-41.5625" style="--cp-cta-seg-alpha:0.6507" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-42.0000" pathLength="100" stroke-dashoffset="-42.0000" style="--cp-cta-seg-alpha:0.6601" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-42.4375" pathLength="100" stroke-dashoffset="-42.4375" style="--cp-cta-seg-alpha:0.6695" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-42.8750" pathLength="100" stroke-dashoffset="-42.8750" style="--cp-cta-seg-alpha:0.6787" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-43.3125" pathLength="100" stroke-dashoffset="-43.3125" style="--cp-cta-seg-alpha:0.6879" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-43.7500" pathLength="100" stroke-dashoffset="-43.7500" style="--cp-cta-seg-alpha:0.6970" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-44.1875" pathLength="100" stroke-dashoffset="-44.1875" style="--cp-cta-seg-alpha:0.7061" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-44.6250" pathLength="100" stroke-dashoffset="-44.6250" style="--cp-cta-seg-alpha:0.7150" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-45.0625" pathLength="100" stroke-dashoffset="-45.0625" style="--cp-cta-seg-alpha:0.7239" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-45.5000" pathLength="100" stroke-dashoffset="-45.5000" style="--cp-cta-seg-alpha:0.7327" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-45.9375" pathLength="100" stroke-dashoffset="-45.9375" style="--cp-cta-seg-alpha:0.7414" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-46.3750" pathLength="100" stroke-dashoffset="-46.3750" style="--cp-cta-seg-alpha:0.7500" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-46.8125" pathLength="100" stroke-dashoffset="-46.8125" style="--cp-cta-seg-alpha:0.7585" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-47.2500" pathLength="100" stroke-dashoffset="-47.2500" style="--cp-cta-seg-alpha:0.7669" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-47.6875" pathLength="100" stroke-dashoffset="-47.6875" style="--cp-cta-seg-alpha:0.7752" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-48.1250" pathLength="100" stroke-dashoffset="-48.1250" style="--cp-cta-seg-alpha:0.7834" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-48.5625" pathLength="100" stroke-dashoffset="-48.5625" style="--cp-cta-seg-alpha:0.7915" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-49.0000" pathLength="100" stroke-dashoffset="-49.0000" style="--cp-cta-seg-alpha:0.7995" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-49.4375" pathLength="100" stroke-dashoffset="-49.4375" style="--cp-cta-seg-alpha:0.8073" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-49.8750" pathLength="100" stroke-dashoffset="-49.8750" style="--cp-cta-seg-alpha:0.8150" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-50.3125" pathLength="100" stroke-dashoffset="-50.3125" style="--cp-cta-seg-alpha:0.8227" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-50.7500" pathLength="100" stroke-dashoffset="-50.7500" style="--cp-cta-seg-alpha:0.8301" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-51.1875" pathLength="100" stroke-dashoffset="-51.1875" style="--cp-cta-seg-alpha:0.8375" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-51.6250" pathLength="100" stroke-dashoffset="-51.6250" style="--cp-cta-seg-alpha:0.8447" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-52.0625" pathLength="100" stroke-dashoffset="-52.0625" style="--cp-cta-seg-alpha:0.8518" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-52.5000" pathLength="100" stroke-dashoffset="-52.5000" style="--cp-cta-seg-alpha:0.8588" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-52.9375" pathLength="100" stroke-dashoffset="-52.9375" style="--cp-cta-seg-alpha:0.8656" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-53.3750" pathLength="100" stroke-dashoffset="-53.3750" style="--cp-cta-seg-alpha:0.8722" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-53.8125" pathLength="100" stroke-dashoffset="-53.8125" style="--cp-cta-seg-alpha:0.8788" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-54.2500" pathLength="100" stroke-dashoffset="-54.2500" style="--cp-cta-seg-alpha:0.8851" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-54.6875" pathLength="100" stroke-dashoffset="-54.6875" style="--cp-cta-seg-alpha:0.8914" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-55.1250" pathLength="100" stroke-dashoffset="-55.1250" style="--cp-cta-seg-alpha:0.8974" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-55.5625" pathLength="100" stroke-dashoffset="-55.5625" style="--cp-cta-seg-alpha:0.9033" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-56.0000" pathLength="100" stroke-dashoffset="-56.0000" style="--cp-cta-seg-alpha:0.9091" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-56.4375" pathLength="100" stroke-dashoffset="-56.4375" style="--cp-cta-seg-alpha:0.9147" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-56.8750" pathLength="100" stroke-dashoffset="-56.8750" style="--cp-cta-seg-alpha:0.9201" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-57.3125" pathLength="100" stroke-dashoffset="-57.3125" style="--cp-cta-seg-alpha:0.9254" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-57.7500" pathLength="100" stroke-dashoffset="-57.7500" style="--cp-cta-seg-alpha:0.9305" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-58.1875" pathLength="100" stroke-dashoffset="-58.1875" style="--cp-cta-seg-alpha:0.9355" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-58.6250" pathLength="100" stroke-dashoffset="-58.6250" style="--cp-cta-seg-alpha:0.9402" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-59.0625" pathLength="100" stroke-dashoffset="-59.0625" style="--cp-cta-seg-alpha:0.9448" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-59.5000" pathLength="100" stroke-dashoffset="-59.5000" style="--cp-cta-seg-alpha:0.9493" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-59.9375" pathLength="100" stroke-dashoffset="-59.9375" style="--cp-cta-seg-alpha:0.9535" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-60.3750" pathLength="100" stroke-dashoffset="-60.3750" style="--cp-cta-seg-alpha:0.9576" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-60.8125" pathLength="100" stroke-dashoffset="-60.8125" style="--cp-cta-seg-alpha:0.9615" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-61.2500" pathLength="100" stroke-dashoffset="-61.2500" style="--cp-cta-seg-alpha:0.9652" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-61.6875" pathLength="100" stroke-dashoffset="-61.6875" style="--cp-cta-seg-alpha:0.9687" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-62.1250" pathLength="100" stroke-dashoffset="-62.1250" style="--cp-cta-seg-alpha:0.9721" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-62.5625" pathLength="100" stroke-dashoffset="-62.5625" style="--cp-cta-seg-alpha:0.9752" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-63.0000" pathLength="100" stroke-dashoffset="-63.0000" style="--cp-cta-seg-alpha:0.9782" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-63.4375" pathLength="100" stroke-dashoffset="-63.4375" style="--cp-cta-seg-alpha:0.9810" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-63.8750" pathLength="100" stroke-dashoffset="-63.8750" style="--cp-cta-seg-alpha:0.9836" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-64.3125" pathLength="100" stroke-dashoffset="-64.3125" style="--cp-cta-seg-alpha:0.9860" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-64.7500" pathLength="100" stroke-dashoffset="-64.7500" style="--cp-cta-seg-alpha:0.9882" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-65.1875" pathLength="100" stroke-dashoffset="-65.1875" style="--cp-cta-seg-alpha:0.9903" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-65.6250" pathLength="100" stroke-dashoffset="-65.6250" style="--cp-cta-seg-alpha:0.9921" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-66.0625" pathLength="100" stroke-dashoffset="-66.0625" style="--cp-cta-seg-alpha:0.9938" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-66.5000" pathLength="100" stroke-dashoffset="-66.5000" style="--cp-cta-seg-alpha:0.9952" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-66.9375" pathLength="100" stroke-dashoffset="-66.9375" style="--cp-cta-seg-alpha:0.9965" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-67.3750" pathLength="100" stroke-dashoffset="-67.3750" style="--cp-cta-seg-alpha:0.9976" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-67.8125" pathLength="100" stroke-dashoffset="-67.8125" style="--cp-cta-seg-alpha:0.9984" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-68.2500" pathLength="100" stroke-dashoffset="-68.2500" style="--cp-cta-seg-alpha:0.9991" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-68.6875" pathLength="100" stroke-dashoffset="-68.6875" style="--cp-cta-seg-alpha:0.9996" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-69.1250" pathLength="100" stroke-dashoffset="-69.1250" style="--cp-cta-seg-alpha:0.9999" />
+                    <rect class="cp-cta-orbit-segment" data-cta-orbit-rect data-cta-orbit-offset="-69.5625" pathLength="100" stroke-dashoffset="-69.5625" style="--cp-cta-seg-alpha:1.0000" />
+                  </g>
+      </svg>
+      <span class="cp-cta-icon cp-cta-icon--wifi" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2.5 8.8a14.2 14.2 0 0 1 19 0"/>
+          <path d="M6 12.4a9 9 0 0 1 12 0"/>
+          <path d="M9.4 16a3.9 3.9 0 0 1 5.2 0"/>
+          <circle cx="12" cy="19.1" r="1.15" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <span class="cp-cta-label">Kết nối Internet</span>
+    </button>
+  </footer>
+
+  <p class="cp-runtime-error" data-runtime-error role="alert" hidden></p>
+
+  <div class="cp-modal" data-access-dialog hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cp-access-title">
+    <button class="cp-modal-backdrop" type="button" data-dialog-cancel aria-label="Hủy"></button>
+    <section class="cp-modal-card">
+            <div class="cp-modal-slider" data-dialog-slider>
+        <div class="cp-modal-track" data-dialog-track>
+                    <div class="cp-modal-slide" data-dialog-slide data-slide-index="0">
+            <img src="/runtime/active/media/popup_1.webp" alt="" loading="eager" decoding="async" draggable="false">
+          </div>
+                    <div class="cp-modal-slide" data-dialog-slide data-slide-index="1">
+            <img src="/runtime/active/media/popup_2.webp" alt="" loading="lazy" decoding="async" draggable="false">
+          </div>
+                    <div class="cp-modal-slide" data-dialog-slide data-slide-index="2">
+            <img src="/runtime/active/media/popup_3.webp" alt="" loading="lazy" decoding="async" draggable="false">
+          </div>
+                    <div class="cp-modal-slide" data-dialog-slide data-slide-index="3">
+            <img src="/runtime/active/media/popup_4.webp" alt="" loading="lazy" decoding="async" draggable="false">
+          </div>
+                    <div class="cp-modal-slide" data-dialog-slide data-slide-index="4">
+            <img src="/runtime/active/media/popup_5.webp" alt="" loading="lazy" decoding="async" draggable="false">
+          </div>
+                              <div class="cp-modal-slide" data-dialog-clone aria-hidden="true">
+            <img src="/runtime/active/media/popup_1.webp" alt="" loading="lazy" decoding="async" draggable="false">
+          </div>
+                  </div>
+                <div class="cp-modal-dots" aria-hidden="true">
+                    <span class="cp-modal-dot" data-dialog-dot aria-current="true"></span>
+                    <span class="cp-modal-dot" data-dialog-dot aria-current="false"></span>
+                    <span class="cp-modal-dot" data-dialog-dot aria-current="false"></span>
+                    <span class="cp-modal-dot" data-dialog-dot aria-current="false"></span>
+                    <span class="cp-modal-dot" data-dialog-dot aria-current="false"></span>
+                  </div>
+              </div>
+            <div class="cp-modal-content">
+        <h2 class="cp-modal-title" id="cp-access-title">Xác nhận truy cập Internet</h2>
+        <p class="cp-modal-body">Bằng việc bấm xác nhận, bạn đã đồng ý với <button class="cp-modal-terms" type="button" data-terms-open>Điều khoản và Điều kiện</button> sử dụng internet.</p>
+        <div class="cp-modal-actions">
+          <button class="cp-modal-btn cp-modal-btn--cancel" type="button" data-dialog-cancel>Hủy</button>
+          <button class="cp-modal-btn cp-modal-btn--confirm" type="button" data-dialog-confirm>Xác nhận</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="cp-terms-modal" data-terms-dialog hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cp-terms-title">
+    <button class="cp-terms-backdrop" type="button" data-terms-close aria-label="Đóng điều khoản"></button>
+    <section class="cp-terms-card">
+      <header class="cp-terms-head">
+        <div class="cp-terms-heading">
+          <h2 class="cp-terms-title" id="cp-terms-title">Điều khoản và Điều kiện</h2>
+          <p class="cp-terms-subtitle">sử dụng internet</p>        </div>
+        <button class="cp-terms-close" type="button" data-terms-close aria-label="Đóng">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="cp-terms-body">
+        <p class="cp-terms-intro">Khi bấm “Xác nhận”, bạn xác nhận đã đọc, hiểu và đồng ý tuân thủ các điều khoản dưới đây trong suốt thời gian sử dụng kết nối Internet được cung cấp qua điểm truy cập này.</p>                <section class="cp-terms-section">
+          <h3>1. Phạm vi sử dụng</h3>          <p>Kết nối Internet được cung cấp cho mục đích truy cập mạng hợp pháp. Bạn chỉ được sử dụng dịch vụ trong phạm vi pháp luật Việt Nam cho phép và phải tuân thủ các quy định hiện hành về viễn thông, an ninh mạng, an toàn thông tin, sở hữu trí tuệ và các quy định có liên quan.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>2. Trách nhiệm của người sử dụng</h3>          <p>Bạn tự chịu trách nhiệm trước pháp luật đối với hành vi do mình thực hiện, nội dung mình lưu trữ, truyền đưa, cung cấp hoặc phát tán, các giao dịch mình thực hiện và việc sử dụng thiết bị, tài khoản hoặc phiên truy cập của mình trong thời gian kết nối. Trách nhiệm này không loại trừ trách nhiệm của bên cung cấp đối với phần lỗi hoặc nghĩa vụ pháp lý thuộc về bên cung cấp theo quy định bắt buộc của pháp luật.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>3. Hành vi không được phép</h3>          <p>Không được sử dụng kết nối để xâm nhập trái phép hệ thống, phát tán mã độc, tấn công hoặc gây gián đoạn mạng, đánh cắp dữ liệu, giả mạo, lừa đảo, spam, thực hiện giao dịch hoặc hoạt động bị pháp luật cấm, xâm phạm quyền riêng tư, quyền sở hữu trí tuệ, quyền và lợi ích hợp pháp của tổ chức hoặc cá nhân khác, hoặc truyền đưa nội dung vi phạm pháp luật Việt Nam.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>4. An toàn thiết bị và thông tin</h3>          <p>Bạn có trách nhiệm tự bảo vệ thiết bị, tài khoản, mật khẩu, dữ liệu và phiên làm việc của mình; thận trọng khi truy cập website, ứng dụng hoặc dịch vụ của bên thứ ba. Không chia sẻ hoặc sử dụng trái phép thông tin xác thực của người khác.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>5. Quản lý và bảo vệ hệ thống</h3>          <p>Bên cung cấp có thể áp dụng các biện pháp kỹ thuật cần thiết để bảo đảm an toàn, ổn định, phòng chống lạm dụng và tuân thủ yêu cầu hợp pháp của cơ quan nhà nước có thẩm quyền. Việc truy cập có thể bị từ chối, giới hạn hoặc chấm dứt khi phát hiện dấu hiệu vi phạm, rủi ro an ninh hoặc khi pháp luật yêu cầu.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>6. Dữ liệu kỹ thuật và nhật ký hệ thống</h3>          <p>Trường hợp hệ thống có thu thập dữ liệu kỹ thuật hoặc nhật ký kết nối phục vụ vận hành, bảo mật, xử lý sự cố hoặc tuân thủ pháp luật, dữ liệu đó phải được xử lý theo mục đích phù hợp, trong phạm vi cần thiết và theo quy định pháp luật hiện hành về bảo vệ dữ liệu và quyền riêng tư.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>7. Giới hạn trách nhiệm hợp lý</h3>          <p>Bên cung cấp không kiểm soát và không chịu trách nhiệm thay cho bạn đối với nội dung, giao dịch, dịch vụ hoặc thiệt hại phát sinh từ bên thứ ba hay từ hành vi sử dụng Internet của chính bạn. Điều khoản này không nhằm loại trừ hoặc hạn chế các nghĩa vụ, trách nhiệm bắt buộc mà pháp luật quy định bên cung cấp phải chịu, bao gồm trách nhiệm do lỗi của bên cung cấp.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>8. Tạm ngừng và chất lượng kết nối</h3>          <p>Dịch vụ có thể bị gián đoạn do bảo trì, sự cố kỹ thuật, lỗi hạ tầng, mất điện, sự cố của nhà mạng, yêu cầu an ninh hoặc sự kiện ngoài khả năng kiểm soát hợp lý. Bên cung cấp sẽ xử lý trong phạm vi kiểm soát của mình nhưng không cam kết kết nối luôn liên tục hoặc không có lỗi.</p>        </section>
+                <section class="cp-terms-section">
+          <h3>9. Luật áp dụng và giải quyết vấn đề phát sinh</h3>          <p>Các điều khoản này được điều chỉnh bởi pháp luật Việt Nam. Mọi vấn đề phát sinh trước hết được ưu tiên giải quyết thông qua trao đổi và hợp tác thiện chí; trường hợp không giải quyết được sẽ thực hiện theo trình tự, thẩm quyền và quy định của pháp luật Việt Nam.</p>        </section>
+              </div>
+      <footer class="cp-terms-footer">
+        <button class="cp-terms-done" type="button" data-terms-close>Đã hiểu</button>
+      </footer>
+    </section>
+  </div>
+</main>
+<script>
+(async()=>{
+  'use strict';
+  const stage=document.querySelector('[data-captive-template="captive-portal"]');
+  if(!stage)return;
+  let localConfig={};
+  try{const r=await fetch('/runtime/active/portal.json',{cache:'no-store'});if(r.ok)localConfig=await r.json();}catch(_error){}
+  const localPopups=Array.isArray(localConfig.popups)?localConfig.popups.filter(Boolean).slice(0,5):[];
+  const localSlider=stage.querySelector('[data-dialog-slider]');
+  const localSlides=[...stage.querySelectorAll('[data-dialog-slide]')];
+  const localDots=[...stage.querySelectorAll('[data-dialog-dot]')];
+  const localClone=stage.querySelector('[data-dialog-clone]');
+  if(localPopups.length===0){if(localSlider)localSlider.remove();}
+  else{
+    localSlides.forEach((slide,index)=>{if(index>=localPopups.length){slide.remove();return;}const img=slide.querySelector('img');if(img)img.src=localPopups[index];});
+    localDots.forEach((dot,index)=>{if(index>=localPopups.length)dot.remove();});
+    const dotWrap=stage.querySelector('.cp-modal-dots');if(localPopups.length<2&&dotWrap)dotWrap.remove();
+    if(localClone){if(localPopups.length>1){const img=localClone.querySelector('img');if(img)img.src=localPopups[0];}else localClone.remove();}
+  }
+  const localWebsite=stage.querySelector('.cp-website-frame');
+  if(localWebsite&&localConfig.website_url)localWebsite.src=String(localConfig.website_url);
+
+  const preventZoomGesture=event=>event.preventDefault();
+  ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,preventZoomGesture,{passive:false}));
+  document.addEventListener('touchmove',event=>{if(event.touches&&event.touches.length>1)event.preventDefault();},{passive:false});
+  document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault();},{passive:false});
+  document.addEventListener('keydown',event=>{
+    if(!(event.ctrlKey||event.metaKey))return;
+    if(['+','-','=','0'].includes(event.key))event.preventDefault();
+  });
+  const portalMode=['website','image','video'].includes(stage.dataset.portalMode)?stage.dataset.portalMode:'video';
+  const analyticsUrl=String(stage.dataset.analyticsUrl||'');
+  const analyticsToken=String(stage.dataset.analyticsToken||'');
+  const analyticsEnabled=analyticsUrl!==''&&analyticsToken!=='';
+  const analyticsOnce=new Set();
+  const track=(event,kind='')=>{
+    if(!analyticsEnabled)return;
+    const payload={token:analyticsToken,event,mode:portalMode};if(kind)payload.kind=kind;
+    try{fetch(analyticsUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',cache:'no-store',keepalive:true}).catch(()=>{});}catch(_error){}
+  };
+  const trackOnce=(key,event,kind='')=>{if(analyticsOnce.has(key))return;analyticsOnce.add(key);track(event,kind);};
+  const trackImpression=()=>trackOnce('content-impression','content_impression',portalMode);
+  trackOnce('portal-view','portal_view',portalMode);
+  const localMedia=localConfig&&typeof localConfig.media==='object'?localConfig.media:{};
+  let mediaConfig={mode:portalMode,videos:{landscape:[],portrait:[]},images:{landscape:[],portrait:[]}};
+  if(localMedia.video_landscape)mediaConfig.videos.landscape=[String(localMedia.video_landscape)];
+  if(localMedia.video_portrait)mediaConfig.videos.portrait=[String(localMedia.video_portrait)];
+  if(localMedia.image_landscape)mediaConfig.images.landscape=[String(localMedia.image_landscape)];
+  if(localMedia.image_portrait)mediaConfig.images.portrait=[String(localMedia.image_portrait)];
+  const mediaMode=mediaConfig.mode==='image'?'image':'video';
+  const portraitMedia=window.matchMedia('(orientation: portrait)');
+  const bgVideos=[...stage.querySelectorAll('[data-bg-video]')];
+  const bgImages=[...stage.querySelectorAll('[data-bg-image]')];
+  let mediaGeneration=0;
+
+  const bgVideo=bgVideos[0]||null;
+  let currentVideoSrc='';
+  let videoStartTimer=0;
+  let videoDialogTimer=0;
+  let videoPhase='idle';
+  let videoFailureMessage='';
+  const VIDEO_INITIAL_DELAY_MS=400;
+  const VIDEO_END_TRANSITION_MS=1000;
+  const audioToggle=stage.querySelector('[data-action="toggle-audio"]');
+  let videoSoundEnabled=false;
+  const clearVideoTimers=()=>{
+    if(videoStartTimer){window.clearTimeout(videoStartTimer);videoStartTimer=0;}
+    if(videoDialogTimer){window.clearTimeout(videoDialogTimer);videoDialogTimer=0;}
+  };
+  const resetVideoVisualState=()=>{
+    if(!bgVideo)return;
+    bgVideo.classList.add('is-visual-reset');
+    bgVideo.classList.remove('is-active');
+    void bgVideo.offsetWidth;
+    bgVideo.classList.remove('is-visual-reset');
+  };
+  const syncAudioToggle=()=>{
+    if(!audioToggle)return;
+    audioToggle.dataset.audioState=videoSoundEnabled?'on':'muted';
+    audioToggle.setAttribute('aria-pressed',videoSoundEnabled?'true':'false');
+    audioToggle.setAttribute('aria-label',videoSoundEnabled?'Tắt âm thanh':'Bật âm thanh');
+  };
+  const applyVideoSoundState=video=>{
+    if(!video)return;
+    video.muted=!videoSoundEnabled;
+    video.defaultMuted=!videoSoundEnabled;
+  };
+  const setVideoSource=(video,src)=>{
+    if(!video||!src)return;
+    if(video.getAttribute('src')===src){applyVideoSoundState(video);return;}
+    video.pause();
+    video.src=src;
+    applyVideoSoundState(video);
+    video.playsInline=true;
+    video.preload='auto';
+    video.load();
+  };
+  const playVideo=video=>{
+    if(!video)return Promise.resolve();
+    applyVideoSoundState(video);
+    video.playsInline=true;
+    let result;
+    try{result=video.play();}catch(error){return Promise.reject(error);}
+    if(!result||typeof result.then!=='function')return Promise.resolve();
+    return result.catch(error=>{
+      if(!error||error.name!=='NotAllowedError'||!videoSoundEnabled)throw error;
+      videoSoundEnabled=false;
+      applyVideoSoundState(video);
+      syncAudioToggle();
+      const fallback=video.play();
+      return fallback&&typeof fallback.then==='function'?fallback:Promise.resolve();
+    });
+  };
+  const toggleVideoAudio=()=>{
+    if(!bgVideo)return;
+    videoSoundEnabled=!videoSoundEnabled;
+    applyVideoSoundState(bgVideo);
+    syncAudioToggle();
+    if(videoSoundEnabled&&videoPhase==='playing'&&!bgVideo.ended){
+      let resumed;
+      try{resumed=bgVideo.play();}catch(_error){resumed=null;}
+      if(resumed&&typeof resumed.catch==='function')resumed.catch(()=>{
+        videoSoundEnabled=false;
+        applyVideoSoundState(bgVideo);
+        syncAudioToggle();
+        try{bgVideo.play();}catch(_ignored){}
+      });
+    }
+  };
+  syncAudioToggle();
+  if(audioToggle)audioToggle.addEventListener('click',()=>{track('content_interaction','audio');toggleVideoAudio();});
+  const reportVideoFailure=message=>{
+    videoFailureMessage=message;
+    window.setTimeout(()=>{if(videoFailureMessage&&state!=='committing')setError(videoFailureMessage);},0);
+  };
+  const waitForVideoReady=(video,generation)=>new Promise((resolve,reject)=>{
+    if(!video){reject(new Error('missing-video'));return;}
+    if(video.readyState>=3){resolve();return;}
+    let timer=0;
+    const cleanup=()=>{video.removeEventListener('canplay',onReady);video.removeEventListener('error',onError);if(timer)window.clearTimeout(timer);};
+    const onReady=()=>{cleanup();generation===mediaGeneration?resolve():reject(new Error('stale-video'));};
+    const onError=()=>{cleanup();reject(new Error('video-load'));};
+    video.addEventListener('canplay',onReady,{once:true});
+    video.addEventListener('error',onError,{once:true});
+    timer=window.setTimeout(()=>{cleanup();reject(new Error('video-timeout'));},20000);
+  });
+  const scheduleVideoPlayback=(delay,generation)=>{
+    if(!bgVideo||generation!==mediaGeneration)return;
+    if(videoStartTimer)window.clearTimeout(videoStartTimer);
+    videoPhase='waiting-start';
+    videoStartTimer=window.setTimeout(()=>{
+      videoStartTimer=0;
+      if(generation!==mediaGeneration||document.hidden)return;
+      playVideo(bgVideo).then(()=>{
+        if(generation!==mediaGeneration)return;
+        videoPhase='playing';
+        window.requestAnimationFrame(()=>bgVideo.classList.add('is-active'));
+        trackImpression();
+      }).catch(()=>reportVideoFailure('Không thể tự động phát video. Vui lòng tải lại Captive Portal.'));
+    },Math.max(0,delay));
+  };
+  const beginVideoIntro=(generation)=>{
+    if(!bgVideo||generation!==mediaGeneration)return;
+    resetVideoVisualState();
+    videoPhase='waiting-start';
+    scheduleVideoPlayback(VIDEO_INITIAL_DELAY_MS,generation);
+  };
+  const beginVideoEndTransition=(generation)=>{
+    if(generation!==mediaGeneration)return;
+    if(videoDialogTimer)window.clearTimeout(videoDialogTimer);
+    videoPhase='dialog-transition';
+    if(state==='ready'&&dialog.hidden)openDialog('video-end');
+    else videoPhase='dialog';
+    videoDialogTimer=window.setTimeout(()=>{
+      videoDialogTimer=0;
+      if(generation!==mediaGeneration)return;
+      if(videoPhase==='dialog-transition')videoPhase='dialog';
+    },VIDEO_END_TRANSITION_MS);
+  };
+  const startVideoCycle=(initialDelay=true)=>{
+    if(mediaMode!=='video'||!bgVideo)return;
+    clearVideoTimers();
+    const playlist=(portraitMedia.matches?mediaConfig.videos?.portrait:mediaConfig.videos?.landscape)||[];
+    const src=playlist.find(item=>typeof item==='string'&&item.length>0)||'';
+    if(!src){reportVideoFailure('Thiếu video phù hợp với hướng màn hình hiện tại.');return;}
+    const generation=mediaGeneration;
+    videoFailureMessage='';
+    videoPhase='preparing';
+    currentVideoSrc=src;
+    resetVideoVisualState();
+    setVideoSource(bgVideo,src);
+    bgVideo.pause();
+    try{bgVideo.currentTime=0;}catch(_error){}
+    waitForVideoReady(bgVideo,generation).then(()=>{
+      if(generation!==mediaGeneration)return;
+      videoPhase='waiting-start';
+      if(document.hidden)return;
+      if(initialDelay)beginVideoIntro(generation);
+      else{scheduleVideoPlayback(0,generation);}
+    }).catch(error=>{
+      if(error&&error.message==='stale-video')return;
+      reportVideoFailure('Không thể tải video Captive Portal. Vui lòng tải lại trang.');
+    });
+  };
+  if(bgVideo)bgVideo.addEventListener('ended',()=>{
+    if(mediaMode!=='video'||videoPhase!=='playing')return;
+    bgVideo.pause();
+    beginVideoEndTransition(mediaGeneration);
+  });
+
+  const bgImage=bgImages[0]||null;
+  const setImageSource=(image,src)=>{
+    if(!image||!src)return;
+    if(image.getAttribute('src')===src)return;
+    image.src=src;
+  };
+  const startImage=()=>{
+    if(mediaMode!=='image'||!bgImage)return;
+    const playlist=(portraitMedia.matches?mediaConfig.images?.portrait:mediaConfig.images?.landscape)||[];
+    const src=playlist.find(item=>typeof item==='string'&&item.length>0)||'';
+    if(!src)return;
+    setImageSource(bgImage,src);
+    bgImage.classList.add('is-active');
+    if(bgImage.complete)trackImpression();else bgImage.addEventListener('load',trackImpression,{once:true});
+    if(typeof bgImage.decode==='function')bgImage.decode().then(trackImpression).catch(()=>{});
+  };
+  const stopBackgroundMedia=()=>{
+    clearVideoTimers();
+    if(bgVideo)bgVideo.pause();
+    videoPhase='idle';
+  };
+  const startBackgroundMedia=()=>{
+    if(portalMode==='website')return;
+    mediaGeneration+=1;
+    stopBackgroundMedia();
+    if(mediaMode==='image')startImage();else startVideoCycle(true);
+  };
+  const onOrientationChange=()=>startBackgroundMedia();
+  if(typeof portraitMedia.addEventListener==='function'){portraitMedia.addEventListener('change',onOrientationChange);}else if(typeof portraitMedia.addListener==='function'){portraitMedia.addListener(onOrientationChange);}
+  const websiteFrame=stage.querySelector('.cp-website-frame');
+  if(portalMode==='website'&&websiteFrame)websiteFrame.addEventListener('load',trackImpression,{once:true});
+  const access=stage.querySelector('[data-action="internet-access"]');
+  const ctaOrbitRects=access?[...access.querySelectorAll('[data-cta-orbit-rect]')]:[];
+  const syncCtaOrbitGeometry=()=>{
+    if(!access||ctaOrbitRects.length===0)return;
+    const width=access.clientWidth;
+    const height=access.clientHeight;
+    const inset=.9;
+    const rectWidth=Math.max(0,width-(inset*2));
+    const rectHeight=Math.max(0,height-(inset*2));
+    const radius=Math.max(0,rectHeight/2);
+    ctaOrbitRects.forEach(rect=>{
+      rect.setAttribute('x',String(inset));
+      rect.setAttribute('y',String(inset));
+      rect.setAttribute('width',String(rectWidth));
+      rect.setAttribute('height',String(rectHeight));
+      rect.setAttribute('rx',String(radius));
+      rect.setAttribute('ry',String(radius));
+    });
+  };
+  syncCtaOrbitGeometry();
+  if(typeof ResizeObserver==='function'&&access){
+    const ctaOrbitObserver=new ResizeObserver(syncCtaOrbitGeometry);
+    ctaOrbitObserver.observe(access);
+  }else{
+    window.addEventListener('resize',syncCtaOrbitGeometry,{passive:true});
+  }
+  const ctaOrbitDurationMs=2400;
+  const ctaOrbitOffsets=ctaOrbitRects.map(rect=>Number.parseFloat(rect.dataset.ctaOrbitOffset||'0'));
+  let ctaOrbitFrame=0;
+  let ctaOrbitStartedAt=0;
+  const renderCtaOrbit=timestamp=>{
+    if(ctaOrbitRects.length===0)return;
+    if(!ctaOrbitStartedAt)ctaOrbitStartedAt=timestamp;
+    const elapsed=(timestamp-ctaOrbitStartedAt)%ctaOrbitDurationMs;
+    const progress=(elapsed/ctaOrbitDurationMs)*100;
+    ctaOrbitRects.forEach((rect,index)=>{
+      const base=Number.isFinite(ctaOrbitOffsets[index])?ctaOrbitOffsets[index]:0;
+      rect.style.strokeDashoffset=String(base-progress);
+    });
+    ctaOrbitFrame=window.requestAnimationFrame(renderCtaOrbit);
+  };
+  const restartCtaOrbit=()=>{
+    if(ctaOrbitFrame){window.cancelAnimationFrame(ctaOrbitFrame);ctaOrbitFrame=0;}
+    ctaOrbitStartedAt=0;
+    ctaOrbitFrame=window.requestAnimationFrame(renderCtaOrbit);
+  };
+  restartCtaOrbit();
+  const dialog=stage.querySelector('[data-access-dialog]');
+  const confirm=stage.querySelector('[data-dialog-confirm]');
+  const cancels=[...stage.querySelectorAll('[data-dialog-cancel]')];
+  const runtimeError=stage.querySelector('[data-runtime-error]');
+  const termsOpen=stage.querySelector('[data-terms-open]');
+  const termsDialog=stage.querySelector('[data-terms-dialog]');
+  const termsCloses=[...stage.querySelectorAll('[data-terms-close]')];
+  const sliderTrack=stage.querySelector('[data-dialog-track]');
+  const sliderDots=[...stage.querySelectorAll('[data-dialog-dot]')];
+  const sliderRealCount=stage.querySelectorAll('[data-dialog-slide]').length;
+  const preview=stage.dataset.preview==='1';
+  const sessionId=String(stage.dataset.localSessionId||'');
+  const authorizeUrl=String(stage.dataset.localAuthorizeUrl||'');
+  let state='preparing';
+  let sliderTimer=0;
+  let sliderSettleTimer=0;
+  let sliderResetting=false;
+
+  const validRuntime=()=>/^[0-9a-fA-F]{16,80}$/.test(sessionId)&&/^http:\/\/10\.10\.10\.1(?::2080)?\/cgi-bin\/portal$/.test(authorizeUrl);
+  const setError=(message)=>{
+    state='error';
+    access.disabled=true;
+    access.setAttribute('aria-disabled','true');
+    if(runtimeError){runtimeError.hidden=false;runtimeError.textContent=message;}
+  };
+  const sliderWidth=()=>sliderTrack?(sliderTrack.clientWidth||1):1;
+  const sliderRawIndex=()=>sliderTrack?Math.max(0,Math.round(sliderTrack.scrollLeft/sliderWidth())):0;
+  const syncSliderDots=()=>{
+    if(sliderDots.length===0)return;
+    const raw=sliderRawIndex();
+    const index=raw>=sliderRealCount?0:Math.min(sliderRealCount-1,raw);
+    sliderDots.forEach((dot,i)=>dot.setAttribute('aria-current',i===index?'true':'false'));
+  };
+  const clearSliderTimers=()=>{
+    if(sliderTimer){window.clearTimeout(sliderTimer);sliderTimer=0;}
+    if(sliderSettleTimer){window.clearTimeout(sliderSettleTimer);sliderSettleTimer=0;}
+  };
+  const stopAutoSlider=()=>{clearSliderTimers();};
+  const jumpSliderToStart=()=>{
+    if(!sliderTrack)return;
+    sliderResetting=true;
+    sliderTrack.scrollTo({left:0,behavior:'auto'});
+    syncSliderDots();
+    window.requestAnimationFrame(()=>{
+      sliderResetting=false;
+      syncSliderDots();
+      scheduleAutoSlider();
+    });
+  };
+  const settleSlider=()=>{
+    if(!sliderTrack||sliderRealCount<2||dialog.hidden||sliderResetting)return;
+    if(sliderRawIndex()>=sliderRealCount){jumpSliderToStart();return;}
+    syncSliderDots();
+    scheduleAutoSlider();
+  };
+  const queueSliderSettle=()=>{
+    if(sliderResetting)return;
+    if(sliderSettleTimer)window.clearTimeout(sliderSettleTimer);
+    sliderSettleTimer=window.setTimeout(()=>{
+      sliderSettleTimer=0;
+      settleSlider();
+    },120);
+  };
+  const scheduleAutoSlider=()=>{
+    if(!sliderTrack||sliderRealCount<2||dialog.hidden||sliderResetting)return;
+    if(sliderTimer)window.clearTimeout(sliderTimer);
+    sliderTimer=window.setTimeout(()=>{
+      sliderTimer=0;
+      const raw=sliderRawIndex();
+      if(raw>=sliderRealCount){jumpSliderToStart();return;}
+      const next=Math.min(raw+1,sliderRealCount);
+      sliderTrack.scrollTo({left:next*sliderWidth(),behavior:'smooth'});
+      queueSliderSettle();
+    },2000);
+  };
+  const prepare=()=>{
+    if(runtimeError){runtimeError.hidden=true;runtimeError.textContent='';}
+    if(!preview&&!validRuntime()){setError('Phiên kết nối chưa sẵn sàng. Vui lòng kết nối lại Wi‑Fi.');return;}
+    state='ready';
+    if(portalMode==='website')trackImpression();
+    access.disabled=false;
+    access.setAttribute('aria-disabled','false');
+  };
+  const openDialog=(transitionMode='default')=>{
+    if(state!=='ready'||!dialog.hidden)return;
+    dialog.classList.toggle('is-video-transition',transitionMode==='video-end');
+    dialog.hidden=false;
+    dialog.setAttribute('aria-hidden','false');
+    if(sliderTrack){jumpSliderToStart();scheduleAutoSlider();}
+    window.setTimeout(()=>confirm.focus(),transitionMode==='video-end'?880:0);
+  };
+  const closeDialog=(restoreFocus=true)=>{
+    if(state==='committing')return;
+    stopAutoSlider();
+    dialog.hidden=true;
+    dialog.setAttribute('aria-hidden','true');
+    dialog.classList.remove('is-video-transition');
+    if(restoreFocus)access.focus();
+  };
+  const cancelDialog=()=>{
+    if(state==='committing')return;
+    closeDialog(false);
+    if(portalMode==='video'){
+      startVideoCycle(true);
+      return;
+    }
+    access.focus();
+  };
+  const openTerms=()=>{
+    if(!termsDialog)return;
+    stopAutoSlider();
+    termsDialog.hidden=false;
+    termsDialog.setAttribute('aria-hidden','false');
+    const firstClose=termsDialog.querySelector('[data-terms-close]');
+    window.setTimeout(()=>{if(firstClose)firstClose.focus();},0);
+  };
+  const closeTerms=(restoreFocus=true)=>{
+    if(!termsDialog||termsDialog.hidden)return;
+    termsDialog.hidden=true;
+    termsDialog.setAttribute('aria-hidden','true');
+    if(!dialog.hidden)scheduleAutoSlider();
+    if(restoreFocus&&termsOpen)termsOpen.focus();
+  };
+  const commit=()=>{
+    if(state!=='ready')return;
+    if(preview){closeDialog(true);return;}
+    if(!validRuntime()){setError('Phiên kết nối chưa sẵn sàng. Vui lòng kết nối lại Wi‑Fi.');closeDialog(false);return;}
+    state='committing';
+    stopAutoSlider();
+    confirm.disabled=true;
+    access.disabled=true;
+    access.setAttribute('aria-disabled','true');
+    dialog.hidden=true;
+    dialog.setAttribute('aria-hidden','true');
+
+    const form=document.createElement('form');
+    form.method='post';
+    form.action=authorizeUrl;
+    form.style.display='none';
+    const action=document.createElement('input');
+    action.type='hidden';action.name='action';action.value='authorize';
+    const sid=document.createElement('input');
+    sid.type='hidden';sid.name='session_id';sid.value=sessionId;
+    form.append(action,sid);
+    document.body.appendChild(form);
+    form.submit();
+  };
+
+  access.disabled=true;
+  access.setAttribute('aria-disabled','true');
+  access.addEventListener('click',()=>{track('content_interaction','cta');openDialog();});
+  if(sliderTrack){
+    sliderTrack.addEventListener('scroll',queueSliderSettle,{passive:true});
+    sliderTrack.addEventListener('pointerdown',()=>{track('content_interaction','banner');stopAutoSlider();},{passive:true});
+    sliderTrack.addEventListener('pointerup',queueSliderSettle,{passive:true});
+    sliderTrack.addEventListener('pointercancel',queueSliderSettle,{passive:true});
+    if('onscrollend' in sliderTrack){sliderTrack.addEventListener('scrollend',settleSlider,{passive:true});}
+  }
+  if(termsOpen)termsOpen.addEventListener('click',openTerms);
+  termsCloses.forEach(button=>button.addEventListener('click',()=>closeTerms(true)));
+  confirm.addEventListener('click',commit);
+  cancels.forEach(button=>button.addEventListener('click',cancelDialog));
+  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(termsDialog&&!termsDialog.hidden){closeTerms(true);return;}if(!dialog.hidden)cancelDialog();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      stopAutoSlider();
+      if(mediaMode==='video'){
+        clearVideoTimers();
+        if(bgVideo)bgVideo.pause();
+      }
+      return;
+    }
+    if(portalMode==='website'){if(!dialog.hidden)scheduleAutoSlider();return;}
+    if(mediaMode==='video'){
+      if(videoPhase==='playing'&&bgVideo){playVideo(bgVideo).catch(()=>reportVideoFailure('Không thể tiếp tục phát video Captive Portal.'));}
+      else if(videoPhase==='dialog-transition'||videoPhase==='dialog'){if(dialog.hidden&&state==='ready')openDialog('video-end');}
+      else if(videoPhase==='waiting-start'||videoPhase==='preparing'){beginVideoIntro(mediaGeneration);}
+      else if(videoPhase==='idle'){startVideoCycle(true);}
+    }else startImage();
+    if(!dialog.hidden)scheduleAutoSlider();
+  });
+  if(portalMode!=='website')startBackgroundMedia();
+  prepare();
+})();
+</script>
+</body>
+</html>
+    

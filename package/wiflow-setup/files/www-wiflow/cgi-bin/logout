@@ -1,0 +1,6 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+clear_management_resume
+t="$(cookie_token)"; [ -n "$t" ] && rm -f "$SESS/$t" 2>/dev/null || true
+g="$(gate_cookie_token)"; [ -n "$g" ] && rm -f "$GATE_SESS/$g" 2>/dev/null || true
+printf 'Status: 302 Found\r\nLocation: /\r\nSet-Cookie: WFSESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict\r\nSet-Cookie: WFGATE=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict\r\nCache-Control: no-store\r\n\r\n'

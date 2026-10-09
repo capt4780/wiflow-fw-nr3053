@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+mkdir -p /etc/wiflow /www-wiflow-portal/runtime/revisions
+chmod 700 /etc/wiflow
+chmod 600 /etc/config/wiflow

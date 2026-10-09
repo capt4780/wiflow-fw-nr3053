@@ -1,0 +1,232 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+
+req="${1:-}"
+[ -f "$req" ] || exit 2
+chmod 600 "$req" 2>/dev/null || true
+jget(){ cat "$req" 2>/dev/null | jsonfilter -e "$1" 2>/dev/null || true; }
+mode="$(jget '@.mode')"
+band="$(jget '@.band')"
+radio="$(jget '@.radio')"
+ssid="$(jget '@.ssid')"
+bssid="$(jget '@.bssid')"
+pass="$(jget '@.password')"
+guest="$(jget '@.guest_ssid')"
+enc="$(jget '@.enc')"; [ -n "$enc" ] || enc=psk2
+command_id="$(jget '@.command_id')"
+command_action="$(jget '@.command_action')"; [ -n "$command_action" ] || command_action=change_wifi
+
+state_set job running
+state_set phase preparing
+state_set job_error ''
+state_set message 'Đang chuẩn bị kết nối'
+state_set job_started "$(date +%s)"
+old_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
+
+backup_configs(){
+    rm -rf "$UPLINK_TXN"
+    mkdir -p "$UPLINK_TXN" || return 1
+    chmod 700 "$UPLINK_TXN" 2>/dev/null || true
+    cp /etc/config/wireless "$UPLINK_TXN/wireless" 2>/dev/null || return 1
+    cp /etc/config/wiflow "$UPLINK_TXN/wiflow" 2>/dev/null || return 1
+    cp /etc/config/network "$UPLINK_TXN/network" 2>/dev/null || return 1
+    [ -n "$command_id" ] && printf '%s\n' "$command_id" > "$UPLINK_TXN/command_id" || true
+    [ -n "$command_action" ] && printf '%s\n' "$command_action" > "$UPLINK_TXN/command_action" || true
+    : > "$UPLINK_TXN/.pending"
+    chmod 600 "$UPLINK_TXN"/* "$UPLINK_TXN/.pending" 2>/dev/null || true
+}
+cleanup_backups(){ rm -rf "$UPLINK_TXN"; }
+cleanup_request(){ rm -f "$req"; }
+reload_radio(){ r="$1"; [ -n "$r" ] || return 0; wifi reload "$r" >/dev/null 2>&1 || wifi up "$r" >/dev/null 2>&1 || return 1; }
+restore_configs(){
+    [ -f "$UPLINK_TXN/wireless" ] && cp "$UPLINK_TXN/wireless" /etc/config/wireless
+    [ -f "$UPLINK_TXN/wiflow" ] && cp "$UPLINK_TXN/wiflow" /etc/config/wiflow
+    [ -f "$UPLINK_TXN/network" ] && cp "$UPLINK_TXN/network" /etc/config/network
+    secure_configs
+    ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || true
+    [ -n "$old_radio" ] && reload_radio "$old_radio" || true
+    [ -n "$radio" ] && [ "$radio" != "$old_radio" ] && reload_radio "$radio" || true
+}
+finish_command(){ status="$1"; message="$2"; [ -n "$command_id" ] && command_result_set "$command_id" "$command_action" "$status" "$message" || true; }
+fail(){
+    code="$1"; message="$2"
+    restore_configs
+    cleanup_backups
+    cleanup_request
+    state_set job failed
+    state_set phase failed
+    state_set job_error "$code"
+    state_set message "$message"
+    state_set internet_live 0
+    finish_command failed "$message"
+    exit 1
+}
+succeed(){
+    message="$1"
+    cleanup_backups
+    cleanup_request
+    state_set job success
+    state_set phase connected
+    state_set job_error ''
+    state_set message "$message"
+    state_set internet_live 1
+    state_set internet_last_ok "$(date +%s)"
+    finish_command success "$message"
+    exit 0
+}
+wait_assoc(){
+    wanted="$1"; seconds="$2"; n=0
+    while [ "$n" -lt "$seconds" ]; do wifi_uplink_associated "$wanted" && return 0; sleep 1; n=$((n+1)); done
+    return 1
+}
+wait_dhcp(){
+    seconds="$1"; n=0
+    while [ "$n" -lt "$seconds" ]; do iface_up wiflow_wwan && return 0; sleep 1; n=$((n+1)); done
+    return 1
+}
+wait_internet(){
+    iface="$1"; tries="${2:-3}"; n=0
+    while [ "$n" -lt "$tries" ]; do iface_route_active "$iface" && internet_probe && return 0; sleep 2; n=$((n+1)); done
+    return 1
+}
+
+backup_configs || { cleanup_request; state_set job failed; state_set phase failed; state_set job_error backup_failed; state_set message 'Không thể tạo điểm khôi phục cấu hình'; finish_command failed 'Không thể tạo điểm khôi phục cấu hình'; exit 1; }
+trap 'fail interrupted "Kết nối bị gián đoạn. Wiflow đã khôi phục cấu hình trước đó."' HUP INT TERM
+if ! uci -q get network.wiflow_wwan >/dev/null 2>&1; then
+    ensure_uplink_network
+fi
+
+if [ "$mode" = lan ]; then
+    state_set phase dhcp
+    state_set message 'Đang kiểm tra Cáp mạng'
+    uci -q get network.wan >/dev/null 2>&1 && uci set network.wan.metric='10'
+    uci set network.wiflow_wwan.metric='50'
+    uci commit network
+    ifup wan >/dev/null 2>&1 || true
+    n=0
+    while [ "$n" -lt 15 ]; do
+        if iface_up wan; then
+            wst="$(ifstatus wan 2>/dev/null || true)"; waddr="$(printf '%s' "$wst" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null || true)"
+            case "$waddr" in
+                10.0.0.*|10.10.10.*) fail source_subnet_conflict 'Mạng nguồn trùng dải mạng nội bộ Wiflow (10.0.0.x hoặc 10.10.10.x). Hãy đổi subnet modem nguồn hoặc dùng mạng nguồn khác.';;
+            esac
+            state_set phase internet_check
+            state_set message 'Đang kiểm tra Internet'
+            if wait_internet wan 3; then
+                uci -q delete wireless.wiflow_uplink >/dev/null 2>&1 || true
+                uci commit wireless
+                ifdown wiflow_wwan >/dev/null 2>&1 || true
+                /usr/lib/wiflow/radio-policy wan >/dev/null 2>&1 || fail radio_policy_failed 'Không áp dụng được cấu hình WiFi khách'
+                [ -n "$old_radio" ] && reload_radio "$old_radio" || true
+                uci set wiflow.core.internet_mode='lan'
+                uci set wiflow.core.internet_verified='1'
+                uci set wiflow.core.setup_step='3'
+                uci -q delete wiflow.core.source_ssid >/dev/null 2>&1 || true
+                uci commit wiflow
+                secure_configs
+                succeed 'Đã kết nối qua Cáp mạng'
+            fi
+            fail internet_failed 'Cáp mạng đã nhận địa chỉ mạng nhưng chưa truy cập được Internet'
+        fi
+        sleep 1; n=$((n+1))
+    done
+    fail dhcp_failed 'Cáp mạng chưa nhận được địa chỉ mạng'
+fi
+
+[ "$mode" = wifi ] || fail invalid_mode 'Kiểu kết nối không hợp lệ'
+case "$band" in 2g|5g) :;; *) fail invalid_band 'Băng tần uplink không hợp lệ';; esac
+[ -n "$ssid" ] || fail missing_ssid 'Chưa chọn WiFi nguồn'
+[ -n "$radio" ] || radio="$(radio_for_band "$band" 2>/dev/null || true)"
+[ -n "$radio" ] && [ "$(radio_band "$radio")" = "$band" ] || fail radio_not_found 'Không tìm thấy radio đúng băng tần'
+
+current_guest="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || true)"; [ -n "$current_guest" ] || current_guest=Wiflow
+if [ "$ssid" = "$current_guest" ]; then
+    [ -n "$guest" ] && [ "$guest" != "$ssid" ] || fail guest_ssid_conflict 'WiFi khách không được trùng WiFi nguồn'
+    uci set "wiflow.core.guest_ssid=$guest"; uci commit wiflow
+fi
+
+/usr/lib/wiflow/radio-policy wifi "$band" anchor >/dev/null 2>&1 || fail radio_policy_failed 'Không áp dụng được chính sách radio quản trị'
+# Tear down the previous STA at interface level. Do not reload the opposite
+# radio: it is the management anchor that keeps Wiflow Setup reachable.
+ifdown wiflow_wwan >/dev/null 2>&1 || true
+sleep 1
+uci -q delete wireless.wiflow_uplink >/dev/null 2>&1 || true
+uci set wireless.wiflow_uplink='wifi-iface'
+uci set wireless.wiflow_uplink.device="$radio"
+uci set wireless.wiflow_uplink.mode='sta'
+uci set wireless.wiflow_uplink.network='wiflow_wwan'
+uci set wireless.wiflow_uplink.ssid="$ssid"
+[ -n "$bssid" ] && uci set wireless.wiflow_uplink.bssid="$bssid" || true
+if [ -n "$pass" ]; then
+    case "$enc" in sae|sae-mixed) uci set wireless.wiflow_uplink.encryption='sae-mixed';; psk) uci set wireless.wiflow_uplink.encryption='psk-mixed';; *) uci set wireless.wiflow_uplink.encryption='psk2';; esac
+    uci set wireless.wiflow_uplink.key="$pass"
+else
+    uci set wireless.wiflow_uplink.encryption='none'
+fi
+uci -q get network.wan >/dev/null 2>&1 && uci set network.wan.metric='50'
+uci set network.wiflow_wwan.metric='10'
+uci commit network
+uci commit wireless
+secure_configs
+
+state_set phase associating
+state_set message 'Đang xác thực WiFi nguồn'
+reload_radio "$radio" || fail radio_reload_failed 'Không tải lại được radio WiFi nguồn'
+ifup wiflow_wwan >/dev/null 2>&1 || true
+
+if ! wait_assoc "$ssid" 12; then
+    # BSSID from a scan can become stale on mesh/band-steering networks. Retry
+    # once by SSID before declaring the uplink invalid.
+    if [ -n "$bssid" ]; then
+        uci -q delete wireless.wiflow_uplink.bssid >/dev/null 2>&1 || true
+        uci commit wireless
+        state_set message 'Đang thử lại WiFi nguồn'
+        reload_radio "$radio" || true
+        ifup wiflow_wwan >/dev/null 2>&1 || true
+        wait_assoc "$ssid" 12 || true
+    fi
+fi
+
+if ! wifi_uplink_associated "$ssid"; then
+    if wifi_ssid_visible "$radio" "$ssid"; then
+        fail wifi_auth_failed 'Không xác thực được WiFi nguồn. Vui lòng kiểm tra mật khẩu.'
+    fi
+    fail wifi_not_found 'Không tìm thấy WiFi nguồn. Vui lòng kiểm tra lại tên WiFi hoặc tín hiệu.'
+fi
+
+state_set phase dhcp
+state_set message 'Đang nhận địa chỉ mạng'
+wait_dhcp 20 || fail dhcp_failed 'Đã kết nối WiFi nhưng không nhận được địa chỉ IP từ modem nguồn'
+st="$(ifstatus wiflow_wwan 2>/dev/null || true)"; addr="$(printf '%s' "$st" | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null || true)"
+case "$addr" in
+    10.0.0.*|10.10.10.*) fail source_subnet_conflict 'WiFi nguồn trùng dải mạng nội bộ Wiflow (10.0.0.x hoặc 10.10.10.x). Hãy đổi subnet modem nguồn hoặc chọn mạng nguồn khác.';;
+esac
+
+state_set phase internet_check
+state_set message 'Đang kiểm tra Internet'
+wait_internet wiflow_wwan 3 || fail internet_failed 'Đã kết nối WiFi nguồn nhưng chưa truy cập được Internet'
+
+# The first association may have used the BSSID captured during scanning.
+# Remove that pin before the final radio reload so mesh/band-steering networks
+# can move the STA later without another Wiflow configuration change.
+uci -q delete wireless.wiflow_uplink.bssid >/dev/null 2>&1 || true
+uci commit wireless
+
+# Uplink is stable. Restore dual-band guest service. Only the target radio is
+# reloaded; the opposite management anchor remains up throughout this step.
+/usr/lib/wiflow/radio-policy wifi "$band" full >/dev/null 2>&1 || fail radio_policy_failed 'Không khôi phục được WiFi khách hai băng tần'
+reload_radio "$radio" || fail radio_reload_failed 'Không khôi phục được WiFi khách trên radio nguồn'
+sleep 2
+ifup wiflow_wwan >/dev/null 2>&1 || true
+wait_assoc "$ssid" 10 || fail wifi_reconnect_failed 'WiFi nguồn bị mất sau khi khôi phục WiFi khách'
+wait_dhcp 15 || fail dhcp_failed 'WiFi nguồn mất địa chỉ IP sau khi khôi phục WiFi khách'
+wait_internet wiflow_wwan 2 || fail internet_failed 'Internet bị mất sau khi khôi phục WiFi khách'
+
+uci set wiflow.core.internet_mode='wifi'
+uci set "wiflow.core.source_ssid=$ssid"
+uci set wiflow.core.internet_verified='1'
+uci set wiflow.core.setup_step='3'
+uci commit wiflow
+secure_configs
+succeed 'Đã kết nối Internet'

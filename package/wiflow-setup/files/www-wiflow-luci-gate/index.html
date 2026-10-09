@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Wiflow</title>
+  <link rel="stylesheet" href="/assets/gate-v1.css">
+</head>
+<body>
+  <main class="wf-shell wf-auth-shell">
+    <section class="wf-card wf-auth-card wf-simple-gate">
+      <span class="wf-mark wf-logo-text">Wiflow</span>
+      <div id="err" class="wf-error" hidden>Mã bảo mật không đúng hoặc đang bị khóa tạm thời.</div>
+      <form method="post" action="/cgi-bin/unlock">
+        <input class="wf-input wf-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" aria-label="Mã bảo mật" placeholder="Mã bảo mật" autofocus required>
+        <button class="wf-btn primary wf-full" type="submit">Tiếp tục</button>
+      </form>
+    </section>
+  </main>
+  <script>if(location.search.includes('error=1'))document.getElementById('err').hidden=false;</script>
+</body>
+</html>

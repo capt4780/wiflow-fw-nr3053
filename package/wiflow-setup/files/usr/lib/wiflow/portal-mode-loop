@@ -1,0 +1,66 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+
+portal_reconcile_local(){
+  desired="$1"
+  case "$desired" in ''|*[!0-9]*) desired=0;; esac
+  current="$(uci -q get wiflow.core.portal_revision 2>/dev/null || echo 0)"
+  case "$current" in ''|*[!0-9]*) current=0;; esac
+
+  # Desired revision >0 means fetch/repair the snapshot if needed.
+  if [ "$desired" -gt 0 ] && { [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ]; }; then
+    /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1 || true
+  fi
+
+  # Local-first invariant: once a valid snapshot exists, captive Portal stays
+  # active even if WP is temporarily unavailable or returns a transient flag.
+  # Unpair explicitly clears storage and disables captive via pairing_clear_local.
+  if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
+    if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" != 1 ]; then
+      uci set wiflow.core.portal_enabled='1'
+      uci commit wiflow >/dev/null 2>&1 || true
+    fi
+    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || state_set portal_error 'captive_firewall_enable_failed'
+  fi
+}
+
+while true; do
+ paired="$(uci -q get wiflow.core.paired 2>/dev/null || echo 0)"
+ if [ "$paired" = 1 ] && [ -n "$(device_token)" ] && [ -n "$(device_id)" ]; then
+  resp="/tmp/wiflow-mode-sync.$$"; rm -f "$resp"; umask 077
+  if wiflow_get "$resp" "$WIFLOW_DEVICE_API/sync" >/dev/null 2>&1; then
+   ok="$(jsonfilter -i "$resp" -e '@.ok' 2>/dev/null || true)"
+   gen="$(jsonfilter -i "$resp" -e '@.data_generation' 2>/dev/null || true)"
+   code="$(jsonfilter -i "$resp" -e '@.code' 2>/dev/null || true)"
+   if [ "$code" = DEVICE_AUTH_INVALID ] || [ "$code" = DEVICE_AUTH_MISSING ]; then
+    pairing_clear_local
+    rm -f "$resp" "${resp}.fetch-error"
+    sleep 2
+    continue
+   fi
+   if { [ "$ok" = true ] || [ "$ok" = 1 ]; } && [ "$gen" = "$WIFLOW_DATA_GENERATION" ]; then
+    account_public_id="$(jsonfilter -i "$resp" -e '@.account_public_id' 2>/dev/null || true)"
+    [ -n "$account_public_id" ] || account_public_id="$(jsonfilter -i "$resp" -e '@.device.account_public_id' 2>/dev/null || true)"
+    if printf '%s' "$account_public_id" | grep -Eq '^WIFID[A-Z0-9]{7}$'; then
+     current_account_public_id="$(uci -q get wiflow.core.account_public_id 2>/dev/null || true)"
+     if [ "$current_account_public_id" != "$account_public_id" ]; then uci set "wiflow.core.account_public_id=$account_public_id"; uci commit wiflow >/dev/null 2>&1 || true; secure_configs; fi
+    fi
+    remote_mode="$(jsonfilter -i "$resp" -e '@.device.portal_mode' 2>/dev/null || true)"
+    case "$remote_mode" in website|image|video)
+      local_mode="$(uci -q get wiflow.core.portal_mode 2>/dev/null || true)"
+      if [ "$local_mode" != "$remote_mode" ]; then
+       uci set "wiflow.core.portal_mode=$remote_mode"; uci commit wiflow >/dev/null 2>&1 || true; secure_configs
+       # Only the Website walled-garden set needs refreshing on an actual mode change.
+       /usr/lib/wiflow/portal-firewall refresh >/dev/null 2>&1 || true
+       logger -t wiflow-portal-mode "mode=$remote_mode"
+      fi;;
+    esac
+    desired="$(jsonfilter -i "$resp" -e '@.device.desired_portal_revision' 2>/dev/null || echo 0)"
+    portal_reconcile_local "$desired"
+   fi
+  fi
+  rm -f "$resp" "${resp}.fetch-error"
+ fi
+ sleep 2
+done

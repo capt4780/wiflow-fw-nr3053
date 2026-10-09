@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Wiflow</title>
+  <link rel="stylesheet" href="/assets/setup-v1.css">
+</head>
+<body>
+  <main class="wf-shell wf-auth-shell">
+    <section class="wf-card wf-auth-card wf-simple-login">
+      <span class="wf-mark wf-logo-text">Wiflow</span>
+      <h1 class="wf-title">Đăng nhập</h1>
+      <div id="err" class="wf-error" hidden>Tài khoản hoặc mật khẩu không đúng.</div>
+      <form method="post" action="/cgi-bin/login" autocomplete="off">
+        <label for="username">Tài khoản</label>
+        <input id="username" class="wf-input" name="username" value="" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <label for="password">Mật khẩu</label>
+        <input id="password" class="wf-input" name="password" type="password" value="" autocomplete="new-password" required>
+        <button class="wf-btn primary wf-full" type="submit">Tiếp tục</button>
+      </form>
+    </section>
+  </main>
+  <script>
+    fetch('/cgi-bin/gate-status',{cache:'no-store',credentials:'same-origin'}).then(r=>r.json()).then(x=>{if(x.authenticated)location.replace('/setup.html');else if(!x.unlocked)location.replace('/');else if(x.setup_required)location.replace('/enroll.html')}).catch(()=>location.replace('/'));
+    if(location.search.includes('error=1'))document.getElementById('err').hidden=false;
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+current=/tmp/wiflow-portal-associated
+DISCONNECT_GRACE=20
+
+while true; do
+    sleep 5
+    guest="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || echo Wiflow)"
+    : > "$current"; queried=0
+    for obj in $(ubus list 'hostapd.*' 2>/dev/null); do
+        st="$(ubus call "$obj" get_status 2>/dev/null || true)"; [ -n "$st" ] || continue
+        ssid="$(printf '%s' "$st" | jsonfilter -e '@.ssid' 2>/dev/null || true)"; [ "$ssid" = "$guest" ] || continue
+        queried=1
+        ubus call "$obj" get_clients 2>/dev/null | grep -Eo '"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}"' | tr -d '"' | tr 'a-f' 'A-F' >> "$current" || true
+    done
+    [ "$queried" = 1 ] || continue
+    sort -u "$current" -o "$current" 2>/dev/null || true
+    now="$(date +%s)"
+
+    while read -r mac; do
+        [ -n "$mac" ] || continue
+        ip="$(awk -v m="$mac" 'toupper($2)==m{print $3;exit}' /tmp/dhcp.leases 2>/dev/null || true)"
+        [ -n "$ip" ] || ip="$(ip neigh show dev br-wiflow 2>/dev/null | awk -v m="$mac" 'toupper($0) ~ m && /lladdr/{print $1;exit}')"
+        [ -n "$ip" ] && /usr/lib/wiflow/portal-client ensure "$ip" >/dev/null 2>&1 || true
+    done < "$current"
+
+    for f in "$CLIENT_SESSIONS"/*; do
+        [ -f "$f" ] || continue
+        IFS='|' read -r mac cid sid ip connected authorized last absent < "$f" 2>/dev/null || continue
+        case "${absent:-0}" in ''|*[!0-9]*) absent=0;; esac
+        if grep -qx "$mac" "$current" 2>/dev/null; then
+            newip="$(awk -v m="$mac" 'toupper($2)==m{print $3;exit}' /tmp/dhcp.leases 2>/dev/null || true)"; [ -n "$newip" ] || newip="$ip"
+            if [ "$newip" != "$ip" ]; then
+                if [ "${authorized:-0}" != 0 ]; then
+                    portal_nft_del "$ip" "$mac"
+                    portal_nft_add "$newip" "$mac" || true
+                elif portal_nft_pair_granted "$ip" "$mac"; then
+                    portal_nft_grant_del "$ip" "$mac"
+                    portal_nft_grant_add "$newip" "$mac" || true
+                fi
+            fi
+            client_session_write "$f" "$mac" "$cid" "$sid" "$newip" "$connected" "${authorized:-0}" "$now" 0 || true
+        else
+            [ "$absent" -gt 0 ] || absent="$now"
+            elapsed=$((now-absent))
+            if [ "$elapsed" -ge "$DISCONNECT_GRACE" ]; then
+                portal_nft_del "$ip" "$mac"
+                portal_nft_grant_del "$ip" "$mac"
+                when="${last:-$now}"; case "$when" in ''|*[!0-9]*) when="$now";; esac
+                event_enqueue disconnected "$cid" "$sid" "$when" || true
+                rm -f "$f"
+                : > "$HEARTBEAT_KICK" 2>/dev/null || true
+            else
+                client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "${last:-$now}" "$absent" || true
+            fi
+        fi
+    done
+done

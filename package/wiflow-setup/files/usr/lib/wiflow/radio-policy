@@ -1,0 +1,43 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+mode="${1:-setup}"
+uplink_band="${2:-}"
+stage="${3:-full}"
+guest_ssid="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || echo Wiflow)"
+r2="$(radio_for_band 2g 2>/dev/null || true)"
+r5="$(radio_for_band 5g 2>/dev/null || true)"
+
+configure_radio(){ r="$1"; band="$2"; [ -n "$r" ] || return 0; uci set "wireless.$r.disabled=0"; uci set "wireless.$r.country=VN"; if [ "$band" = 2g ]; then uci set "wireless.$r.channel=6"; uci set "wireless.$r.htmode=HE20"; else uci set "wireless.$r.channel=36"; uci set "wireless.$r.htmode=HE40"; fi; }
+ensure_guest(){ sec="$1"; r="$2"; disabled="$3"; [ -n "$r" ] || return 0; uci -q delete "wireless.$sec" >/dev/null 2>&1 || true; uci set "wireless.$sec=wifi-iface"; uci set "wireless.$sec.device=$r"; uci set "wireless.$sec.mode=ap"; uci set "wireless.$sec.network=wiflow_guest"; uci set "wireless.$sec.ssid=$guest_ssid"; uci set "wireless.$sec.encryption=none"; uci set "wireless.$sec.disabled=$disabled"; }
+# Disable stock/default AP sections so Wiflow has one canonical AP per radio.
+for sec in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-iface" {n=$1;sub(/^wireless\./,"",n);print n}'); do
+    case "$sec" in wiflow_guest_2g|wiflow_guest_5g|wiflow_uplink) continue;; esac
+    [ "$(uci -q get wireless.$sec.mode 2>/dev/null || true)" = ap ] || continue
+    uci set "wireless.$sec.disabled=1"
+done
+
+d2=0; d5=0
+case "$mode" in
+  wan|setup) d2=0; d5=0;;
+  wifi)
+    d2=0; d5=0
+    case "$uplink_band" in
+      5g)
+        [ -n "$r5" ] && { uci set "wireless.$r5.disabled=0"; uci set "wireless.$r5.channel=auto"; }
+        [ "$stage" = anchor ] && d5=1
+        ;;
+      2g)
+        [ -n "$r2" ] && { uci set "wireless.$r2.disabled=0"; uci set "wireless.$r2.channel=auto"; }
+        [ "$stage" = anchor ] && d2=1
+        ;;
+      *) exit 2;;
+    esac;;
+  *) exit 2;;
+esac
+[ "$uplink_band" != 2g ] && configure_radio "$r2" 2g || true
+[ "$uplink_band" != 5g ] && configure_radio "$r5" 5g || true
+ensure_guest wiflow_guest_2g "$r2" "$d2"
+ensure_guest wiflow_guest_5g "$r5" "$d5"
+uci commit wireless
+exit 0

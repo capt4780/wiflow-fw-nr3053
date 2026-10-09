@@ -1,0 +1,126 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+[ "${REQUEST_METHOD:-GET}" = POST ] && read_body || BODY=''
+require_session
+action="$(param action 2>/dev/null || true)"; [ -n "$action" ] || action=status
+case "$action" in
+scan)
+    band="$(param band 2>/dev/null || echo 5g)"; case "$band" in 2g|5g) :;; *) header_json; echo '{"ok":false,"error":"Băng tần không hợp lệ"}'; exit 0;; esac
+    /usr/lib/wiflow/scan-wifi "$band"
+    header_json; printf '{"ok":true,"band":"%s","networks":[' "$(json_escape "$band")"; first=1
+    if [ -f /tmp/wiflow-scan.out ]; then TAB="$(printf '\t')"; while IFS="$TAB" read -r radio nband ssid bssid enc; do [ -n "$ssid" ] || continue; [ "$first" -eq 1 ] || printf ','; first=0; printf '{"radio":"%s","band":"%s","ssid":"%s","bssid":"%s","enc":"%s"}' "$(json_escape "$radio")" "$(json_escape "$nband")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$enc")"; done < /tmp/wiflow-scan.out; fi
+    printf ']}\n';;
+connect)
+    require_csrf
+    arm_management_resume >/dev/null 2>&1 || true
+    if ! mkdir /tmp/wiflow-uplink.lock 2>/dev/null; then header_json; echo '{"ok":false,"error":"Một cấu hình Internet khác đang được xử lý"}'; exit 0; fi
+    mode="$(param mode 2>/dev/null || true)"; band="$(param band 2>/dev/null || true)"; radio="$(param radio 2>/dev/null || true)"; ssid="$(param ssid 2>/dev/null || true)"; bssid="$(param bssid 2>/dev/null || true)"; pass="$(param password 2>/dev/null || true)"; guest="$(param guest_ssid 2>/dev/null || true)"; enc="$(param enc 2>/dev/null || true)"
+    req="/tmp/wiflow-uplink-request-$$.json"; umask 077
+    printf '{"mode":"%s","band":"%s","radio":"%s","ssid":"%s","bssid":"%s","password":"%s","guest_ssid":"%s","enc":"%s"}\n' \
+        "$(json_escape "$mode")" "$(json_escape "$band")" "$(json_escape "$radio")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$pass")" "$(json_escape "$guest")" "$(json_escape "$enc")" > "$req"
+    chmod 600 "$req"
+    state_set job running; state_set phase preparing; state_set job_error ''; state_set message 'Đang chuẩn bị kết nối'; state_set job_started "$(date +%s)"
+    ( /usr/lib/wiflow/apply-uplink "$req" >/tmp/wiflow-uplink.log 2>&1; rm -rf /tmp/wiflow-uplink.lock ) >/dev/null 2>&1 &
+    header_json; echo '{"ok":true,"started":true}';;
+job)
+    j="$(state_get job)"; p="$(state_get phase)"; m="$(state_get message)"; e="$(state_get job_error)"; started="$(state_get job_started)"; case "$started" in ''|*[!0-9]*) started=0;; esac
+    now="$(date +%s)"
+    if [ "$j" = running ] && [ "$started" -gt 0 ] && [ $((now-started)) -gt 180 ] && [ ! -d /tmp/wiflow-uplink.lock ]; then
+        j=failed; p=failed; e=job_timeout; m='Kết nối bị gián đoạn. Thử lại.'; state_set job "$j"; state_set phase "$p"; state_set job_error "$e"; state_set message "$m"
+    fi
+    header_json; printf '{"ok":true,"job":"%s","phase":"%s","error_code":"%s","message":"%s","started_at":%s}\n' "$(json_escape "${j:-idle}")" "$(json_escape "${p:-}")" "$(json_escape "${e:-}")" "$(json_escape "${m:-}")" "$started";;
+pair)
+    require_csrf
+    pairing_code="$(param pairing_code 2>/dev/null || true)"
+    pairing_code="$(printf '%s' "$pairing_code" | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9')"
+    printf '%s' "$pairing_code" | grep -Eq '^[A-Z0-9]{12}$' || { header_json; echo '{"ok":false,"error":"Mã kết nối không đúng định dạng","code":"PAIR_CODE_FORMAT"}'; exit 0; }
+    did="$(device_id)"; [ -n "$did" ] || { header_json; echo '{"ok":false,"error":"Không đọc được ID thiết bị","code":"PAIR_DEVICE_ID_MISSING"}'; exit 0; }
+
+    health="/tmp/wiflow-health.$$"; herr="${health}.fetch-error"; rm -f "$health" "$herr"
+    if ! uclient-fetch -T 8 -O "$health" "$WIFLOW_DEVICE_API/health" 2>"$herr"; then
+        http="$(sed -n 's/^HTTP error \([0-9][0-9]*\).*$/\1/p' "$herr" 2>/dev/null | tail -n1)"
+        detail="$(tail -n1 "$herr" 2>/dev/null | tr -d '\r\n' | cut -c1-160)"; [ -n "$detail" ] || detail='Không nhận được phản hồi HTTP'
+        if [ -n "$http" ]; then code="API_HEALTH_HTTP_$http"; message="API Wiflow trả lỗi HTTP $http"; else code='API_HEALTH_TRANSPORT'; message='Không thể kết nối API Wiflow'; fi
+        printf '%s|%s|%s\n' "$code" "$message" "$detail" > /tmp/wiflow-pair-last-error
+        rm -f "$health" "$herr"; header_json; printf '{"ok":false,"error":"%s","code":"%s"}\n' "$(json_escape "$message")" "$code"; exit 0
+    fi
+    rm -f "$herr"
+    hok="$(jsonfilter -i "$health" -e '@.ok' 2>/dev/null || true)"
+    hver="$(jsonfilter -i "$health" -e '@.api_version' 2>/dev/null || true)"
+    hgen="$(jsonfilter -i "$health" -e '@.data_generation' 2>/dev/null || true)"
+    hroot="$(jsonfilter -i "$health" -e '@.rest_root' 2>/dev/null || true)"
+    rm -f "$health"
+    if { [ "$hok" != true ] && [ "$hok" != 1 ]; } || [ "$hver" != 1 ] || [ "$hgen" != "$WIFLOW_DATA_GENERATION" ] || [ "$hroot" != "$WIFLOW_REST_ROOT" ]; then
+        printf '%s\n' 'API_HEALTH_INVALID|API Wiflow không đúng generation/REST contract' > /tmp/wiflow-pair-last-error
+        header_json; echo '{"ok":false,"error":"WP và IPK không cùng phiên bản.","code":"API_HEALTH_INVALID"}'; exit 0
+    fi
+
+    body="{\"pairing_code\":\"$(json_escape "$pairing_code")\",\"device_id\":\"$(json_escape "$did")\",\"model\":\"Viettel NR3053\",\"agent_version\":\"$WIFLOW_AGENT_VERSION\",\"data_generation\":$WIFLOW_DATA_GENERATION}"
+    resp="/tmp/wiflow-pair-response.$$"; rerr="${resp}.fetch-error"; rm -f "$resp" "$rerr"
+    if ! uclient-fetch -T 15 --post-data="$body" --header='Content-Type: application/json' -O "$resp" "$WIFLOW_DEVICE_API/pair" 2>"$rerr"; then
+        http="$(sed -n 's/^HTTP error \([0-9][0-9]*\).*$/\1/p' "$rerr" 2>/dev/null | tail -n1)"
+        detail="$(tail -n1 "$rerr" 2>/dev/null | tr -d '\r\n' | cut -c1-160)"; [ -n "$detail" ] || detail='Không nhận được phản hồi HTTP'
+        if [ -n "$http" ]; then code="PAIR_HTTP_$http"; message="API thiết bị trả lỗi HTTP $http"; else code='PAIR_TRANSPORT'; message='Không thể gửi yêu cầu kết nối'; fi
+        printf '%s|%s|%s\n' "$code" "$message" "$detail" > /tmp/wiflow-pair-last-error
+        rm -f "$resp" "$rerr"; header_json; printf '{"ok":false,"error":"%s","code":"%s"}\n' "$(json_escape "$message")" "$code"; exit 0
+    fi
+    rm -f "$rerr"
+    ok="$(jsonfilter -i "$resp" -e '@.ok' 2>/dev/null || true)"
+    if [ "$ok" != true ] && [ "$ok" != 1 ]; then
+        err="$(jsonfilter -i "$resp" -e '@.message' 2>/dev/null || true)"; code="$(jsonfilter -i "$resp" -e '@.code' 2>/dev/null || true)"
+        [ -n "$err" ] || err='Máy chủ từ chối kết nối'; [ -n "$code" ] || code='PAIR_REJECTED'
+        printf '%s|%s\n' "$code" "$err" > /tmp/wiflow-pair-last-error
+        rm -f "$resp"; header_json; printf '{"ok":false,"error":"%s","code":"%s"}\n' "$(json_escape "$err")" "$(json_escape "$code")"; exit 0
+    fi
+    generation="$(jsonfilter -i "$resp" -e '@.data_generation' 2>/dev/null || true)"
+    [ "$generation" = "$WIFLOW_DATA_GENERATION" ] || { rm -f "$resp"; header_json; echo '{"ok":false,"error":"WP và thiết bị không cùng generation dữ liệu.","code":"PAIR_GENERATION_MISMATCH"}'; exit 0; }
+    token="$(jsonfilter -i "$resp" -e '@.device_token' 2>/dev/null || true)"
+    printf '%s' "$token" | grep -Eq '^[A-Za-z0-9_-]{40,160}$' || { rm -f "$resp"; header_json; echo '{"ok":false,"error":"Máy chủ chưa cấp device token hợp lệ","code":"PAIR_TOKEN_INVALID"}'; exit 0; }
+    desired="$(jsonfilter -i "$resp" -e '@.desired_portal_revision' 2>/dev/null || echo 0)"; case "$desired" in ''|*[!0-9]*) desired=0;; esac
+    pen="$(jsonfilter -i "$resp" -e '@.portal_enabled' 2>/dev/null || true)"; case "$pen" in true|1) wanted=1;; *) wanted=0;; esac
+    account_public_id="$(jsonfilter -i "$resp" -e '@.account_public_id' 2>/dev/null || true)"
+    rm -f /tmp/wiflow-pair-last-error "$resp" 2>/dev/null || true
+
+    # Commit pairing identity first. Portal content sync runs asynchronously so the Setup UI can switch immediately.
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+    portal_storage_reset
+    uci set wiflow.core.paired='1'; uci set wiflow.core.pair_required='0'; uci set "wiflow.core.device_token=$token"
+    if printf '%s' "$account_public_id" | grep -Eq '^WIFID[A-Z0-9]{7}$'; then uci set "wiflow.core.account_public_id=$account_public_id"; else uci -q delete wiflow.core.account_public_id >/dev/null 2>&1 || true; account_public_id=''; fi
+    uci set wiflow.core.portal_enabled='0'; uci set wiflow.core.portal_revision='0'; uci set wiflow.core.portal_sync_status='idle'; uci set wiflow.core.portal_sync_error=''
+    uci commit wiflow; secure_configs
+    ensure_guest_network >/dev/null 2>&1 || true
+    : > "$HEARTBEAT_KICK" 2>/dev/null || true
+
+    if [ "$wanted" = 1 ] && [ "$desired" -gt 0 ]; then
+        (
+            if /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1 && [ -f "$PORTAL_ACTIVE/portal.json" ]; then
+                uci set wiflow.core.portal_enabled='1'; uci commit wiflow >/dev/null 2>&1 || true
+                /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || state_set portal_error 'captive_firewall_enable_failed'
+            fi
+        ) >/tmp/wiflow-pair-portal-sync.log 2>&1 &
+    fi
+    guest="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || echo Wiflow)"
+    header_json; printf '{"ok":true,"paired":1,"account_public_id":"%s","guest_ssid":"%s"}\n' "$(json_escape "$account_public_id")" "$(json_escape "$guest")";;
+status)
+    paired="$(uci -q get wiflow.core.paired 2>/dev/null || echo 0)"; pair_required="$(uci -q get wiflow.core.pair_required 2>/dev/null || echo 0)"; guest="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || echo Wiflow)"; did="$(cat /etc/wiflow/device-id 2>/dev/null | tr -d '\r\n')"; account_public_id="$(uci -q get wiflow.core.account_public_id 2>/dev/null || true)"
+    mode="$(uci -q get wiflow.core.internet_mode 2>/dev/null || true)"; source_ssid="$(uci -q get wiflow.core.source_ssid 2>/dev/null || true)"; verified="$(uci -q get wiflow.core.internet_verified 2>/dev/null || echo 0)"; setup_step="$(uci -q get wiflow.core.setup_step 2>/dev/null || echo 2)"; ready=0; live="$(state_get internet_live 2>/dev/null || echo 0)"; internet=''
+    case "$live" in 0|1) :;; *) live=0;; esac
+    active_wifi_ssid="$(uci -q get wireless.wiflow_uplink.ssid 2>/dev/null || true)"
+    if [ -n "$active_wifi_ssid" ] && iface_up wiflow_wwan; then mode='wifi'; source_ssid="$active_wifi_ssid"; [ "$live" = 1 ] && ready=1; internet="WiFi: $source_ssid"
+    elif [ "$mode" = wifi ]; then [ -n "$source_ssid" ] && internet="WiFi: $source_ssid"; [ "$verified" = 1 ] && [ "$live" = 1 ] && ready=1
+    elif iface_up wan; then mode='lan'; [ "$live" = 1 ] && ready=1; internet='Cáp mạng'
+    elif [ "$mode" = lan ]; then internet='Cáp mạng'; [ "$verified" = 1 ] && [ "$live" = 1 ] && ready=1; fi
+    header_json; printf '{"ok":true,"paired":%s,"pair_required":%s,"internet_ready":%s,"internet_live":%s,"internet_verified":%s,"setup_step":%s,"internet_mode":"%s","source_ssid":"%s","guest_ssid":"%s","internet":"%s","device_id":"%s","account_public_id":"%s","csrf":"%s"}\n' "$paired" "$pair_required" "$ready" "$live" "$verified" "$setup_step" "$(json_escape "$mode")" "$(json_escape "$source_ssid")" "$(json_escape "$guest")" "$(json_escape "$internet")" "$(json_escape "$did")" "$(json_escape "$account_public_id")" "$CSRF";;
+reset)
+    require_csrf
+    if [ "$(uci -q get wiflow.core.paired 2>/dev/null || echo 0)" = 1 ] && [ -n "$(device_token)" ]; then out="/tmp/wiflow-unpair.$$"; wiflow_post "$out" "$WIFLOW_DEVICE_API/unpair" '{}' >/dev/null 2>&1 || true; rm -f "$out"; fi
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+    uci set wiflow.core.paired='0'; uci set wiflow.core.pair_required='0'; uci set wiflow.core.portal_enabled='0'; uci set wiflow.core.internet_verified='0'; uci set wiflow.core.setup_step='2'; uci set wiflow.core.guest_ssid='Wiflow'
+    for k in device_token account_public_id client_hash_salt internet_mode source_ssid last_command_id last_command_action last_command_status last_command_message; do uci -q delete "wiflow.core.$k" >/dev/null 2>&1 || true; done
+    portal_storage_reset; uci commit wiflow; secure_configs; setup_reset_login
+    uci -q delete wireless.wiflow_uplink >/dev/null 2>&1 || true; uci commit wireless; ifdown wiflow_wwan >/dev/null 2>&1 || true
+    rm -f /tmp/wiflow-state /tmp/wiflow-events.queue /tmp/wiflow-heartbeat-kick /tmp/wiflow-pair-last-error; clear_all_management_resume; rm -rf "$CLIENT_SESSIONS"/* "$UPLINK_TXN" 2>/dev/null || true
+    ensure_guest_network; /usr/lib/wiflow/radio-policy setup >/dev/null 2>&1 || true; ubus call network reload >/dev/null 2>&1 || true; /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true; /etc/init.d/firewall reload >/dev/null 2>&1 || true; wifi reload >/dev/null 2>&1 || true
+    header_json; echo '{"ok":true}';;
+*) header_json; echo '{"ok":false,"error":"unknown_action"}';;
+esac

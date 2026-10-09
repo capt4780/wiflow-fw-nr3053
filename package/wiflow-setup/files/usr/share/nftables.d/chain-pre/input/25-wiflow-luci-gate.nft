@@ -1,0 +1,2 @@
+ip daddr 10.0.0.2 tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept
+ip daddr 10.0.0.2 tcp dport 8081 drop

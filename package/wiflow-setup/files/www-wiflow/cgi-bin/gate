@@ -1,0 +1,12 @@
+#!/bin/sh
+. /usr/lib/wiflow/common.sh
+[ "${REQUEST_METHOD:-}" = POST ] || redirect '/'
+read_body; pin="$(param pin 2>/dev/null || true)"
+case "$pin" in ??????) case "$pin" in *[!0-9]*) redirect '/?error=1';; esac;; *) redirect '/?error=1';; esac
+id="$(cat /etc/wiflow/device-id 2>/dev/null | tr -d '\r\n')"; want="$(printf '%s' "$id" | sed -n 's/.*\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\1/p')"
+client="${REMOTE_ADDR:-unknown}"; safe="$(printf '%s' "$client" | tr -cd '0-9A-Za-z_.-' | tr '.' '_')"; ff="/tmp/wiflow-gate-fail-$safe"; now="$(date +%s)"; count=0; until=0
+[ -f "$ff" ] && read count until < "$ff" 2>/dev/null || true; case "$count" in ''|*[!0-9]*) count=0;; esac; case "$until" in ''|*[!0-9]*) until=0;; esac
+    [ "$now" -ge "$until" ] || { sleep 1; redirect '/?error=1'; }
+    if [ -z "$want" ] || [ "$pin" != "$want" ]; then count=$((count+1)); if [ "$count" -ge 5 ]; then count=0; until=$((now+60)); fi; printf '%s %s\n' "$count" "$until" > "$ff"; sleep 1; redirect '/?error=1'; fi
+rm -f "$ff"; t="$(make_gate_session)" || redirect '/?error=1'
+printf 'Status: 302 Found\r\nLocation: /login.html\r\nSet-Cookie: WFGATE=%s; Path=/; HttpOnly; SameSite=Strict\r\nCache-Control: no-store\r\n\r\n' "$t"
