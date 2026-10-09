@@ -32,5 +32,13 @@ class NR3053MtwifiProfileTests(unittest.TestCase):
         self.assertIn("CONFIG_MTK_MT_WIFI_FIRMWARE_PATH_MT7981=", SRC)
 
 
+    def test_wiflow_runtime_requires_mtwifi_ucode_in_apk(self):
+        pkg = (Path(__file__).resolve().parents[1] /
+               "package/wiflow-setup/Makefile").read_text()
+        deps = next(x for x in pkg.splitlines() if "DEPENDS:=" in x)
+        self.assertIn("+mtwifi-cfg-ucode", deps.split())
+        self.assertNotIn("+luci-app-mtwifi-cfg", deps.split())
+
+
 if __name__ == "__main__":
     unittest.main()
