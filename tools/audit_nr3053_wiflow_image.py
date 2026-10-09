@@ -6,6 +6,7 @@ This is read-only offline inspection, not proof of boot, WiFi, security, or flas
 from pathlib import Path
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -131,6 +132,65 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     return problems
 
 
+def audit_root_shadow_field(fs: Path) -> dict:
+    """Classify ONLY the built root credential field, never disclose its value.
+
+    A hash merely proves the field is populated. It does not prove that the
+    password is strong or has been rotated; root credential RELEASE remains
+    explicitly blocked pending real first-owner/runtime verification.
+    """
+    path = fs / "etc/shadow"
+    state = "MISSING"
+    # Reject a symlinked shadow file or an etc-directory link escaping the
+    # extracted FIT rootfs. Host credentials must never satisfy image checks.
+    if path.is_symlink() or (path.is_file() and not
+                             path.resolve().is_relative_to(fs.resolve())):
+        state = "SYMLINK_OR_OUTSIDE_ROOTFS"
+    elif path.is_file():
+        data = path.read_text(encoding="utf-8", errors="replace")
+        lines = [line for line in data.splitlines()
+                 if line.split(":", 1)[0] == "root"]
+        if len(lines) != 1:
+            state = "MISSING" if not lines else "DUPLICATE"
+        else:
+            fields = lines[0].split(":")
+            if len(fields) != 9:
+                state = "MALFORMED"
+            else:
+                password_field = fields[1]
+                if not password_field:
+                    state = "EMPTY"
+                elif password_field.startswith(("!", "*")):
+                    state = "LOCKED"
+                elif re.fullmatch(
+                    r"\$6\$(?:rounds=[1-9][0-9]*\$)?[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}",
+                    password_field,
+                ):
+                    state = "SHA512_CRYPT_HASH_PRESENT"
+                elif password_field.startswith("$"):
+                    state = "OTHER_OR_MALFORMED_HASH"
+                else:
+                    state = "UNSAFE_NONHASHED_FIELD"
+    return {
+        "root_password_field_state": state,
+        "root_shadow_static_check": (
+            "HASH_PRESENT_ONLY" if state == "SHA512_CRYPT_HASH_PRESENT"
+            else "BLOCK"
+        ),
+        # Fixed public defaults or unchanged firstboot hashes aren't secure.
+        "root_credential_release_gate": "BLOCK",
+    }
+
+
+
+def root_shadow_static_errors(root_audit: dict) -> list[str]:
+    """Return only sanitized findings for image packaging (never credentials)."""
+    if root_audit["root_shadow_static_check"] == "BLOCK":
+        return ["built root credential field unsafe: "
+                + root_audit["root_password_field_state"]]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -152,14 +212,18 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal", "etc/shadow"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
             raise ValueError("SquashFS extraction failed: " + result.stderr[-800:])
         fs = root / "fs"
+        root_audit = audit_root_shadow_field(fs)
         missing = [p for p in REQUIRED_FILES if not (fs / p).is_file()]
         issues = [f"missing Wiflow image file: {p}" for p in missing]
+        # Fail-closed: 22/22 component success must not publish images with
+        # empty, locked, malformed, duplicate or missing root shadow records.
+        issues.extend(root_shadow_static_errors(root_audit))
         if not missing:
             login = (fs / "usr/lib/wiflow/common.sh").read_text(errors="replace")
             gate = (fs / "www-wiflow/cgi-bin/gate").read_text(errors="replace")
@@ -203,6 +267,7 @@ def audit(path: Path) -> dict:
             "device_recovery_tested": False,
             "files_checked": len(REQUIRED_FILES),
             "found_files": len(REQUIRED_FILES) - len(missing),
+            **root_audit,
             "errors": issues,
         }
 
@@ -216,6 +281,9 @@ def main() -> int:
         result = audit(args.fit_image)
     except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as e:
         result = {"static_gate": "BLOCK", "release_approval": "BLOCK",
+                  "root_password_field_state": "NOT_INSPECTED",
+                  "root_shadow_static_check": "BLOCK",
+                  "root_credential_release_gate": "BLOCK",
                   "errors": [str(e)]}
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, sort_keys=True))
