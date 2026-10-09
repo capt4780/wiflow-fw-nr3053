@@ -38,21 +38,27 @@ class SourcePortTests(unittest.TestCase):
         self.assertIn("https://projify.io.vn/wiflow/wp-json", common)
         self.assertIn("WIFLOW_DATA_GENERATION='4'", common)
 
-    def test_emergency_access_limited_to_first_owner_claim(self):
-        gate = (F / "www-wiflow/cgi-bin/gate").read_text()
-        luci = (F / "www-wiflow-luci-gate/cgi-bin/unlock").read_text()
+    def test_two_persistent_gate_codes_share_one_verifier(self):
+        setup_gate = (F / "www-wiflow/cgi-bin/gate").read_text()
+        luci_gate = (F / "www-wiflow-luci-gate/cgi-bin/unlock").read_text()
+        verifier = (F / "usr/lib/wiflow/gate-code.sh").read_text()
         common = (F / "usr/lib/wiflow/common.sh").read_text()
-        entry = (F / "www-wiflow/index.html").read_text()
-        self.assertNotIn("247365", gate + luci)
-        self.assertNotIn("master=", gate + luci)
-        self.assertIn('first_use_emergency_gate "$pin"', gate)
-        self.assertIn('[ "$pin" = "$want" ]', gate)
-        self.assertIn('"$pin" != "$want"', luci)
-        self.assertIn("WIFLOW_FIRST_USE_GATE_CODE='WIFDIDNR3053'", common)
-        self.assertIn('[ ! -e "$ROOT/setup-claimed" ]', common)
-        self.assertIn('printf \'claimed\\n\' > "$ROOT/setup-claimed"', common)
-        self.assertIn('pattern="([0-9]{6}|WIFDIDNR3053)"', entry)
-        self.assertNotIn("WIFDIDNR3053", luci)
+        setup_form = (F / "www-wiflow/index.html").read_text()
+        luci_form = (F / "www-wiflow-luci-gate/index.html").read_text()
+        for script in (setup_gate, luci_gate):
+            self.assertNotIn("247365", script)
+            self.assertIn(". /usr/lib/wiflow/gate-code.sh", script)
+            self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', script)
+            self.assertIn("WIFDIDNR3053", script)
+        for form in (setup_form, luci_form):
+            self.assertIn('pattern="([0-9]{6}|WIFDIDNR3053)"', form)
+            self.assertIn('maxlength="12"', form)
+        self.assertIn("WIFLOW_EMERGENCY_GATE_CODE='WIFDIDNR3053'", verifier)
+        self.assertIn('case "${REMOTE_ADDR:-}" in', verifier)
+        self.assertIn('10.0.0.*)', verifier)
+        self.assertIn('[ "$wf_gate_entered" = "$wf_gate_expected" ]', verifier)
+        self.assertNotIn("first_use_emergency_gate", common + setup_gate + luci_gate)
+        self.assertNotIn("setup-claimed", common + verifier)
 
     def test_no_default_password_and_first_boot_enrollment(self):
         common = (F / "usr/lib/wiflow/common.sh").read_text()
