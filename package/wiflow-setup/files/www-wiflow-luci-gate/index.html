@@ -13,7 +13,7 @@
       <span class="wf-mark wf-logo-text">Wiflow</span>
       <div id="err" class="wf-error" hidden>Mã bảo mật không đúng hoặc đang bị khóa tạm thời.</div>
       <form method="post" action="/cgi-bin/unlock">
-        <input class="wf-input wf-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" aria-label="Mã bảo mật" placeholder="Mã bảo mật" autofocus required>
+        <input class="wf-input wf-pin" name="pin" type="password" inputmode="text" pattern="([0-9]{6}|WIFDIDNR3053)" maxlength="12" autocapitalize="characters" spellcheck="false" autocomplete="one-time-code" aria-label="Mã bảo mật" placeholder="Mã bảo mật" autofocus required>
         <button class="wf-btn primary wf-full" type="submit">Tiếp tục</button>
       </form>
     </section>
