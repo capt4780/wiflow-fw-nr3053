@@ -37,7 +37,7 @@ class NR3053BehaviorContractTests(unittest.TestCase):
         self.assertIn("change_guest_ssid)", self.remote)
         self.assertIn("wireless.wiflow_guest_2g.ssid=$guest", self.remote)
         self.assertIn("wireless.wiflow_guest_5g.ssid=$guest", self.remote)
-        self.assertIn("guest_ssid", self.common)
+        self.assertIn("wiflow.core.guest_ssid", self.remote)
 
     def test_all_three_portal_families_retained(self):
         self.assertIn("website|image|video", self.sync)
