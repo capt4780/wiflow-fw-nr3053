@@ -1,0 +1,48 @@
+name: NR3053 Wiflow Kconfig Preflight (NO FLASH)
+
+# Check pinned upstream, feeds, real Kconfig and radio/ucode selection
+# without spending hours compiling firmware for a broken package graph.
+on:
+  pull_request:
+    paths:
+      - "package/wiflow-setup/Makefile"
+      - "scripts/build-nr3053-base.sh"
+      - "tools/test_wiflow_kconfig_preflight.py"
+      - ".github/workflows/nr3053-kconfig-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kconfig:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      WIFLOW_SOURCE_BUILD: "1"
+      WIFLOW_KCONFIG_ONLY: "1"
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@v4
+      - name: Host regressions and public source safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+          python3 tools/verify_public_tree.py --repo .
+      - name: Install Kconfig and feeds dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential flex bison gawk git python3 python3-setuptools \
+            libncurses-dev rsync unzip wget curl file
+      - name: Real pinned NR3053 and Wiflow Kconfig only (NO FIRMWARE)
+        shell: bash
+        run: bash scripts/build-nr3053-base.sh
+      - name: Confirm no build artifacts are published
+        shell: bash
+        run: |
+          test ! -e output/BUILD-STATUS.txt
+          echo "PREFLIGHT_ONLY_NO_IMAGE_NO_FLASH"

@@ -148,10 +148,21 @@ for pkg in ("luci-app-mtwifi-cfg", "luci-app-nr3053-throughwall", "luci-theme-au
 import os
 if os.getenv("WIFLOW_SOURCE_BUILD") == "1":
     assert "CONFIG_PACKAGE_wiflow-setup=y" in config, "Wiflow APK source not selected by Kconfig"
+    # Pinned mtwifi-cfg-ucode requires iwinfo-ucode, whose Kconfig forbids
+    # the legacy iwinfo variant (@!PACKAGE_iwinfo). Never select both.
+    assert "CONFIG_PACKAGE_iwinfo-ucode=y" in config, ("REQUIRED_UCODE_IWINFO_DROPPED", "CONFIG_PACKAGE_iwinfo-ucode=y")
+    assert "CONFIG_PACKAGE_iwinfo=y" not in config, ("LEGACY_IWINFO_CONFLICT", "CONFIG_PACKAGE_iwinfo=y")
     print("NR3053_WIFLOW_PACKAGE_CONFIG_PASS")
 print("NR3053_ONLY_KCONFIG_PASS")
 PY
 echo "::endgroup::"
+
+# A fast, real pinned-upstream + full-feeds Kconfig preflight for PRs.
+# No downloads, toolchain compilation, or image artifact in this mode.
+if [[ "${WIFLOW_KCONFIG_ONLY:-0}" == "1" ]]; then
+  echo "NR3053_PINNED_KCONFIG_PREFLIGHT_PASS_NO_IMAGE_NO_FLASH"
+  exit 0
+fi
 
 echo "::group::Download sources and check disk"
 for feed in packages luci routing telephony; do
