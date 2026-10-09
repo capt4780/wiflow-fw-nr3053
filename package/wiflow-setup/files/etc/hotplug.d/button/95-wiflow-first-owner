@@ -1,5 +1,0 @@
-#!/bin/sh
-# GPIO WPS and Reset are distinct in pinned NR3053 DTS.
-[ "$BUTTON" = wps ] && [ "$ACTION" = pressed ] || exit 0
-. /usr/lib/wiflow/owner-claim.sh
-owner_claim_wps || true

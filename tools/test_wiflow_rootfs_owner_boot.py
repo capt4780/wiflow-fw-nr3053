@@ -11,7 +11,7 @@ SRC = Path(__file__).resolve().parents[1] / "package/wiflow-setup/files"
 PARTS = (
     "www-wiflow/cgi-bin/enroll", "www-wiflow/cgi-bin/claim-arm",
     "usr/lib/wiflow/owner-claim.sh",
-    "etc/hotplug.d/button/95-wiflow-first-owner",
+    "etc/rc.wps/00-wiflow-first-owner",
     "etc/init.d/wiflow-setup",
     "www-wiflow/cgi-bin/gate", "www-wiflow-luci-gate/cgi-bin/unlock",
 )
@@ -44,8 +44,13 @@ class FirstOwnerImageAuditTests(unittest.TestCase):
                             audit_first_owner_and_boot_rootfs(self.root)))
 
     def test_missing_physical_button_wiring_is_block(self):
-        (self.root / "etc/hotplug.d/button/95-wiflow-first-owner").unlink()
-        self.assertTrue(any("button/95" in x for x in
+        (self.root / "etc/rc.wps/00-wiflow-first-owner").unlink()
+        self.assertTrue(any("rc.wps/00" in x for x in
+                            audit_first_owner_and_boot_rootfs(self.root)))
+
+    def test_non_executable_wps_handler_is_block(self):
+        (self.root / "etc/rc.wps/00-wiflow-first-owner").chmod(0o644)
+        self.assertTrue(any("executable" in x for x in
                             audit_first_owner_and_boot_rootfs(self.root)))
 
     def test_legacy_enrollment_without_one_use_claim_is_block(self):

@@ -15,7 +15,7 @@ BASE = ROOT / "package/wiflow-setup/files"
 CLAIM = BASE / "usr/lib/wiflow/owner-claim.sh"
 ENROLL = BASE / "www-wiflow/cgi-bin/enroll"
 ARM = BASE / "www-wiflow/cgi-bin/claim-arm"
-BUTTON = BASE / "etc/hotplug.d/button/95-wiflow-first-owner"
+BUTTON = BASE / "etc/rc.wps/00-wiflow-first-owner"
 HTML = BASE / "www-wiflow/enroll.html"
 GATE_TOKEN = "a" * 64
 OTHER_TOKEN = "b" * 64
@@ -105,7 +105,10 @@ uci(){
         self.assertIn('owner_claim_arm "$claim_gate" "$REMOTE_ADDR"', arm)
         self.assertIn("[ \"$HTTP_ORIGIN\" = 'http://10.0.0.1' ]", arm)
         self.assertIn('[ "$BUTTON" = wps ]', button)
-        self.assertIn('[ "$ACTION" = pressed ]', button)
+        self.assertIn('[ "${ACTION:-}" = released ]', button)
+        self.assertIn('owner_claim_wps', button)
+        self.assertNotIn("|| true", button)
+        self.assertTrue(BUTTON.stat().st_mode & 0o100)
         self.assertIn('owner_claim_wps', button)
         self.assertIn("disabled>2. Sau khi nhấn WPS", html)
         self.assertNotIn("owner_claim_wps", enroll)
