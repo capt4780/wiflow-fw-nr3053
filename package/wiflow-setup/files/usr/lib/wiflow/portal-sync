@@ -14,18 +14,17 @@ fail(){
  if [ -n "$(device_token)" ]; then body="{\"revision\":${rev:-0},\"status\":\"failed\",\"error\":\"$(json_escape "$msg")\",\"data_generation\":$WIFLOW_DATA_GENERATION}"; out="/tmp/wiflow-portal-ack.$$"; wiflow_post "$out" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 || true; rm -f "$out"; fi
  logger -t wiflow-portal-sync "status=failed revision=${rev:-0} error=$msg" 2>/dev/null || true; exit 1
 }
-# WP can miss the first active ACK even when the local atomic swap succeeded.
-# Replay an idempotent ACK for the same verified revision at every sync check.
-# A transport failure must not undo a valid local Portal snapshot.
+# WP may miss the initial active ACK although local activation succeeded.
+# Replay the idempotent status for an already active revision on future sync.
 ack_active_revision(){
- ack="/tmp/wiflow-portal-ack.$"
+ ack="/tmp/wiflow-portal-ack.$$"
  body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"
  if ! wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1; then
   logger -t wiflow-portal-sync "status=active ack=retry_needed revision=$REV" 2>/dev/null || true
  fi
  rm -f "$ack"
 }
-RESP="/tmp/wiflow-portal-manifest.$"; rm -f "$RESP"; umask 077
+RESP="/tmp/wiflow-portal-manifest.$$"; rm -f "$RESP"; umask 077
 wiflow_get "$RESP" "$WIFLOW_PORTAL_API/manifest" >/dev/null 2>&1 || fail 'manifest_transport'
 ok="$(jsonfilter -i "$RESP" -e '@.ok' 2>/dev/null || true)"; [ "$ok" = true ] || [ "$ok" = 1 ] || fail 'manifest_rejected'
 generation="$(jsonfilter -i "$RESP" -e '@.data_generation' 2>/dev/null || true)"; [ "$generation" = "$WIFLOW_DATA_GENERATION" ] || fail 'manifest_generation'
