@@ -131,6 +131,29 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
 
 
 
+def audit_root_password_rootfs(fs: Path) -> list[str]:
+    """Block a built image with absent/empty/locked LuCI root credentials.
+
+    Does not assert any particular plaintext password, nor E5 login success.
+    """
+    shadow = fs / "etc/shadow"
+    if not shadow.is_file():
+        return ["root credential missing: etc/shadow not extracted or not in image"]
+    lines = [line for line in shadow.read_text(errors="replace").splitlines()
+             if line.startswith("root:")]
+    if len(lines) != 1:
+        return ["root credential missing or duplicated in image shadow"]
+    fields = lines[0].split(":")
+    credential = fields[1] if len(fields) > 1 else ""
+    if not credential:
+        return ["BLOCK: root has empty password field; public Gate is not authentication"]
+    if credential.startswith(("!", "*")):
+        return ["BLOCK: root is locked; usable LuCI root credential not provisioned"]
+    if not credential.startswith("$"):
+        return ["BLOCK: root has unrecognized non-hashed password field"]
+    return []
+
+
 def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
     """Check the built image's first-owner/WPS path and init autostart wiring.
 
@@ -222,7 +245,7 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "etc/rc.d", "etc/hotplug.d/button", "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "etc/rc.d", "etc/hotplug.d/button", "etc/shadow", "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
@@ -265,6 +288,7 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_first_owner_and_boot_rootfs(fs))
+            issues.extend(audit_root_password_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
