@@ -7,6 +7,7 @@ No router access, no NAND operation, no credentials, no flashing.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +15,20 @@ import sys
 import tempfile
 
 from check_nr3053_fit_reference import fdt_nodes, read_image, u32
+
+
+
+def wifi_command_precedes_module_load(boot_text: str) -> bool:
+    """Check executable shell lines only (ignore mentions in comments)."""
+    wifi = re.search(
+        r"(?m)^[ \\t]*(?:\\[[^\\n]*?\\][ \\t]*&&[ \\t]*)?/sbin/wifi[ \\t]+config[ \\t]*(?:#.*)?$",
+        boot_text,
+    )
+    load = re.search(
+        r"(?m)^[ \\t]*/sbin/kmodloader[ \\t]*(?:#.*)?$",
+        boot_text,
+    )
+    return bool(wifi and load and wifi.start() < load.start())
 
 
 def inspect(path: Path):
@@ -132,11 +147,7 @@ def inspect(path: Path):
             and "/etc/config/network" in generator_text
             and "board_detect" in generator_text
         )
-        wireless_boot_generation = (
-            "/sbin/wifi config" in boot_text
-            and "/sbin/kmodloader" in boot_text
-            and boot_text.index("/sbin/wifi config") < boot_text.index("/sbin/kmodloader")
-        )
+        wireless_boot_generation = wifi_command_precedes_module_load(boot_text)
         firstboot_errors = []
         if not all(firstboot_files.values()):
             firstboot_errors.append(
