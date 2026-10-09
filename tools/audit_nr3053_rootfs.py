@@ -35,9 +35,21 @@ def inspect(path: Path):
         fs = td / "fs"
         squashfs = td / "image.squashfs"
         squashfs.write_bytes(payload)
-        subprocess.run(["unsquashfs", "-no-progress", "-d", str(fs), str(squashfs)],
-                       check=True, text=True, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.PIPE, timeout=180)
+        command = ["unsquashfs", "-no-progress", "-d", str(fs), str(squashfs)]
+        probe = subprocess.run(["unsquashfs", "-s", str(squashfs)],
+                               capture_output=True, text=True, timeout=30)
+        print("SQUASHFS_HEADER_PROBE=" + json.dumps({
+            "exit": probe.returncode,
+            "stdout": probe.stdout[-1500:],
+            "stderr": probe.stderr[-1500:],
+            "data_bytes": len(payload),
+        }), flush=True)
+        try:
+            subprocess.run(command, check=True, text=True, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.PIPE, timeout=180)
+        except subprocess.CalledProcessError as exc:
+            raise ValueError("unsquashfs extraction failed: " +
+                             (exc.stderr or "")[-2400:]) from exc
 
         # Initial audit is exploratory about base package paths, strict about
         # known destructive auto-writers and a functioning init/BusyBox.
