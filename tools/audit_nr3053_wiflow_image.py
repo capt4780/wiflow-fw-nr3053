@@ -6,6 +6,8 @@ This is read-only offline inspection, not proof of boot, WiFi, security, or flas
 from pathlib import Path
 import argparse
 import json
+import os
+import stat
 import shutil
 import subprocess
 import sys
@@ -28,6 +30,10 @@ REQUIRED_FILES = (
     "www-wiflow/cgi-bin/login",
     "www-wiflow/index.html",
     "www-wiflow/cgi-bin/enroll",
+    "www-wiflow/cgi-bin/claim-arm",
+    "www-wiflow/enroll.html",
+    "usr/lib/wiflow/owner-claim.sh",
+    "etc/hotplug.d/button/95-wiflow-first-owner",
     "www-wiflow-luci-gate/cgi-bin/unlock",
     "www-wiflow-luci-gate/index.html",
     "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
@@ -124,6 +130,77 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     return problems
 
 
+
+def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
+    """Check the built image's first-owner/WPS path and init autostart wiring.
+
+    This is E2 STATIC evidence only; a GPIO/hostapd/booted-router test remains BLOCK.
+    """
+    problems = []
+    paths = {
+        "enroll": "www-wiflow/cgi-bin/enroll",
+        "arm": "www-wiflow/cgi-bin/claim-arm",
+        "claim": "usr/lib/wiflow/owner-claim.sh",
+        "button": "etc/hotplug.d/button/95-wiflow-first-owner",
+        "init": "etc/init.d/wiflow-setup",
+    }
+    texts = {}
+    for name, rel in paths.items():
+        p = fs / rel
+        if not p.is_file():
+            problems.append(f"missing first-owner/boot source: {rel}")
+        else:
+            texts[name] = p.read_text(encoding="utf-8", errors="replace")
+    if problems:
+        return problems
+    required_tokens = {
+        "enroll": (
+            'claim_gate="$(check_gate_session 2>/dev/null || true)"',
+            'owner_claim_consume "$claim_gate" "$REMOTE_ADDR"',
+            'setup_set_login "$u" "$p"',
+        ),
+        "arm": (
+            'check_gate_session',
+            'owner_claim_arm "$claim_gate" "$REMOTE_ADDR"',
+            "http://10.0.0.1",
+        ),
+        "claim": (
+            "owner_unclaimed(){", "owner_claim_arm(){",
+            "owner_claim_wps(){", "owner_claim_consume(){",
+        ),
+        "button": (
+            '[ "$BUTTON" = wps ]',
+            '[ "$ACTION" = pressed ]',
+            "owner_claim_wps",
+        ),
+        "init": (
+            "START=96",
+            "/usr/lib/wiflow/bootstrap",
+            "procd_open_instance heartbeat",
+        ),
+    }
+    for name, tokens in required_tokens.items():
+        for token in tokens:
+            if token not in texts[name]:
+                problems.append(f"first-owner/boot control missing: {name}: {token}")
+    enroll = texts["enroll"]
+    if "owner_claim_consume " in enroll and "setup_set_login " in enroll:
+        if enroll.index("owner_claim_consume ") > enroll.index("setup_set_login "):
+            problems.append("first-owner physical approval occurs after owner creation")
+    for rel in ("www-wiflow/cgi-bin/enroll", "www-wiflow/cgi-bin/claim-arm",
+                "www-wiflow/cgi-bin/gate", "www-wiflow-luci-gate/cgi-bin/unlock",
+                "etc/init.d/wiflow-setup"):
+        script = fs / rel
+        if not script.is_file() or not (script.stat().st_mode & stat.S_IXUSR):
+            problems.append(f"missing executable CGI/init permission: {rel}")
+    startup = fs / "etc/rc.d/S96wiflow-setup"
+    if not startup.is_symlink():
+        problems.append("Wiflow init not enabled: missing rc.d/S96wiflow-setup symlink")
+    elif not os.readlink(startup).endswith("init.d/wiflow-setup"):
+        problems.append("Wiflow init rc.d symlink points to wrong service")
+    return problems
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -145,7 +222,7 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "etc/rc.d", "etc/hotplug.d/button", "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
@@ -179,14 +256,15 @@ def audit(path: Path) -> dict:
             guest_enroll = (fs / "www-wiflow/cgi-bin/enroll").read_text(errors="replace")
             if '10.0.0.*|10.10.10.*)' not in guest_enroll:
                 issues.append("post-Gate Setup enrollment blocks guest IPs")
-            if 'check_gate_session >/dev/null 2>&1' not in guest_enroll:
-                issues.append("Setup enrollment skips Gate cookie validation")
+            if 'claim_gate="$(check_gate_session 2>/dev/null || true)"' not in guest_enroll:
+                issues.append("Setup enrollment skips the Gate-session-bound first-owner claim")
             luci_nft = (fs / "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft").read_text(errors="replace")
             if "tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept" not in luci_nft:
                 issues.append("LuCI gated-backend allowlist missing")
             if "tcp dport 8081 drop" not in luci_nft:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
+            issues.extend(audit_first_owner_and_boot_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
