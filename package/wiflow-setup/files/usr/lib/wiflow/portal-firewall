@@ -122,6 +122,10 @@ disable(){
  [ -f "$NFT_FILE" ] && changed=1
  uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
  uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && changed=1
+ # Disabled is the steady state for an unpublished/inactive Portal.
+ # Avoid committing firewall config to flash every heartbeat when no captive
+ # rules or forwarding exist. Still remove any failed-write temporary file.
+ if [ "$changed" = 0 ]; then rm -f "$NFT_FILE.tmp"; return 0; fi
  rm -f "$NFT_FILE" "$NFT_FILE.tmp" || return 1
  uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
  uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
