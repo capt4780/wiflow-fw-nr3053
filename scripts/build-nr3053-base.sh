@@ -118,6 +118,10 @@ if [[ "${WIFLOW_SOURCE_BUILD:-0}" == "1" ]]; then
   done
   cp -a "$source_dir" package/wiflow-setup
   echo "CONFIG_PACKAGE_wiflow-setup=y" >> .config
+  # Keep the pinned upstream intact; stage an audited root shadow override
+  # for Wiflow builds only. Never publish plaintext shadow or any private data.
+  python3 "$GITHUB_WORKSPACE/tools/provision_nr3053_root_shadow.py" \
+    package/base-files/files/etc/shadow files/etc/shadow
   echo "NR3053_WIFLOW_SOURCE_STAGE_PASS"
   echo "::endgroup::"
 fi

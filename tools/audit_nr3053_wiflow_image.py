@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from check_nr3053_fit_reference import fdt_nodes, read_image, u32
+from provision_nr3053_root_shadow import inspect_root_shadow
 
 REQUIRED_FILES = (
     "usr/bin/iwinfo-ucode",
@@ -152,7 +153,7 @@ def audit(path: Path) -> dict:
         result = subprocess.run(
             ["unsquashfs", "-no-progress", "-d", str(root / "fs"), str(blob),
              "usr/bin/iwinfo-ucode", "usr/lib/wiflow", "usr/share/nftables.d", "etc/init.d/wiflow-setup", "etc/config/wiflow",
-             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal"],
+             "www-wiflow", "www-wiflow-luci-gate", "www-wiflow-portal", "etc/shadow"],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode:
@@ -160,6 +161,15 @@ def audit(path: Path) -> dict:
         fs = root / "fs"
         missing = [p for p in REQUIRED_FILES if not (fs / p).is_file()]
         issues = [f"missing Wiflow image file: {p}" for p in missing]
+        # This is an image-level root credential check, not a login test.
+        # A source package audit cannot attest the actual built /etc/shadow.
+        shadow = fs / "etc/shadow"
+        if not shadow.is_file():
+            issues.append("root account shadow missing from built image")
+        else:
+            shadow_gate, reason = inspect_root_shadow(shadow.read_text(errors="replace"))
+            if shadow_gate != "PASS":
+                issues.append("root shadow unsafe: " + reason)
         if not missing:
             login = (fs / "usr/lib/wiflow/common.sh").read_text(errors="replace")
             gate = (fs / "www-wiflow/cgi-bin/gate").read_text(errors="replace")
@@ -203,6 +213,11 @@ def audit(path: Path) -> dict:
             "device_recovery_tested": False,
             "files_checked": len(REQUIRED_FILES),
             "found_files": len(REQUIRED_FILES) - len(missing),
+            "root_shadow_gate": (
+                inspect_root_shadow(shadow.read_text(errors="replace"))[0]
+                if shadow.is_file() else "BLOCK"
+            ),
+            "root_login_tested": False,
             "errors": issues,
         }
 
