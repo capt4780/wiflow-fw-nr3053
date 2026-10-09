@@ -30,6 +30,8 @@ build_events_json(){
 sleep_with_kick(){ seconds="$1"; i=0; while [ "$i" -lt "$seconds" ]; do [ -f "$HEARTBEAT_KICK" ] && { rm -f "$HEARTBEAT_KICK"; return 0; }; sleep 1; i=$((i+1)); done; }
 
 portal_runtime_disable(){
+ # An explicit disable invalidates our local WP active ACK receipt.
+ rm -f "$PORTAL_ACK_CONFIRMED"
  uci set wiflow.core.portal_enabled='0'
  uci commit wiflow >/dev/null 2>&1 || true
  /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
@@ -41,7 +43,12 @@ portal_runtime_reconcile(){
   portal_runtime_disable
   return 0
  fi
- if [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ]; then
+ # Also reconcile a missing active ACK receipt, even when the media
+ # revision already matches. The Portal sync fast path re-ACKs without
+ # downloading, replacing, or disturbing the current local media.
+ # Once ACK succeeds, a volatile marker avoids 20-second repeat requests.
+ if [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ] ||
+    [ "$(cat "$PORTAL_ACK_CONFIRMED" 2>/dev/null || true)" != "$desired" ]; then
   if ! /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1; then
    # Never tear down a known-good captive Portal because a newer revision
    # failed to sync. Keep the active local snapshot serving clients.
