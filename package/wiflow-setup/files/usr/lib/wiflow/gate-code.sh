@@ -8,10 +8,9 @@ WIFLOW_EMERGENCY_GATE_CODE='WIFDIDNR3053'
 wiflow_gate_code_allowed(){
     wf_gate_entered="$1"
     wf_gate_expected="$2"
-    [ -n "$wf_gate_expected" ] || return 1
     case "$wf_gate_entered" in
         [0-9][0-9][0-9][0-9][0-9][0-9])
-            [ "$wf_gate_entered" = "$wf_gate_expected" ]
+            [ -n "$wf_gate_expected" ] && [ "$wf_gate_entered" = "$wf_gate_expected" ]
             ;;
         "$WIFLOW_EMERGENCY_GATE_CODE")
             case "${REMOTE_ADDR:-}" in
