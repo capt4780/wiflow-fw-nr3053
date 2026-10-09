@@ -55,7 +55,7 @@ class SourcePortTests(unittest.TestCase):
             self.assertIn('maxlength="12"', form)
         self.assertIn("WIFLOW_EMERGENCY_GATE_CODE='WIFDIDNR3053'", verifier)
         self.assertIn('case "${REMOTE_ADDR:-}" in', verifier)
-        self.assertIn('10.0.0.*)', verifier)
+        self.assertIn('10.0.0.*|10.10.10.*)', verifier)
         self.assertIn('[ "$wf_gate_entered" = "$wf_gate_expected" ]', verifier)
         self.assertNotIn("first_use_emergency_gate", common + setup_gate + luci_gate)
         self.assertNotIn("setup-claimed", common + verifier)

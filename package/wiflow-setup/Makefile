@@ -11,7 +11,7 @@ define Package/wiflow-setup
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Wiflow Setup for Viettel NR3053 (public source candidate)
-  DEPENDS:=+uhttpd +uclient-fetch +iwinfo +iw +jsonfilter +firewall4 +ca-bundle +dnsmasq-full +nftables-json
+  DEPENDS:=+uhttpd +uclient-fetch +iwinfo +iw +jsonfilter +firewall4 +ca-bundle +dnsmasq-full +nftables-json +wifi-scripts
 endef
 
 define Package/wiflow-setup/description

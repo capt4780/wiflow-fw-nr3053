@@ -77,9 +77,46 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertIn("wiflow_gate_code_allowed", SETUPGATE.read_text())
         self.assertIn("wiflow_gate_code_allowed", LUCIGATE.read_text())
 
+    def test_guest_emergency_code_passes_both_gate_handlers(self):
+        verifier = VERIFIER.read_text()
+        for ip in ("10.10.10.100", "10.10.10.249"):
+            run = subprocess.run(
+                ["sh", "-c", verifier + '\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
+                env={**os.environ, "REMOTE_ADDR": ip,
+                     "ENTERED": "WIFDIDNR3053", "PIN": ""},
+                capture_output=True, text=True, timeout=5,
+            )
+            self.assertEqual(run.returncode, 0, f"{ip}: {run.stderr}")
+        self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', SETUPGATE.read_text())
+        self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', LUCIGATE.read_text())
+
+    def test_gate_post_requires_same_origin_before_unlock(self):
+        # Browser CSRF check; cannot substitute for device firewall/authentication.
+        # Exercise the exact shell predicate used by each Gate handler.
+        gate_paths = ((SETUPGATE, "http://10.0.0.1"),
+                      (LUCIGATE, "http://10.0.0.2"))
+        for path, trusted in gate_paths:
+            source = path.read_text()
+            prefix = '[ "${HTTP_ORIGIN:-}" = '
+            guards = [line.strip() for line in source.splitlines()
+                      if line.strip().startswith(prefix)]
+            self.assertEqual(len(guards), 1, str(path))
+            self.assertIn(f"= '{trusted}' ]", guards[0])
+            self.assertLess(source.index(guards[0]), source.index("read_body;"))
+            for origin, expected_rc in ((trusted, 0), ("", 55),
+                                        ("http://evil.example", 55),
+                                        ("http://10.0.0.1:8081", 55),
+                                        ("null", 55)):
+                with self.subTest(handler=str(path), origin=origin):
+                    trial = subprocess.run(
+                        ["sh", "-c", "redirect(){ exit 55; }; " + guards[0]],
+                        env={**os.environ, "HTTP_ORIGIN": origin},
+                        capture_output=True, text=True, timeout=5)
+                    self.assertEqual(trial.returncode, expected_rc, trial.stderr)
+
     def test_guest_first_enrollment_keeps_gate_and_origin_protection(self):
         enroll = ENROLL.read_text()
-        auth = 'check_gate_session >/dev/null 2>&1 || redirect \'/\''
+        auth = 'claim_gate="$(check_gate_session 2>/dev/null || true)"'
         origin = '[ "${HTTP_ORIGIN:-}" = \'http://10.0.0.1\' ]'
         allow = next(
             line for line in enroll.splitlines()
@@ -90,6 +127,8 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertLess(enroll.index(origin), enroll.index(allow))
         self.assertLess(enroll.index(allow), enroll.index('lock=/tmp/wiflow-setup-enrollment.lock'))
         self.assertIn('[ -z "$current" ] || redirect \'/login.html\'', enroll)
+        self.assertIn('owner_claim_consume "$claim_gate" "$REMOTE_ADDR"', enroll)
+        self.assertLess(enroll.index('owner_claim_consume "$claim_gate"'), enroll.index('setup_set_login "$u" "$p"'))
         self.assertIn('setup_set_login "$u" "$p"', enroll)
         for addr in ("10.0.0.2", "10.10.10.100", "10.10.10.249"):
             with self.subTest(client=addr):

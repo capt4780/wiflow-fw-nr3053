@@ -2,6 +2,8 @@
 . /usr/lib/wiflow/common.sh
 . /usr/lib/wiflow/gate-code.sh
 [ "${REQUEST_METHOD:-}" = POST ] || redirect '/'
+# Browser form posts must originate from the exact Setup Gate origin.
+[ "${HTTP_ORIGIN:-}" = 'http://10.0.0.1' ] || redirect '/?error=1'
 read_body; pin="$(param pin 2>/dev/null || true)"
 # Normal six-digit device code and permanent management-only emergency code.
 case "$pin" in
