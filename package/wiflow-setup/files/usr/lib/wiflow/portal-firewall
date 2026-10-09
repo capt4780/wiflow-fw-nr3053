@@ -63,8 +63,20 @@ enable(){
  uci set firewall.wiflow_guest_wan.dest='wan'
  uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
  uci set firewall.wiflow_guest_portal='rule'; uci set firewall.wiflow_guest_portal.name='Wiflow-Captive-Portal'; uci set firewall.wiflow_guest_portal.src='wiflow_guest'; uci set firewall.wiflow_guest_portal.proto='tcp'; uci set firewall.wiflow_guest_portal.dest_port='2080'; uci set firewall.wiflow_guest_portal.target='ACCEPT'; uci commit firewall || return 1
- /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
- portal_nft_ready || return 1
+ # The WAN forwarding has just been selected: never leave it configured
+ # if fw4 rejects the captive chain or either authorization set is missing.
+ if ! /etc/init.d/firewall reload >/dev/null 2>&1; then
+  state_set portal_error 'captive_reload_failed'
+  disable || state_set portal_error 'captive_rollback_failed'
+  return 1
+ fi
+ if ! portal_nft_ready ||
+    ! /usr/sbin/nft list chain inet fw4 wiflow_portal_prerouting >/dev/null 2>&1 ||
+    ! /usr/sbin/nft list chain inet fw4 wiflow_portal_forward >/dev/null 2>&1; then
+  state_set portal_error 'captive_chains_missing'
+  disable || state_set portal_error 'captive_rollback_failed'
+  return 1
+ fi
  refresh || true
  state_set portal_error ''
  return 0

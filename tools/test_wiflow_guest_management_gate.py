@@ -151,6 +151,10 @@ class GuestManagementGateTests(unittest.TestCase):
         self.assertIn('[ -f "$PORTAL_ACTIVE/portal.json" ] || { disable; return 1; }', captive)
         self.assertIn('uci -q delete firewall.wiflow_guest_wan', captive)
         self.assertIn('[ "$(uci -q get firewall.wiflow_guest_wan', captive)
+        self.assertIn("state_set portal_error 'captive_reload_failed'", captive)
+        self.assertIn("state_set portal_error 'captive_chains_missing'", captive)
+        self.assertIn("disable || state_set portal_error 'captive_rollback_failed'", captive)
+        self.assertIn("! /usr/sbin/nft list chain inet fw4 wiflow_portal_forward", captive)
 
     def test_no_standalone_ungated_luci_port_in_guest_firewall_rules(self):
         net = COMMON.read_text()

@@ -93,6 +93,9 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
         "uci set firewall.wiflow_guest_wan='forwarding'",
         "uci -q delete firewall.wiflow_guest_wan",
         '[ -f "$PORTAL_ACTIVE/portal.json" ] || { disable; return 1; }',
+        "state_set portal_error 'captive_reload_failed'",
+        "state_set portal_error 'captive_chains_missing'",
+        "disable || state_set portal_error 'captive_rollback_failed'",
     ):
         if required not in captive_source:
             problems.append(f"Portal-owned forwarding lifecycle missing: {required}")
