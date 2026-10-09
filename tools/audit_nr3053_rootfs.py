@@ -100,6 +100,68 @@ def inspect(path: Path):
                 if not installed_lines:
                     installed_lines = [s[9:] for s in data.splitlines() if s.startswith("Package: ")]
                 break
+        # OpenWrt/ImmortalWrt often generates UCI network and wireless
+        # configs on first boot. An absent config file is acceptable ONLY when
+        # the generating scripts and exact NR3053 board mapping are present.
+        # This checks on-disk source paths; it is NOT a runtime boot test.
+        firstboot_paths = {
+            "board_detect": "bin/board_detect",
+            "config_generate": "bin/config_generate",
+            "nr3053_board_network": "etc/board.d/02_network",
+            "early_boot_script": "etc/init.d/boot",
+            "wireless_cli": "sbin/wifi",
+            "module_loader": "sbin/kmodloader",
+            "network_service": "etc/init.d/network",
+        }
+        firstboot_files = {
+            name: ((fs / rel).exists() or (fs / rel).is_symlink())
+            for name, rel in firstboot_paths.items()
+        }
+        board_network = (fs / firstboot_paths["nr3053_board_network"])
+        boot_script = (fs / firstboot_paths["early_boot_script"])
+        config_generator = (fs / firstboot_paths["config_generate"])
+        board_text = board_network.read_text(errors="replace") if board_network.is_file() else ""
+        boot_text = boot_script.read_text(errors="replace") if boot_script.is_file() else ""
+        generator_text = config_generator.read_text(errors="replace") if config_generator.is_file() else ""
+        nr3053_board_mapping = (
+            "viettel,nr3053)" in board_text
+            and 'ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" wan' in board_text
+        )
+        generated_network_path = (
+            "generate_network" in generator_text
+            and "/etc/config/network" in generator_text
+            and "board_detect" in generator_text
+        )
+        wireless_boot_generation = (
+            "/sbin/wifi config" in boot_text
+            and "/sbin/kmodloader" in boot_text
+        )
+        firstboot_errors = []
+        if not all(firstboot_files.values()):
+            firstboot_errors.append(
+                "first-boot generator/service missing: " +
+                ", ".join(sorted(k for k, v in firstboot_files.items() if not v))
+            )
+        if not nr3053_board_mapping:
+            firstboot_errors.append("NR3053 LAN/WAN mapping missing or changed")
+        if not generated_network_path:
+            firstboot_errors.append("dynamic first-boot network configuration path missing")
+        if not wireless_boot_generation:
+            firstboot_errors.append("dynamic Wi-Fi config/driver boot sequence missing")
+        firstboot = {
+            "static_gate": "BLOCK" if firstboot_errors else "PASS",
+            "firmware_on_device_tested": False,
+            "wifi_2g_runtime_verified": False,
+            "wifi_5g_runtime_verified": False,
+            "first_boot_runtime_verified": False,
+            "firstboot_paths_present": firstboot_files,
+            "nr3053_board_lan_wan": nr3053_board_mapping,
+            "dynamic_network_config_source": generated_network_path,
+            "wireless_config_before_kmodloader": wireless_boot_generation,
+            "observed_network_config_baked_in": present["network_configuration"],
+            "observed_wireless_config_baked_in": present["wireless_configuration"],
+            "errors": firstboot_errors,
+        }
         portal_paths = [
             "usr/lib/wiflow",
             "etc/init.d/wiflow",
@@ -114,6 +176,7 @@ def inspect(path: Path):
                           ", ".join(unexpected_radio))
         if not modules:
             errors.append("no mt_wifi kernel module found in built rootfs")
+        errors.extend(firstboot_errors)
         report = {
             "phase": "PUBLIC_NR3053_BASE_ONLY",
             "rootfs_audit": "BLOCK" if errors else "PASS",
@@ -123,6 +186,7 @@ def inspect(path: Path):
             "rootfs_sha256": hashlib.sha256(payload).hexdigest(),
             "rootfs_bytes": len(payload),
             "present": present,
+            "firstboot_static": firstboot,
             "mtwifi_modules": modules,
             "firmware_files": firmware[:100],
             "observed_package_count": len(installed_lines),
