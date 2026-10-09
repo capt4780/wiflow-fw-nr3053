@@ -97,6 +97,27 @@ print("NR3053_SOURCE_CONFIG_PREPARED")
 PY
 echo "::endgroup::"
 
+# Optional experimental Wiflow source is copied exactly once into its
+# authoritative package owner before feeds/Kconfig. The standard base build
+# remains unchanged when WIFLOW_SOURCE_BUILD is unset.
+if [[ "${WIFLOW_SOURCE_BUILD:-0}" == "1" ]]; then
+  echo "::group::Stage cleaned public Wiflow package source"
+  source_dir="$GITHUB_WORKSPACE/package/wiflow-setup"
+  test -s "$source_dir/Makefile"
+  for path in usr/lib/wiflow/common.sh usr/lib/wiflow/portal-sync \
+              etc/init.d/wiflow-setup www-wiflow/cgi-bin/api \
+              www-wiflow/cgi-bin/enroll; do
+    test -s "$source_dir/files/$path" || {
+      echo "::error::Wiflow public package missing: $path"
+      exit 1
+    }
+  done
+  cp -a "$source_dir" package/wiflow-setup
+  echo "CONFIG_PACKAGE_wiflow-setup=y" >> .config
+  echo "NR3053_WIFLOW_SOURCE_STAGE_PASS"
+  echo "::endgroup::"
+fi
+
 echo "::group::Install public 25.12 package feeds"
 ./scripts/feeds update -a
 ./scripts/feeds install -a
@@ -119,6 +140,10 @@ for value in ("CONFIG_TARGET_MULTI_PROFILE=y",
 for pkg in ("luci-app-nr3053-throughwall", "luci-theme-aurora",
             "luci-app-aurora-config"):
     assert "CONFIG_PACKAGE_" + pkg + "=y" not in config, ("UNSAFE_OR_UNUSED_PACKAGE_SELECTED", pkg)
+import os
+if os.getenv("WIFLOW_SOURCE_BUILD") == "1":
+    assert "CONFIG_PACKAGE_wiflow-setup=y" in config, "Wiflow APK source not selected by Kconfig"
+    print("NR3053_WIFLOW_PACKAGE_CONFIG_PASS")
 print("NR3053_ONLY_KCONFIG_PASS")
 PY
 echo "::endgroup::"
@@ -158,8 +183,14 @@ cp "${files[0]}" "$OUTPUT/"
   sha256sum ./*.itb > SHA256SUMS
 )
 {
-  echo "STATE=PUBLIC_UPSTREAM_BASE_BUILD_ONLY"
-  echo "WIFLOW_RUNTIME_PRESENT=NO"
+  if [[ "${WIFLOW_SOURCE_BUILD:-0}" == "1" ]]; then
+    echo "STATE=PUBLIC_WIFLOW_EXPERIMENTAL_SOURCE_BUILD_ONLY"
+    echo "WIFLOW_SOURCE_PACKAGE_SELECTED=YES"
+    echo "WIFLOW_RUNTIME_E5_VERIFIED=NO"
+  else
+    echo "STATE=PUBLIC_UPSTREAM_BASE_BUILD_ONLY"
+    echo "WIFLOW_RUNTIME_PRESENT=NO"
+  fi
   echo "FIRMWARE_RELEASE_APPROVED=NO"
   echo "DO_NOT_FLASH=YES"
   echo "UPSTREAM_COMMIT=$PIN"
