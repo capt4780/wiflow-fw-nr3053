@@ -11,6 +11,8 @@ HEARTBEAT_KICK=/tmp/wiflow-heartbeat-kick
 PORTAL_RUNTIME=/www-wiflow-portal/runtime
 PORTAL_REVISIONS=$PORTAL_RUNTIME/revisions
 PORTAL_ACTIVE=$PORTAL_RUNTIME/active
+# Volatile ACK receipt: retry once after reboot; never write every heartbeat to flash.
+PORTAL_ACK_CONFIRMED=/tmp/wiflow-portal-ack-confirmed-revision
 UPLINK_TXN=$ROOT/uplink-txn
 RESUME_DIR=/tmp/wiflow-management-resume
 # Production WordPress device API is package-owned, not user-configurable.
