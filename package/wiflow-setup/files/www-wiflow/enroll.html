@@ -3,9 +3,9 @@
 <body><main class="wf-shell wf-auth-shell"><section class="wf-card wf-auth-card">
 <h1 class="wf-title">Thiết lập tài khoản</h1>
 <div id="err" class="wf-error" hidden>Không thể thiết lập: kiểm tra mật khẩu hoặc xác minh lại bằng nút WPS vật lý.</div>
-<p>Lần đầu thiết lập, bạn phải có mặt cạnh NR3053. Sử dụng nút <strong>WPS</strong>, không nhấn Reset.</p>
+<p>Lần đầu thiết lập, bạn phải có mặt cạnh NR3053. Nhấn ngắn rồi thả nút <strong>WPS</strong>, không nhấn Reset.</p>
 <button id="arm" class="wf-btn wf-full" type="button">1. Bắt đầu xác minh</button>
-<p id="claim-status" role="status" aria-live="polite">Bắt đầu xác minh, sau đó nhấn WPS trên router trong vòng 60 giây.</p>
+<p id="claim-status" role="status" aria-live="polite">Bắt đầu xác minh, sau đó nhấn ngắn rồi thả WPS trên router trong vòng 60 giây.</p>
 <form method="post" action="/cgi-bin/enroll" autocomplete="off">
 <label for="username">Tài khoản</label><input id="username" class="wf-input" name="username" value="wiflow" readonly required>
 <label for="password">Mật khẩu mới (tối thiểu 12 ký tự)</label><input id="password" class="wf-input" name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>

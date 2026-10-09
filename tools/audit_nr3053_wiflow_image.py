@@ -196,6 +196,7 @@ def audit_first_owner_and_boot_rootfs(fs: Path) -> list[str]:
         "button": (
             '[ "${BUTTON:-}" = wps ]',
             '[ "${ACTION:-}" = released ]',
+            '[ "$SEEN" -lt 3 ]',
             "owner_claim_wps",
         ),
         "dispatcher": (
