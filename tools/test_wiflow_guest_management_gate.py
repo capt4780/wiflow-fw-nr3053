@@ -1,0 +1,84 @@
+"""Guest subnet may reach ONLY the gated management entrypoints.
+
+Host regression test: verifies source configuration and the actual shared gate
+verifier with a guest client address. This does NOT prove packet-level firewall
+behavior on a physical NR3053.
+"""
+from pathlib import Path
+import os
+import subprocess
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "package/wiflow-setup/files"
+COMMON = SRC / "usr/lib/wiflow/common.sh"
+PORTAL = SRC / "usr/lib/wiflow/portal-firewall"
+BOOT = SRC / "usr/lib/wiflow/bootstrap"
+LUCIGATE = SRC / "www-wiflow-luci-gate/cgi-bin/unlock"
+SETUPGATE = SRC / "www-wiflow/cgi-bin/gate"
+VERIFIER = SRC / "usr/lib/wiflow/gate-code.sh"
+LUCINFT = SRC / "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft"
+
+
+class GuestManagementGateTests(unittest.TestCase):
+    def test_guest_allowed_to_both_gate_pages_only(self):
+        net = COMMON.read_text()
+        for setting in (
+            "uci set firewall.wiflow_guest.input='REJECT'",
+            "uci set firewall.wiflow_guest_setup.dest_ip='10.0.0.1'",
+            "uci set firewall.wiflow_guest_setup.dest_port='80'",
+            "uci set firewall.wiflow_guest_setup.target='ACCEPT'",
+            "uci set firewall.wiflow_guest_gate.dest_ip='10.0.0.2'",
+            "uci set firewall.wiflow_guest_gate.dest_port='80'",
+            "uci set firewall.wiflow_guest_gate.target='ACCEPT'",
+            "uci set firewall.wiflow_guest_setup.src='wiflow_guest'",
+            "uci set firewall.wiflow_guest_gate.src='wiflow_guest'",
+        ):
+            with self.subTest(setting=setting):
+                self.assertIn(setting, net)
+        self.assertNotIn("uci set firewall.wiflow_guest_setup.dest_port='8081'", net)
+        self.assertNotIn("uci set firewall.wiflow_guest_gate.dest_port='8081'", net)
+
+    def test_guest_captive_redirect_excludes_gate_targets(self):
+        captive = PORTAL.read_text()
+        for dest in ("10.0.0.1", "10.0.0.2"):
+            self.assertIn(f"ip saddr 10.10.10.0/24 ip daddr {dest} return", captive)
+        self.assertIn("ip saddr 10.10.10.0/24 tcp dport 80 redirect to :2080", captive)
+
+    def test_luci_true_backend_remains_guarded(self):
+        nft = LUCINFT.read_text().splitlines()
+        self.assertEqual(len(nft), 2, "unreviewed changes to LuCI input policy")
+        self.assertEqual(nft[0],
+            "ip daddr 10.0.0.2 tcp dport 8081 ip saddr @wiflow_luci_allowed4 accept")
+        self.assertEqual(nft[1], "ip daddr 10.0.0.2 tcp dport 8081 drop")
+        unlock = LUCIGATE.read_text()
+        self.assertIn('wiflow_gate_code_allowed "$pin" "$want"', unlock)
+        self.assertIn('nft add element inet fw4 wiflow_luci_allowed4', unlock)
+        self.assertIn('timeout 20m', unlock)
+        self.assertIn("redirect 'http://10.0.0.2:8081/cgi-bin/luci/'", unlock)
+        boot = BOOT.read_text()
+        self.assertIn("uci add_list uhttpd.main.listen_http='10.0.0.2:8081'", boot)
+        self.assertIn("uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80'", boot)
+        self.assertIn("uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80'", boot)
+        self.assertIn("uci add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080'", boot)
+
+    def test_guest_device_pin_can_pass_shared_gate(self):
+        verifier = VERIFIER.read_text()
+        for ip in ("10.10.10.100", "10.10.10.249"):
+            run = subprocess.run(
+                ["sh", "-c", verifier + '\nwiflow_gate_code_allowed "$ENTERED" "$PIN"'],
+                env={**os.environ, "REMOTE_ADDR": ip, "ENTERED": "221262", "PIN": "221262"},
+                capture_output=True, text=True, timeout=5)
+            self.assertEqual(run.returncode, 0, f"{ip}: {run.stderr}")
+        self.assertIn("wiflow_gate_code_allowed", SETUPGATE.read_text())
+        self.assertIn("wiflow_gate_code_allowed", LUCIGATE.read_text())
+
+    def test_no_standalone_ungated_luci_port_in_guest_firewall_rules(self):
+        net = COMMON.read_text()
+        scoped = net[net.index("ensure_guest_network(){"):net.index("ensure_uplink_network(){")]
+        self.assertNotIn("dest_port='8081'", scoped)
+        self.assertNotIn("dest_port='443'", scoped)
+
+
+if __name__ == "__main__":
+    unittest.main()
