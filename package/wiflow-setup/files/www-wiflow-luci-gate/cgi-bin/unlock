@@ -1,19 +1,23 @@
 #!/bin/sh
 ROOT=/etc/wiflow
+. /usr/lib/wiflow/gate-code.sh
 read_body(){ n="${CONTENT_LENGTH:-0}"; case "$n" in ''|*[!0-9]*) n=0;; esac; [ "$n" -le 1024 ] || n=1024; BODY="$(dd bs=1 count="$n" 2>/dev/null)"; }
 urldecode(){ /usr/sbin/uhttpd -d "$(printf '%s' "$1" | tr '+' ' ')" 2>/dev/null; }
 param(){ key="$1"; old="$IFS"; IFS='&'; for kv in ${BODY:-}; do k="${kv%%=*}"; v="${kv#*=}"; if [ "$k" = "$key" ]; then IFS="$old"; urldecode "$v"; return 0; fi; done; IFS="$old"; return 1; }
 redirect(){ printf 'Status: 302 Found\r\nLocation: %s\r\nCache-Control: no-store\r\n\r\n' "$1"; exit 0; }
 [ "${REQUEST_METHOD:-}" = POST ] || redirect '/'
 read_body; pin="$(param pin 2>/dev/null || true)"
-case "$pin" in ??????) case "$pin" in *[!0-9]*) redirect '/?error=1';; esac;; *) redirect '/?error=1';; esac
+case "$pin" in
+    [0-9][0-9][0-9][0-9][0-9][0-9]|WIFDIDNR3053) :;;
+    *) redirect '/?error=1';;
+esac
 id="$(cat "$ROOT/device-id" 2>/dev/null | tr -d '\r\n')"; want="$(printf '%s' "$id" | sed -n 's/.*\([0-9][0-9][0-9][0-9][0-9][0-9]\)$/\1/p')"
 client="${REMOTE_ADDR:-}"; case "$client" in ''|*[!0-9.]*) redirect '/?error=1';; esac
 safe="$(printf '%s' "$client" | tr '.' '_')"; ff="/tmp/wiflow-luci-gate-$safe"; now="$(date +%s)"; count=0; until=0
 if [ -f "$ff" ]; then read count until < "$ff" 2>/dev/null || true; fi
 case "$count" in ''|*[!0-9]*) count=0;; esac; case "$until" in ''|*[!0-9]*) until=0;; esac
     if [ "$now" -lt "$until" ]; then sleep 1; redirect '/?error=1'; fi
-    if [ -z "$want" ] || [ "$pin" != "$want" ]; then count=$((count+1)); if [ "$count" -ge 5 ]; then count=0; until=$((now+60)); fi; printf '%s %s\n' "$count" "$until" > "$ff"; sleep 1; redirect '/?error=1'; fi
+    if ! wiflow_gate_code_allowed "$pin" "$want"; then count=$((count+1)); if [ "$count" -ge 5 ]; then count=0; until=$((now+60)); fi; printf '%s %s\n' "$count" "$until" > "$ff"; sleep 1; redirect '/?error=1'; fi
 rm -f "$ff"
 nft list set inet fw4 wiflow_luci_allowed4 >/dev/null 2>&1 || { /etc/init.d/firewall reload >/dev/null 2>&1 || true; sleep 1; }
 nft add element inet fw4 wiflow_luci_allowed4 "{ $client timeout 20m }" >/dev/null 2>&1 || redirect '/?error=1'
