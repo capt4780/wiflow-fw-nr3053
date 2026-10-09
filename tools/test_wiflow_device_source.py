@@ -77,7 +77,10 @@ class SourcePortTests(unittest.TestCase):
         self.assertIn('"$manifest_generation" = "$WIFLOW_DATA_GENERATION"', sync)
         self.assertIn('sha256sum "$out"', sync)
         self.assertIn('mv -Tf "$LINK" "$PORTAL_ACTIVE"', sync)
-        self.assertIn('revisions/rev-$REV', sync)
+        self.assertIn('DEST="$PORTAL_REVISIONS/rev-$REV-$$"', sync)
+        self.assertIn('ln -s "revisions/${DEST##*/}" "$LINK"', sync)
+        self.assertLess(sync.index('mv -Tf "$LINK" "$PORTAL_ACTIVE"'),
+                        sync.index('for d in "$PORTAL_REVISIONS"/rev-*'))
 
     def test_no_fonts_or_logo_binary_in_public_source(self):
         for p in F.rglob("*"):
