@@ -1,6 +1,8 @@
-"""Executed host regressions for local Portal active-revision ACK replay.
+"""Host-executed regressions for WordPress Portal ACK receipt and retry.
 
-E3 source/host evidence only; does not assert a live WordPress ACK.
+The production shell helper is exercised with fake HTTP transport, and the
+production heartbeat reconciliation function is exercised with test-only path
+substitutions. This does not assert a live WordPress/device E5 session.
 """
 from pathlib import Path
 import json
@@ -9,10 +11,10 @@ import subprocess
 import tempfile
 import unittest
 
-SOURCE = (
-    Path(__file__).resolve().parents[1]
-    / "package/wiflow-setup/files/usr/lib/wiflow/portal-sync"
-).read_text(encoding="utf-8")
+FILES = Path(__file__).resolve().parents[1] / "package/wiflow-setup/files"
+SOURCE = (FILES / "usr/lib/wiflow/portal-sync").read_text(encoding="utf-8")
+HEARTBEAT = (FILES / "usr/lib/wiflow/heartbeat-loop").read_text(encoding="utf-8")
+COMMON = (FILES / "usr/lib/wiflow/common.sh").read_text(encoding="utf-8")
 
 
 def production_ack_function():
@@ -21,15 +23,25 @@ def production_ack_function():
     return SOURCE[begin:end]
 
 
+def production_heartbeat_functions():
+    begin = HEARTBEAT.index("portal_runtime_disable(){")
+    end = HEARTBEAT.index("\ndelay=20", begin)
+    return HEARTBEAT[begin:end].replace(
+        "/usr/lib/wiflow/portal-sync", "portal_sync_test"
+    ).replace("/usr/lib/wiflow/portal-firewall", "portal_firewall_test")
+
+
 class PortalActiveAckReplayTests(unittest.TestCase):
     def invoke(self, failure=False):
         with tempfile.TemporaryDirectory(prefix="wiflow-ack-test-") as temp:
             path = Path(temp) / "ack.log"
             log = Path(temp) / "error.log"
+            marker = Path(temp) / "confirmed-revision"
             script = (
                 "REV=27\n"
                 "WIFLOW_DATA_GENERATION=4\n"
                 "WIFLOW_PORTAL_API=https://example.invalid/wiflow/wp-json/portal\n"
+                'PORTAL_ACK_CONFIRMED="$ACK_MARKER"\n'
                 "wiflow_post(){ printf '%s|%s\\n' \"$2\" \"$3\" >> \"$ACK_OUTPUT\"; "
                 '[ "$ACK_FAIL" = 0 ]; }\n'
                 'logger(){ printf "%s\\n" "$*" >> "$ERROR_OUTPUT"; }\n'
@@ -40,7 +52,8 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 ["sh", "-c", script],
                 capture_output=True, text=True, check=False, timeout=5,
                 env={**os.environ, "ACK_OUTPUT": str(path),
-                     "ERROR_OUTPUT": str(log), "ACK_FAIL": "1" if failure else "0"},
+                     "ERROR_OUTPUT": str(log), "ACK_MARKER": str(marker),
+                     "ACK_FAIL": "1" if failure else "0"},
             )
             self.assertEqual(proc.stdout, "")
             self.assertEqual(proc.stderr, "")
@@ -53,7 +66,45 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 self.assertEqual(json.loads(payload), {
                     "revision": 27, "status": "active", "data_generation": 4,
                 })
+            if failure:
+                self.assertFalse(marker.exists(), "a failed ACK must remain retryable")
+            else:
+                self.assertEqual(marker.read_text(), "27\n")
             return log.read_text().splitlines() if log.exists() else []
+
+    def heartbeat_probe(self, starting_marker=None, wanted=1):
+        with tempfile.TemporaryDirectory(prefix="wiflow-heartbeat-ack-") as temp:
+            base = Path(temp)
+            active = base / "active"
+            active.mkdir()
+            (active / "portal.json").write_text('{"revision":27}')
+            marker = base / "confirmed-revision"
+            calls = base / "sync.calls"
+            if starting_marker is not None:
+                marker.write_text(starting_marker)
+            script = (
+                'PORTAL_ACTIVE="$TEST_ACTIVE"\n'
+                'PORTAL_ACK_CONFIRMED="$ACK_MARKER"\n'
+                'uci(){ :; }\n'
+                'state_set(){ :; }\n'
+                'portal_firewall_test(){ :; }\n'
+                'portal_sync_test(){ printf "sync:%s\\n" "$1" >> "$TEST_CALLS"; '
+                'printf "%s\\n" "$1" > "$PORTAL_ACK_CONFIRMED"; }\n'
+                + production_heartbeat_functions()
+                + "\nportal_runtime_reconcile \"$WANTED\" 27 27\n"
+                + "\nportal_runtime_reconcile \"$WANTED\" 27 27\n"
+            )
+            proc = subprocess.run(
+                ["sh", "-c", script],
+                capture_output=True, text=True, check=False, timeout=5,
+                env={**os.environ, "TEST_ACTIVE": str(active),
+                     "ACK_MARKER": str(marker), "TEST_CALLS": str(calls),
+                     "WANTED": str(wanted)},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(proc.stdout, "")
+            self.assertEqual(proc.stderr, "")
+            return calls.read_text().splitlines() if calls.exists() else [], marker.exists()
 
     def test_same_revision_ack_replays_idempotently(self):
         self.assertEqual(self.invoke(), [])
@@ -80,6 +131,30 @@ class PortalActiveAckReplayTests(unittest.TestCase):
         self.assertEqual(SOURCE.count("ack_active_revision()"), 1)
         self.assertEqual(SOURCE.count("\n  ack_active_revision\n"), 1)
         self.assertEqual(SOURCE.count("\nack_active_revision\n"), 1)
+
+    def test_heartbeat_retries_missing_or_stale_ack_once(self):
+        for starting_marker in (None, "26\n", ""):
+            with self.subTest(starting_marker=starting_marker):
+                calls, exists = self.heartbeat_probe(starting_marker)
+                self.assertEqual(calls, ["sync:27"])
+                self.assertTrue(exists)
+
+    def test_heartbeat_skips_already_confirmed_revision(self):
+        calls, exists = self.heartbeat_probe("27\n")
+        self.assertEqual(calls, [])
+        self.assertTrue(exists)
+
+    def test_disabling_portal_invalidates_ack_receipt(self):
+        calls, marker_exists = self.heartbeat_probe("27\n", wanted=0)
+        self.assertEqual(calls, [])
+        self.assertFalse(marker_exists)
+
+    def test_marker_is_volatile_shared_and_does_not_write_flash_every_heartbeat(self):
+        self.assertIn("PORTAL_ACK_CONFIRMED=/tmp/", COMMON)
+        self.assertIn('cat "$PORTAL_ACK_CONFIRMED"', HEARTBEAT)
+        self.assertIn('rm -f "$PORTAL_ACK_CONFIRMED"', HEARTBEAT)
+        self.assertIn('mv "$PORTAL_ACK_CONFIRMED.$$" "$PORTAL_ACK_CONFIRMED"', SOURCE)
+        self.assertIn('rm -f "$PORTAL_ACK_CONFIRMED"', SOURCE)
 
 
 if __name__ == "__main__":
