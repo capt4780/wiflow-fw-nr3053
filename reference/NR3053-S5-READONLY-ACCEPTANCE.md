@@ -35,8 +35,9 @@ python3 tools/nr3053-s5a-verify-factory-backup.py \
 
 The tool reads only the two supplied local regular files and the public pinned
 Golden metadata. It checks the expected Factory length (2 MiB), refuses
-symlinks/same-inode hardlinks, checks SHA-256 equivalence of distinct local
-files, and detects basic file mutations while reading. It prints **only status
+symlinks/same-inode hardlinks, rejects all-0xFF (erased) or all-0x00 (zeroed)
+copies, checks SHA-256 equivalence of distinct local files, and detects basic
+file mutations while reading. It prints **only status
 codes** (never file paths, backup contents, individual hashes or device IDs).
 There are no router commands, network calls, uploads, or device writes.
 Exit code 0 means **copy-level local byte consistency only**.
