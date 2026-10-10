@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import stat
 
@@ -76,7 +77,161 @@ def inspect(path: Path, expected: int) -> tuple[str, str, tuple[int, int] | None
         return "WARN", "file_unavailable_or_unreadable", None, None
 
 
-def run(first: Path, second: Path) -> int:
+
+def observed_factory_digest(fingerprint: Path) -> tuple[str, bytes | None]:
+    """Read the owner's PRIVATE pre-flash device fingerprint, never print its hash.
+
+    This checks a previously recorded /dev/mtd2 Factory *hash*, not device
+    provenance or an independently demonstrated bootloader restore path.
+    """
+    try:
+        before = fingerprint.lstat()
+        if not stat.S_ISREG(before.st_mode) or not (100 <= before.st_size <= 2 * 1024 * 1024):
+            return "BLOCK", None
+        fd = os.open(fingerprint, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            opened = os.fstat(fd)
+            if ((opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                    or not stat.S_ISREG(opened.st_mode)):
+                return "BLOCK", None
+            buf = bytearray()
+            while len(buf) <= 2 * 1024 * 1024:
+                block = os.read(fd, 128 * 1024)
+                if not block:
+                    break
+                buf.extend(block)
+            if len(buf) > 2 * 1024 * 1024 or len(buf) != opened.st_size:
+                return "BLOCK", None
+            after = os.fstat(fd)
+            if (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns) != (
+                    after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                return "BLOCK", None
+        finally:
+            os.close(fd)
+        document = buf.decode("utf-8", "strict")
+    except (OSError, UnicodeDecodeError, ValueError):
+        return "BLOCK", None
+    if not re.search(r'^mtd2:\\s+00200000\\s+[0-9a-fA-F]+\\s+"Factory"\\s*    report("stage", "INFO", "S5_A_PRIVATE_OFFLINE_FACTORY_BACKUP_CHECK")
+    try:
+        expected = factory_expected_size()
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        report("golden_factory_reference", "BLOCK", "missing_or_invalid_golden")
+        report("factory_copy_pair", "NOT_TESTED", "golden_reference_unavailable")
+        status = 2
+    else:
+        report("golden_factory_reference", "PASS", "pinned_size_loaded")
+        a = inspect(first, expected)
+        b = inspect(second, expected)
+        report("factory_copy_a", a[0], a[1])
+        report("factory_copy_b", b[0], b[1])
+        if a[0] != "PASS" or b[0] != "PASS":
+            report("factory_copy_pair", "NOT_TESTED", "both_valid_regular_copies_required")
+            status = 2
+        elif a[2] == b[2]:
+            report("factory_copy_pair", "BLOCK", "same_file_or_hardlink")
+            status = 2
+        elif a[3] != b[3]:
+            report("factory_copy_pair", "BLOCK", "sha256_content_mismatch")
+            status = 2
+        else:
+            report("factory_copy_pair", "PASS", "distinct_files_equal_sha256")
+            status = 0
+    # The supplied 2026-10-07 device fingerprint is kept local/offline.
+    # Comparing bytes to the *observed* Factory digest narrows wrong-copy risk,
+    # but a text document and its hash still cannot authenticate hardware origin.
+    if fingerprint is None:
+        report("factory_fingerprint_match", "NOT_VERIFIED", "private_observed_fingerprint_not_supplied")
+    elif status != 0:
+        report("factory_fingerprint_match", "NOT_TESTED", "valid_matching_backup_pair_required")
+    else:
+        fp_status, digest = observed_factory_digest(fingerprint)
+        if fp_status != "PASS" or digest is None:
+            report("factory_fingerprint_match", "BLOCK", "private_fingerprint_invalid")
+            status = 2
+        elif digest != a[3]:
+            report("factory_fingerprint_match", "BLOCK", "observed_device_factory_hash_mismatch")
+            status = 2
+        else:
+            report("factory_fingerprint_match", "PASS", "matching_observed_factory_hash")
+    # Always keep the high-risk approval gates blocked. File copies can be forged.
+    report("backup_device_origin", "NOT_VERIFIED", "technician_device_export_evidence_required")
+    report("backup_restore_test", "NOT_VERIFIED", "independent_restore_evidence_required")
+    report("uart_bootloader_recovery", "NOT_VERIFIED", "physical_lab_demonstration_required")
+    report("first_flash_approval", "BLOCK", "independent_hardware_recovery_not_proven")
+    report("release_s6", "BLOCK", "device_e5_and_recovery_not_proven")
+    return status
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="NR3053 offline Factory backup copy integrity check (NO FLASH)")
+    parser.add_argument("--factory-a", type=Path, required=True, help="Private Factory dump copy A")
+    parser.add_argument("--factory-b", type=Path, required=True, help="Private Factory dump copy B")
+    parser.add_argument("--observed-fingerprint", type=Path,
+                        help="Private 2026-10-07 stock-device fingerprint text, never upload to GitHub")
+    args = parser.parse_args()
+    return run(args.factory_a, args.factory_b, args.observed_fingerprint)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+, document, re.M):
+        return "BLOCK", None
+    section = document.split("===== FACTORY PARTITION FINGERPRINT", 1)
+    if len(section) != 2:
+        return "BLOCK", None
+    section = section[1].split("===== APK / FEEDS", 1)[0]
+    matches = re.findall(
+        r'^([0-9a-fA-F]{64})[ \\t]+/dev/mtd2\\s*    report("stage", "INFO", "S5_A_PRIVATE_OFFLINE_FACTORY_BACKUP_CHECK")
+    try:
+        expected = factory_expected_size()
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        report("golden_factory_reference", "BLOCK", "missing_or_invalid_golden")
+        report("factory_copy_pair", "NOT_TESTED", "golden_reference_unavailable")
+        status = 2
+    else:
+        report("golden_factory_reference", "PASS", "pinned_size_loaded")
+        a = inspect(first, expected)
+        b = inspect(second, expected)
+        report("factory_copy_a", a[0], a[1])
+        report("factory_copy_b", b[0], b[1])
+        if a[0] != "PASS" or b[0] != "PASS":
+            report("factory_copy_pair", "NOT_TESTED", "both_valid_regular_copies_required")
+            status = 2
+        elif a[2] == b[2]:
+            report("factory_copy_pair", "BLOCK", "same_file_or_hardlink")
+            status = 2
+        elif a[3] != b[3]:
+            report("factory_copy_pair", "BLOCK", "sha256_content_mismatch")
+            status = 2
+        else:
+            report("factory_copy_pair", "PASS", "distinct_files_equal_sha256")
+            status = 0
+    # Always keep the high-risk approval gates blocked. File copies can be forged.
+    report("backup_device_origin", "NOT_VERIFIED", "technician_device_export_evidence_required")
+    report("backup_restore_test", "NOT_VERIFIED", "independent_restore_evidence_required")
+    report("uart_bootloader_recovery", "NOT_VERIFIED", "physical_lab_demonstration_required")
+    report("first_flash_approval", "BLOCK", "independent_hardware_recovery_not_proven")
+    report("release_s6", "BLOCK", "device_e5_and_recovery_not_proven")
+    return status
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="NR3053 offline Factory backup copy integrity check (NO FLASH)")
+    parser.add_argument("--factory-a", type=Path, required=True, help="Private Factory dump copy A")
+    parser.add_argument("--factory-b", type=Path, required=True, help="Private Factory dump copy B")
+    args = parser.parse_args()
+    return run(args.factory_a, args.factory_b)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+, section, re.M)
+    if len(matches) != 1 or "Factory device=/dev/mtd2" not in section:
+        return "BLOCK", None
+    return "PASS", bytes.fromhex(matches[0])
+
+
+def run(first: Path, second: Path, fingerprint: Path | None = None) -> int:
     report("stage", "INFO", "S5_A_PRIVATE_OFFLINE_FACTORY_BACKUP_CHECK")
     try:
         expected = factory_expected_size()
