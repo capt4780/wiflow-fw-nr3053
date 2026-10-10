@@ -9,6 +9,8 @@ import subprocess
 import tempfile
 import unittest
 
+from audit_nr3053_wiflow_image import audit_portal_enable_owner_rootfs
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/portal-mode-loop").read_text()
 HEARTBEAT = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/heartbeat-loop").read_text()
@@ -83,6 +85,31 @@ class PortalEnabledOwnerTests(unittest.TestCase):
         self.assertEqual(self.probe(0, firewall_ok=False),
                          ["firewall:disable",
                           "state:portal_error=captive_firewall_disable_failed"])
+
+    def test_exact_image_audit_accepts_remote_enable_owner(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-image-owner-") as tmp:
+            target = Path(tmp) / "usr/lib/wiflow/portal-mode-loop"
+            target.parent.mkdir(parents=True)
+            target.write_text(SOURCE)
+            self.assertEqual(audit_portal_enable_owner_rootfs(Path(tmp)), [])
+
+    def test_exact_image_audit_rejects_reenable_regression(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-image-owner-") as tmp:
+            target = Path(tmp) / "usr/lib/wiflow/portal-mode-loop"
+            target.parent.mkdir(parents=True)
+            bad = SOURCE.replace(
+                '  enabled="$(uci -q get wiflow.core.portal_enabled',
+                '  uci set wiflow.core.portal_enabled=1\\n'
+                '  enabled="$(uci -q get wiflow.core.portal_enabled', 1,
+            )
+            self.assertNotEqual(bad, SOURCE)
+            target.write_text(bad)
+            self.assertIn("override", " ".join(
+                audit_portal_enable_owner_rootfs(Path(tmp))))
+
+    def test_exact_image_audit_rejects_missing_mode_poller(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-image-owner-") as tmp:
+            self.assertTrue(audit_portal_enable_owner_rootfs(Path(tmp)))
 
     def test_only_heartbeat_mutates_enabled_flag(self):
         body = production_reconcile()
