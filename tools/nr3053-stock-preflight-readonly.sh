@@ -71,9 +71,44 @@ if [ -r "$mtd_path" ]; then
  else
   report calibration_partition_hint WARN calibration_partition_name_not_confirmed
  fi
+
+ # Size-only, non-mutating /proc/mtd cross-check. /proc/mtd cannot establish
+ # physical offsets, backup contents or bootloader recovery. This portable
+ # mirror of pinned reference/nr3053-golden.json is checked by host tests.
+ profile="$(awk '
+  BEGIN {
+   expected["BL2"]="00100000"
+   expected["u-boot-env"]="00100000"
+   expected["Factory"]="00200000"
+   expected["FIP"]="00200000"
+   expected["ubi"]="0ea00000"
+  }
+  $1 ~ /^mtd[0-9]+:$/ {
+   name=$4
+   gsub(/^"|"$/, "", name)
+   if (name in expected) {
+    seen[name]++
+    if (seen[name] > 1) duplicate=1
+    if (tolower($2) != expected[name]) mismatch=1
+   }
+  }
+  END {
+   for (name in expected) if (seen[name] > 0) observed++
+   if (duplicate) print "BLOCK|duplicate_required_partition"
+   else if (mismatch) print "BLOCK|required_partition_size_mismatch"
+   else if (observed < 5) print "WARN|required_partition_inventory_incomplete"
+   else print "PASS|required_partition_sizes_match_golden"
+  }
+ ' "$mtd_path" 2>/dev/null)" || profile='WARN|mtd_profile_read_error'
+ case "$profile" in
+  PASS\|required_partition_sizes_match_golden|BLOCK\|duplicate_required_partition|BLOCK\|required_partition_size_mismatch|WARN\|required_partition_inventory_incomplete|WARN\|mtd_profile_read_error)
+   printf 'golden_partition_sizes|%s\n' "$profile" ;;
+  *) report golden_partition_sizes WARN mtd_profile_unavailable ;;
+ esac
 else
  report flash_partition_inventory WARN mtd_table_unavailable
  report calibration_partition_hint WARN mtd_table_unavailable
+ report golden_partition_sizes WARN mtd_table_unavailable
 fi
 
 if [ -z "$STOCK_ROOT" ] && has ip; then
