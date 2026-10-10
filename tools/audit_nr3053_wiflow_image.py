@@ -107,7 +107,10 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
         "state_set portal_error 'captive_chains_missing'",
         "disable || state_set portal_error 'captive_rollback_failed'",
         "captive_nft_objects_present(){",
-        "if captive_nft_objects_present; then changed=1; fi",
+        "table_ready=1",
+        '/usr/sbin/nft list table inet fw4 >/dev/null 2>&1 || table_ready=0',
+        'if [ "$table_ready" = 1 ] && captive_nft_objects_present; then',
+        'if [ "$changed" = 0 ]; then',
         "state_set portal_error 'captive_disable_nft_unavailable'",
         "state_set portal_error 'captive_disable_stale_nft_state'",
     ):
