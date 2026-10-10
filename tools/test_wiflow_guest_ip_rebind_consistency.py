@@ -144,6 +144,32 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertNotIn("new_grant_add", events)
 
+    def test_compiled_image_audit_rejects_missing_remote_enable_guards(self):
+        from audit_nr3053_wiflow_image import audit_captive_rebind_rootfs
+        with tempfile.TemporaryDirectory(prefix="wiflow-rebind-guard-image-") as tmp:
+            root = Path(tmp)
+            sources = {
+                "portal-client": CLIENT,
+                "portal-session-loop": LOOP,
+            }
+            files = {}
+            for name, source in sources.items():
+                file = root / "usr/lib/wiflow" / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(source)
+                files[name] = file
+            self.assertEqual(audit_captive_rebind_rootfs(root), [])
+            for name, source in sources.items():
+                with self.subTest(component=name):
+                    damaged = source.replace(
+                        'uci -q get wiflow.core.portal_enabled',
+                        'uci -q get wiflow.core.deprecated_portal_enabled'
+                    )
+                    self.assertNotEqual(damaged, source)
+                    files[name].write_text(damaged)
+                    self.assertTrue(audit_captive_rebind_rootfs(root))
+                    files[name].write_text(source)
+
     def test_client_failed_session_write_must_not_authorize_new_ip(self):
         code, events = self.invoke("client", write_ok=False)
         self.assertEqual(code, 1)
