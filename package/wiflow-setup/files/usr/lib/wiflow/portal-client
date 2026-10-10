@@ -145,7 +145,7 @@ revoke-session)
     # be reported as success while an authorized IP/MAC still forwards.
     portal_nft_del "$ip" "$mac"
     now="$(date +%s)"
-    if ! portal_nft_ready || portal_nft_pair_authorized "$ip" "$mac"; then
+    if ! portal_nft_pair_revoked "$ip" "$mac"; then
         /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
         # Never preserve an authorized session which could be auto-restored
         # on the next firewall ensure after the emergency disable.
