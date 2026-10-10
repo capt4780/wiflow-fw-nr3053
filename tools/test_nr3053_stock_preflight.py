@@ -5,6 +5,7 @@ fixture is a hardware test or bootloader recovery/flash authorization.
 """
 from pathlib import Path
 import os
+import json
 import re
 import subprocess
 import tempfile
@@ -12,11 +13,13 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools/nr3053-stock-preflight-readonly.sh"
+GOLDEN = json.loads((ROOT / "reference/nr3053-golden.json").read_text())
 
 
 class NR3053StockPreflightTests(unittest.TestCase):
     def evaluate(self, *, board="viettel,nr3053", compatible=True,
-                 release=True, mtd=True, calibration=True, wiflow=False):
+                 release=True, mtd=True, calibration=True, wiflow=False,
+                 mtd_variant="golden"):
         with tempfile.TemporaryDirectory(prefix="nr3053-stock-preflight-") as temp:
             directory = Path(temp)
             root = directory / "stock"
@@ -43,12 +46,31 @@ class NR3053StockPreflightTests(unittest.TestCase):
             if mtd:
                 partition_file = root / "proc/mtd"
                 partition_file.parent.mkdir(parents=True, exist_ok=True)
-                partition_file.write_text(
-                    'dev:    size   erasesize  name\n'
-                    'mtd0: 00100000 00020000 "BL2"\n'
-                    + ('mtd1: 00080000 00020000 "factory"\n' if calibration
-                       else 'mtd1: 00080000 00020000 "rootfs"\n')
+                partitions = [
+                    (p["name"], f'{int(p["size"], 16):08x}')
+                    for p in GOLDEN["dtb"]["spi_nand_partition_layout"]
+                ]
+                if not calibration:
+                    partitions = [(name, size) for name, size in partitions
+                                  if name != "Factory"]
+                if mtd_variant == "wrong_factory_size":
+                    partitions = [(name, "00080000" if name == "Factory" else size)
+                                  for name, size in partitions]
+                elif mtd_variant == "missing_ubi":
+                    partitions = [(name, size) for name, size in partitions
+                                  if name != "ubi"]
+                elif mtd_variant == "duplicate_factory":
+                    partitions.append(("Factory", "00200000"))
+                elif mtd_variant == "unrelated_extra":
+                    partitions.append(("rootfs_data", "00040000"))
+                elif mtd_variant == "reordered":
+                    partitions.reverse()
+                lines = ["dev:    size   erasesize  name"]
+                lines.extend(
+                    f'mtd{i}: {size} 00020000 "{name}"'
+                    for i, (name, size) in enumerate(partitions)
                 )
+                partition_file.write_text("\n".join(lines) + "\n")
             if wiflow:
                 wiflow_file = root / "usr/lib/wiflow/portal-client"
                 wiflow_file.parent.mkdir(parents=True)
@@ -93,6 +115,7 @@ class NR3053StockPreflightTests(unittest.TestCase):
                       "flash_partition_inventory", "soc_compatible"):
             self.assertEqual(data[field][0], "PASS")
         self.assertEqual(data["calibration_partition_hint"][0], "INFO")
+        self.assertEqual(data["golden_partition_sizes"][0], "PASS")
         self.assertEqual(data["wiflow_installation"][0], "INFO")
         self.assertEqual(data["stock_radio_2g"][0], "SKIP")
         self.assertEqual(data["stock_radio_5g"][0], "SKIP")
@@ -126,13 +149,52 @@ class NR3053StockPreflightTests(unittest.TestCase):
     def test_missing_board_mtd_and_os_are_explicitly_unknown(self):
         data = self.evaluate(board=None, compatible=None, release=False, mtd=False)
         for field in ("board_identity", "dt_compatible", "stock_os_metadata",
-                      "flash_partition_inventory", "calibration_partition_hint", "soc_compatible"):
+                      "flash_partition_inventory", "calibration_partition_hint",
+                      "soc_compatible", "golden_partition_sizes"):
             self.assertEqual(data[field][0], "WARN")
 
     def test_missing_named_calibration_partition_is_warning(self):
         data = self.evaluate(calibration=False)
         self.assertEqual(data["flash_partition_inventory"][0], "PASS")
         self.assertEqual(data["calibration_partition_hint"][0], "WARN")
+        self.assertEqual(data["golden_partition_sizes"][0], "WARN")
+
+    def test_required_golden_partition_size_mismatch_blocks_inventory(self):
+        data = self.evaluate(mtd_variant="wrong_factory_size")
+        self.assertEqual(data["flash_partition_inventory"][0], "PASS")
+        self.assertEqual(data["golden_partition_sizes"],
+                         ("BLOCK", "required_partition_size_mismatch"))
+
+    def test_missing_golden_partition_is_unknown_not_approved(self):
+        data = self.evaluate(mtd_variant="missing_ubi")
+        self.assertEqual(data["golden_partition_sizes"],
+                         ("WARN", "required_partition_inventory_incomplete"))
+
+    def test_duplicate_required_partition_is_blocked(self):
+        data = self.evaluate(mtd_variant="duplicate_factory")
+        self.assertEqual(data["golden_partition_sizes"],
+                         ("BLOCK", "duplicate_required_partition"))
+
+    def test_unrelated_partition_does_not_invalidate_required_sizes(self):
+        data = self.evaluate(mtd_variant="unrelated_extra")
+        self.assertEqual(data["golden_partition_sizes"][0], "PASS")
+
+    def test_partition_order_not_claimed_by_size_only_crosscheck(self):
+        data = self.evaluate(mtd_variant="reordered")
+        self.assertEqual(data["golden_partition_sizes"][0], "PASS")
+
+    def test_missing_mtd_table_reports_unknown(self):
+        data = self.evaluate(mtd=False)
+        self.assertEqual(data["golden_partition_sizes"][0], "WARN")
+
+    def test_expected_partition_sizes_mirror_pinned_golden_json(self):
+        source = TOOL.read_text()
+        mirrored = dict(re.findall(r'expected\["([^"]+)"\]="([0-9a-f]+)"', source))
+        golden = {
+            p["name"]: f'{int(p["size"], 16):08x}'
+            for p in GOLDEN["dtb"]["spi_nand_partition_layout"]
+        }
+        self.assertEqual(mirrored, golden)
 
     def test_unexpected_wiflow_files_are_observed_not_executed(self):
         data = self.evaluate(wiflow=True)
