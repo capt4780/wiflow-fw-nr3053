@@ -68,7 +68,7 @@ class CaptiveActionGuardTests(unittest.TestCase):
     def test_guard_precedes_session_authorization_and_event(self):
         source = self.source
         self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
-                        source.index('case "$action" in\n authorize)'))
+                        source.index('case "$action" in\n status)'))
         self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
                         source.index('authorize-session "$sid" "$cid"'))
         self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
