@@ -324,6 +324,28 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
         return ["guest DHCP IP rebind fail-closed guard missing"]
     a = a[ai:a.find("\n    fi\n\n    # Stage 3", ai)]
     b = b[bi:b.find('\n        else\n            [ "$absent"', bi)]
+    # Neither path may use the stored authorized flag to skip old-pair
+    # revocation: a stale nft entry could outlive an unauthorized record.
+    if 'if [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then' not in a:
+        return ["client DHCP rebind skips stale unauthorized nft authorization"]
+    old_loop = b[b.find("had_grant=0"):b.find('if ! client_session_write "$f"')]
+    required_unconditional = (
+        'portal_nft_del "$ip" "$mac"',
+        'if ! portal_nft_pair_revoked "$ip" "$mac"; then',
+        'if [ "${authorized:-0}" = 0 ] && portal_nft_pair_granted',
+    )
+    if not old_loop.startswith('had_grant=0') or any(
+        token not in old_loop for token in required_unconditional
+    ):
+        return ["session-loop DHCP rebind skips stale unauthorized nft authorization"]
+    if 'if [ "${authorized:-0}" != 0 ]; then' in old_loop:
+        return ["session-loop old nft revoke guarded by local authorization flag"]
+    if not (
+        old_loop.index(required_unconditional[0]) <
+        old_loop.index(required_unconditional[1]) <
+        old_loop.index(required_unconditional[2])
+    ):
+        return ["session-loop DHCP revoke not verified before grant migration"]
     required_a = (
         'portal_nft_del "$oldip" "$mac"',
         'if ! client_session_write "$f"',

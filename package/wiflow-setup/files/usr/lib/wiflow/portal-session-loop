@@ -35,14 +35,16 @@ while true; do
                 # A DHCP reassignment is a state transition. Revoke the old
                 # pair and persist the new IP BEFORE opening any new pair.
                 had_grant=0
-                if [ "${authorized:-0}" != 0 ]; then
-                    portal_nft_del "$ip" "$mac"
-                    if ! portal_nft_pair_revoked "$ip" "$mac"; then
-                        /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
-                        state_set portal_error 'client_ip_old_authorization_revoke_failed'
-                        continue
-                    fi
-                elif portal_nft_pair_granted "$ip" "$mac"; then
+                # Always remove the old authorized pair and verify its
+                # absence, even if the session claims it was unauthorized.
+                # Local state alone cannot prove the nft set is empty.
+                portal_nft_del "$ip" "$mac"
+                if ! portal_nft_pair_revoked "$ip" "$mac"; then
+                    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+                    state_set portal_error 'client_ip_old_authorization_revoke_failed'
+                    continue
+                fi
+                if [ "${authorized:-0}" = 0 ] && portal_nft_pair_granted "$ip" "$mac"; then
                     had_grant=1
                     portal_nft_grant_del "$ip" "$mac"
                 fi
