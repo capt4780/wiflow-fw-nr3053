@@ -71,7 +71,8 @@ class PortalEnabledOwnerTests(unittest.TestCase):
 
     def test_missing_snapshot_must_not_open_forwarding(self):
         self.assertEqual(self.probe(1, snapshot=False),
-                         ["firewall:disable", "state:portal_error=snapshot_missing"])
+                         ["sync:27", "firewall:disable",
+                          "state:portal_error=snapshot_missing"])
 
     def test_ensure_failure_reports_error(self):
         self.assertEqual(self.probe(1, firewall_ok=False),
