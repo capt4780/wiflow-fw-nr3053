@@ -21,7 +21,35 @@ This reads the runtime board identifier and device-tree compatibility (NR3053 bo
 
 If stock firmware does **not** provide an authorized shell/SSH (or access is Wi-Fi only), **do not force SSH, install packages, change bootloader settings or flash merely to run a test**. Collect the available non-sensitive board/revision and firmware-version details from the original UI and hardware label privately. An authorized technician may document the PCB/bootloader and a physically recoverable connection. This step cannot certify a recovery procedure.
 
-**Gate between S5-A and S5-B (not yet met):** match the exact stock hardware variant to Golden, determine and independently validate an offline backup of calibration and partitions, confirm bootloader/UART recovery with a second management path on dedicated lab hardware, and approve a *separate* controlled first-flash plan. Do not treat GitHub Actions green tests or a readable MTD table as any of those proofs.
+### Optional S5-A offline Factory backup-copy consistency check
+
+**Only after an authorized technician has privately obtained Factory backup copies
+from the real stock NR3053 through a separately approved extraction procedure.**
+Run this on an offline/trusted workstation, from the reviewed repository clone:
+
+~~~sh
+python3 tools/nr3053-s5a-verify-factory-backup.py \
+  --factory-a /LOCAL/PRIVATE/FACTORY-COPY-A \
+  --factory-b /LOCAL/PRIVATE/FACTORY-COPY-B
+~~~
+
+The tool reads only the two supplied local regular files and the public pinned
+Golden metadata. It checks the expected Factory length (2 MiB), refuses
+symlinks/same-inode hardlinks, checks SHA-256 equivalence of distinct local
+files, and detects basic file mutations while reading. It prints **only status
+codes** (never file paths, backup contents, individual hashes or device IDs).
+There are no router commands, network calls, uploads, or device writes.
+Exit code 0 means **copy-level local byte consistency only**.
+
+Two matching files may still be copies of the same damaged, fake, wrong-board,
+or incomplete source. This tool **does not validate** provenance, NAND
+read errors, physical offsets, every partition, independently acquired dumps,
+Factory calibration validity, bootloader usability, or ability to restore.
+The required backup_device_origin and backup_restore_test always remain
+NOT_VERIFIED; first_flash_approval always remains BLOCK. Keep private
+backup files and any device details outside this public repository and chat.
+
+**Gate between S5-A and S5-B (not yet met):** match the exact stock hardware variant to Golden, determine and independently validate an offline backup of calibration and partitions, confirm bootloader/UART recovery with a second management path on dedicated lab hardware, and approve a *separate* controlled first-flash plan. Do not treat GitHub Actions green tests, a readable MTD table, or two matching backup files as any of those proofs.
 
 **S5-B** begins *only if* a designated lab NR3053 has actually booted a reviewed Wiflow candidate through an approved, recoverable process. The remainder of this runbook, including `nr3053-s5-readonly.sh`, applies to S5-B and **cannot be run as a Wiflow acceptance test on stock firmware**.
 
