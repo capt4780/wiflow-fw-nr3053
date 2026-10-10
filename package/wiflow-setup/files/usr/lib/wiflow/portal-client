@@ -49,9 +49,10 @@ ensure)
         event_enqueue connected "$cid" "$sid" "$now" || true
         log_client_event connected "$sid" ok
     else
-        # On DHCP IP rebind, never authorize a new IP before its matching
-        # session record is committed. Revoke any old IP/MAC rule first.
-        if [ "${authorized:-0}" != 0 ] && [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then
+        # On any DHCP IP rebind, revoke and verify the old IP/MAC rule
+        # before persisting the new IP. Even an unauthorized session may
+        # have a stale nft authorization; never retain it accidentally.
+        if [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then
             portal_nft_del "$oldip" "$mac"
             if ! portal_nft_pair_revoked "$oldip" "$mac"; then
                 /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
