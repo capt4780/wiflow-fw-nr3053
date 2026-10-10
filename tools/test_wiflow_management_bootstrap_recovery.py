@@ -13,6 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOOT = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/bootstrap").read_text()
 INIT = (ROOT / "package/wiflow-setup/files/etc/init.d/wiflow-setup").read_text()
+MINIMAL = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/minimal-profile").read_text()
 CONFIGS = ("network", "wireless", "firewall", "dhcp", "uhttpd")
 
 
@@ -103,6 +104,7 @@ rollback_stock_configs
         with tempfile.TemporaryDirectory(prefix="wiflow-p46-rootfs-audit-") as tmp:
             fs = Path(tmp)
             for rel, body in (("usr/lib/wiflow/bootstrap", BOOT),
+                              ("usr/lib/wiflow/minimal-profile", MINIMAL),
                               ("etc/init.d/wiflow-setup", INIT)):
                 dest = fs / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -116,6 +118,12 @@ rollback_stock_configs
                 BOOT.replace("rollback_stock_configs(){", "no_rollback(){"),
                 encoding="utf-8")
             self.assertTrue(audit_management_recovery_rootfs(fs))
+
+    def test_minimal_profile_keeps_independent_rescue_services(self):
+        self.assertIn("OPTIONAL_SERVICES='nodogsplash opennds wifidog'", MINIMAL)
+        optional = MINIMAL.split("OPTIONAL_SERVICES=", 1)[1].split("\\n", 1)[0]
+        for rescue in ("tailscale", "zerotier", "openvpn", "ttyd", "nginx"):
+            self.assertNotIn(rescue, optional)
 
     def test_bootstrap_failure_stops_portal_start(self):
         self.assertNotIn("/usr/lib/wiflow/bootstrap >/tmp/wiflow-bootstrap.log 2>&1 || true", INIT)
