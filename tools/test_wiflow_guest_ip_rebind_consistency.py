@@ -47,6 +47,7 @@ portal_nft_del(){
  [ "$TEST_REVOKE_OK" = 0 ] || rm -f "$TEST_ROOT/old"
 }
 portal_nft_pair_authorized(){ [ -f "$TEST_ROOT/old" ]; }
+portal_nft_pair_revoked(){ [ "$TEST_NFT_READ_OK" = 1 ] && [ ! -f "$TEST_ROOT/old" ]; }
 portal_nft_pair_granted(){ [ "$TEST_GRANT" = 1 ]; }
 portal_nft_grant_del(){ printf "old_grant_del\n" >> "$LOG"; }
 portal_nft_grant_add(){ printf "new_grant_add\n" >> "$LOG"; }
@@ -79,7 +80,8 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                 env={**os.environ, "TEST_ROOT": str(base),
                      "TEST_WRITE_OK": "1" if write_ok else "0",
                      "TEST_REVOKE_OK": "1" if revoke_ok else "0",
-                     "TEST_GRANT": "1" if had_grant else "0"},
+                     "TEST_GRANT": "1" if had_grant else "0",
+                     "TEST_NFT_READ_OK": "1"},
             )
             log = (base / "log").read_text().splitlines() if (base / "log").exists() else []
             self.assertEqual(proc.stderr, "", proc.stderr)
