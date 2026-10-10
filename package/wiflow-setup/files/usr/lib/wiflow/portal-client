@@ -33,6 +33,24 @@ flush_captive_conntrack(){
     conntrack -D -s "$ipx" -p tcp --dport 80 >/dev/null 2>&1 || true
 }
 
+# An nft deletion request is not proof that a guest pair is revoked.
+# A failed readback is ambiguous and must fail closed. All authorize failure
+# branches use this one cleanup owner before reporting an unsuccessful CTA.
+rollback_authorization_pair(){
+    rb_ip="$1"; rb_mac="$2"; rb_sid="$3"
+    portal_nft_del "$rb_ip" "$rb_mac"
+    if ! portal_nft_pair_revoked "$rb_ip" "$rb_mac"; then
+        if /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1; then
+            state_set portal_error 'client_authorize_rollback_unverified'
+        else
+            state_set portal_error 'client_authorize_rollback_firewall_disable_failed'
+        fi
+        log_client_event authorize_failed "$rb_sid" rollback_unverified
+        return 1
+    fi
+    return 0
+}
+
 case "$mode" in
 ensure)
     ip="$value"; valid_guest_ip "$ip" || exit 2
@@ -106,9 +124,14 @@ authorize-session)
     # add exact IP+MAC to the authorized bypass set and return immediately.
     if [ "${authorized:-0}" != 0 ] && portal_nft_pair_authorized "$ip" "$mac"; then exit 0; fi
     now="$(date +%s)"
-    portal_nft_add "$ip" "$mac" || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
+    if ! portal_nft_add "$ip" "$mac"; then
+        # nft add may have taken effect before its verification read failed.
+        rollback_authorization_pair "$ip" "$mac" "$sid"
+        log_client_event authorize_failed "$sid" policy_apply
+        exit 5
+    fi
     if ! portal_nft_pair_authorized "$ip" "$mac"; then
-        portal_nft_del "$ip" "$mac"
+        rollback_authorization_pair "$ip" "$mac" "$sid"
         log_client_event authorize_failed "$sid" policy_verify
         exit 5
     fi
@@ -121,12 +144,7 @@ authorize-session)
     newly_authorized=0
     if [ "${authorized:-0}" = 0 ]; then authorized="$now"; newly_authorized=1; fi
     if ! client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0; then
-        portal_nft_del "$ip" "$mac"
-        if portal_nft_pair_authorized "$ip" "$mac"; then
-            # Deletion of a live authorization must not fail open silently.
-            /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
-            log_client_event authorize_failed "$sid" rollback_unverified
-        fi
+        rollback_authorization_pair "$ip" "$mac" "$sid"
         log_client_event authorize_failed "$sid" persist
         exit 7
     fi
