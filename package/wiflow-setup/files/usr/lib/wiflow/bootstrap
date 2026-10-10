@@ -136,8 +136,8 @@ configure_web(){
     uci set uhttpd.wiflow_portal.max_requests='4'
     uci set uhttpd.wiflow_portal.max_connections='24'
     uci commit uhttpd || return 1
-    /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
-    /etc/init.d/firewall reload >/dev/null 2>&1 || true
+    /etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1
+    /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
 
     i=0
     while [ "$i" -lt 10 ]; do
@@ -149,11 +149,6 @@ configure_web(){
 
 wait_for_br_lan || { log 'BOOTSTRAP_BLOCK: br-lan unavailable'; exit 1; }
 ensure_device_id
-if [ "$(uci -q get wiflow.core.last_command_status 2>/dev/null || true)" = rebooting ]; then
-    cid="$(uci -q get wiflow.core.last_command_id 2>/dev/null || true)"
-    act="$(uci -q get wiflow.core.last_command_action 2>/dev/null || echo reboot)"
-    [ -n "$cid" ] && command_result_set "$cid" "$act" success 'Thiết bị đã khởi động lại' || true
-fi
 backup_stock_configs || { log 'BOOTSTRAP_BLOCK: incomplete stock configuration backup'; exit 1; }
 recover_uplink_transaction && log 'Recovered interrupted uplink transaction' || true
 ensure_management_network || bootstrap_fail 'management LAN configuration failed'
@@ -163,7 +158,6 @@ tune_wiflow_runtime
 ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || bootstrap_fail 'network reload failed'
 wait_for_management_ip || bootstrap_fail 'management IP 10.0.0.1 not confirmed'
 ensure_luci_ip || bootstrap_fail 'LuCI IP 10.0.0.2/32 not confirmed'
-cleanup_legacy_management_ips
 wait_for_guest_ip || bootstrap_fail 'guest IP 10.10.10.1 not confirmed'
 /etc/init.d/dnsmasq restart >/dev/null 2>&1 || bootstrap_fail 'dnsmasq restart failed'
 /etc/init.d/firewall reload >/dev/null 2>&1 || bootstrap_fail 'firewall reload failed'
@@ -196,6 +190,12 @@ fi
 wifi reload >/dev/null 2>&1 || true
 configure_web || bootstrap_fail 'management web listeners not confirmed'
 /usr/lib/wiflow/minimal-profile >/dev/null 2>&1 || log 'Minimal runtime profile could not be fully applied'
+cleanup_legacy_management_ips
+if [ "$(uci -q get wiflow.core.last_command_status 2>/dev/null || true)" = rebooting ]; then
+    cid="$(uci -q get wiflow.core.last_command_id 2>/dev/null || true)"
+    act="$(uci -q get wiflow.core.last_command_action 2>/dev/null || echo reboot)"
+    [ -n "$cid" ] && command_result_set "$cid" "$act" success 'Thiết bị đã khởi động lại' || true
+fi
 log 'Wiflow Setup active on 10.0.0.1; Security Gate on 10.0.0.2:80; LuCI on 10.0.0.2:8081'
 rm -f /etc/wiflow/reboot-required >/dev/null 2>&1 || true
 exit 0
