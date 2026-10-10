@@ -12,6 +12,16 @@ from audit_nr3053_wiflow_image import audit_portal_disable_reporting_rootfs
 
 ROOT = Path(__file__).resolve().parents[1]
 HEARTBEAT = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/heartbeat-loop").read_text()
+FIREWALL = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/portal-firewall").read_text()
+
+
+def production_firewall_disable():
+    start = FIREWALL.index("captive_nft_objects_present(){")
+    end = FIREWALL.index("\ncase \"$MODE\" in", start)
+    return FIREWALL[start:end].replace("/usr/sbin/nft", "nft_test").replace(
+        "/etc/init.d/firewall reload", "firewall_reload_test"
+    )
+
 
 
 def production_functions():
@@ -89,6 +99,78 @@ class ExplicitPortalDisableReportingTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(value, "0")
         self.assertEqual(log, ["firewall:disable"])
+
+    def exercise_firewall_disable(self, *, orphan=False, rules=False,
+                                  table_ok=True, reload_ok=True, stale_after_reload=False):
+        with tempfile.TemporaryDirectory(prefix="wiflow-firewall-disable-") as tmp:
+            base = Path(tmp)
+            if orphan:
+                (base / "orphan").touch()
+            if rules:
+                (base / "captive.nft").write_text("test")
+            script = r'''
+NFT_FILE="$TEST_ROOT/captive.nft"
+uci(){
+ case "$1" in
+ -q) return 1 ;;
+ commit) echo commit >> "$TEST_ROOT/log"; return 0 ;;
+ esac
+ return 0
+}
+nft_test(){
+ if [ "$1" = list ] && [ "$2" = table ]; then
+  [ "$TABLE_OK" = 1 ]; return
+ fi
+ [ -f "$TEST_ROOT/orphan" ]
+}
+firewall_reload_test(){
+ echo reload >> "$TEST_ROOT/log"
+ [ "$RELOAD_OK" = 1 ] || return 1
+ [ "$STALE" = 1 ] || rm -f "$TEST_ROOT/orphan"
+ return 0
+}
+state_set(){ echo "error:$2" >> "$TEST_ROOT/log"; }
+''' + production_firewall_disable() + '\ndisable\n'
+            result = subprocess.run(
+                ["sh", "-c", script], capture_output=True, text=True, timeout=8,
+                env={**os.environ, "TEST_ROOT": str(base),
+                     "TABLE_OK": "1" if table_ok else "0",
+                     "RELOAD_OK": "1" if reload_ok else "0",
+                     "STALE": "1" if stale_after_reload else "0"},
+            )
+            log = (base / "log").read_text().splitlines() if (base / "log").exists() else []
+            self.assertEqual(result.stderr, "")
+            return result.returncode, log
+
+    def test_disable_clean_kernel_and_config_avoids_reloads(self):
+        code, log = self.exercise_firewall_disable()
+        self.assertEqual(code, 0)
+        self.assertEqual(log, [])
+
+    def test_disable_detects_orphaned_live_nft_state_after_config_deletion(self):
+        code, log = self.exercise_firewall_disable(orphan=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(log, ["commit", "reload"])
+
+    def test_disable_live_rule_unchanged_by_reload_is_not_reported_success(self):
+        code, log = self.exercise_firewall_disable(orphan=True, stale_after_reload=True)
+        self.assertNotEqual(code, 0)
+        self.assertIn("error:captive_disable_stale_nft_state", log)
+
+    def test_disable_unqueryable_nft_state_is_not_reported_success(self):
+        code, log = self.exercise_firewall_disable(table_ok=False)
+        self.assertNotEqual(code, 0)
+        self.assertIn("error:captive_disable_nft_unavailable", log)
+
+    def test_disable_firewall_reload_failure_propagates(self):
+        code, log = self.exercise_firewall_disable(orphan=True, reload_ok=False)
+        self.assertNotEqual(code, 0)
+        self.assertIn("error:captive_disable_reload_failed", log)
+
+    def test_disable_config_deletion_requires_firewall_reload(self):
+        code, log = self.exercise_firewall_disable(rules=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(log, ["commit", "reload"])
 
     def test_exact_image_audit_rejects_swallowed_failure(self):
         with tempfile.TemporaryDirectory(prefix="wiflow-disable-image-") as tmp:
