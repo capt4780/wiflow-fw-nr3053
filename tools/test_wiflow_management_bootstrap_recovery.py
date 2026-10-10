@@ -4,6 +4,7 @@ Production shell functions are executed against disposable /etc/config fixtures.
 No target router, flash, credentials or calibration data are accessed.
 """
 from pathlib import Path
+from audit_nr3053_wiflow_image import audit_management_recovery_rootfs
 import os
 import subprocess
 import tempfile
@@ -97,6 +98,24 @@ rollback_stock_configs
             "backup_stock_configs && rollback_stock_configs", service_ok=False)
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(trace, ["svc:network reload"])
+
+    def test_compiled_image_guard_rejects_regression(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-p46-rootfs-audit-") as tmp:
+            fs = Path(tmp)
+            for rel, body in (("usr/lib/wiflow/bootstrap", BOOT),
+                              ("etc/init.d/wiflow-setup", INIT)):
+                dest = fs / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(body, encoding="utf-8")
+            self.assertEqual(audit_management_recovery_rootfs(fs), [])
+            (fs / "etc/init.d/wiflow-setup").write_text(
+                INIT.replace("return 1", "return 0"), encoding="utf-8")
+            self.assertTrue(audit_management_recovery_rootfs(fs))
+            (fs / "etc/init.d/wiflow-setup").write_text(INIT, encoding="utf-8")
+            (fs / "usr/lib/wiflow/bootstrap").write_text(
+                BOOT.replace("rollback_stock_configs(){", "no_rollback(){"),
+                encoding="utf-8")
+            self.assertTrue(audit_management_recovery_rootfs(fs))
 
     def test_bootstrap_failure_stops_portal_start(self):
         self.assertNotIn("/usr/lib/wiflow/bootstrap >/tmp/wiflow-bootstrap.log 2>&1 || true", INIT)
