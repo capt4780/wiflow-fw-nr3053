@@ -128,14 +128,22 @@ wait_for_guest_ip || log 'Guest IP 10.10.10.1 not confirmed'
 /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 /etc/init.d/firewall reload >/dev/null 2>&1 || true
 secure_configs
-if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
-    # Active snapshot is the local source of truth after reboot. Never leave a
-    # valid captive Portal disabled because of a stale/transient remote flag.
-    uci set wiflow.core.portal_enabled='1'; uci commit wiflow >/dev/null 2>&1 || true
-    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || log 'Captive portal firewall could not be enabled'
+# The last confirmed remote enable/disable state is authoritative across
+# reboots. An existing cached snapshot does not override an explicit WP
+# disable. At a WP outage a previously enabled valid snapshot keeps working.
+saved_portal_enabled="$(uci -q get wiflow.core.portal_enabled 2>/dev/null || true)"
+if [ "$saved_portal_enabled" = 1 ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then
+    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 ||
+        log 'Captive portal firewall could not be enabled'
 else
-    uci set wiflow.core.portal_enabled='0'; uci commit wiflow >/dev/null 2>&1 || true
-    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+    # Missing snapshot is fail-closed even if a stale enabled flag survived.
+    # Do not write UCI flash repeatedly for an already disabled Portal.
+    if [ "$saved_portal_enabled" != 0 ]; then
+        uci set wiflow.core.portal_enabled='0'
+        uci commit wiflow >/dev/null 2>&1 || log 'Could not persist disabled Portal state'
+    fi
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 ||
+        log 'Captive portal firewall could not be disabled'
 fi
 uplink_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
 uplink_ssid="$(uci -q get wireless.wiflow_uplink.ssid 2>/dev/null || true)"
