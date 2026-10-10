@@ -12,6 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOT = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/bootstrap").read_text()
+COMMON = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/common.sh").read_text()
 INIT = (ROOT / "package/wiflow-setup/files/etc/init.d/wiflow-setup").read_text()
 MINIMAL = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/minimal-profile").read_text()
 CONFIGS = ("network", "wireless", "firewall", "dhcp", "uhttpd")
@@ -105,6 +106,7 @@ rollback_stock_configs
             fs = Path(tmp)
             for rel, body in (("usr/lib/wiflow/bootstrap", BOOT),
                               ("usr/lib/wiflow/minimal-profile", MINIMAL),
+                              ("usr/lib/wiflow/common.sh", COMMON),
                               ("etc/init.d/wiflow-setup", INIT)):
                 dest = fs / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -116,6 +118,12 @@ rollback_stock_configs
             (fs / "etc/init.d/wiflow-setup").write_text(INIT, encoding="utf-8")
             (fs / "usr/lib/wiflow/bootstrap").write_text(
                 BOOT.replace("rollback_stock_configs(){", "no_rollback(){"),
+                encoding="utf-8")
+            self.assertTrue(audit_management_recovery_rootfs(fs))
+            (fs / "usr/lib/wiflow/bootstrap").write_text(BOOT, encoding="utf-8")
+            (fs / "usr/lib/wiflow/common.sh").write_text(
+                COMMON.replace("uci commit dhcp >/dev/null 2>&1 || return 1",
+                               "uci commit dhcp >/dev/null 2>&1 || true"),
                 encoding="utf-8")
             self.assertTrue(audit_management_recovery_rootfs(fs))
 
