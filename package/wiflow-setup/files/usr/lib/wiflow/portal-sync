@@ -19,7 +19,8 @@ fail(){
 ack_active_revision(){
  ack="/tmp/wiflow-portal-ack.$$"
  body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"
- if wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1; then
+ if wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 &&
+    { ack_ok="$(jsonfilter -i "$ack" -e '@.ok' 2>/dev/null || true)"; [ "$ack_ok" = true ] || [ "$ack_ok" = 1 ]; }; then
   # Mark only a revision whose ACK transport returned success. A reboot
   # clears this marker so the first live heartbeat can re-confirm WP status.
   if printf '%s\n' "$REV" > "$PORTAL_ACK_CONFIRMED.$$" &&
