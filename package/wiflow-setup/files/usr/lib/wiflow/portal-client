@@ -93,6 +93,12 @@ authorize-session)
     [ "$stored_sid" = "$sid" ] || exit 1
     [ -z "$expected_client" ] || [ "$expected_client" = "$cid" ] || { log_client_event authorize_failed "$sid" client_mismatch; exit 1; }
     valid_guest_ip "$ip" || { log_client_event authorize_failed "$sid" invalid_ip; exit 1; }
+    # Remote Portal disable is authoritative even if nft has not yet
+    # completed the firewall transition. A stale Page 6 POST cannot reopen it.
+    [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" = 1 ] ||
+        { log_client_event authorize_failed "$sid" portal_disabled; exit 1; }
+    [ -f "$PORTAL_ACTIVE/portal.json" ] ||
+        { log_client_event authorize_failed "$sid" snapshot_missing; exit 1; }
     portal_nft_ready || { log_client_event authorize_failed "$sid" firewall_unavailable; exit 1; }
     portal_nft_pair_granted "$ip" "$mac" || { log_client_event authorize_failed "$sid" grant_missing; exit 6; }
 
