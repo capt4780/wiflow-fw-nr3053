@@ -124,5 +124,28 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                                   "state_error:client_ip_state_write_failed"])
 
 
+    def test_built_rootfs_audit_rejects_unordered_ip_rebind(self):
+        from audit_nr3053_wiflow_image import audit_captive_rebind_rootfs
+        with tempfile.TemporaryDirectory(prefix="wiflow-rebind-rootfs-") as tmp:
+            root = Path(tmp)
+            client = root / "usr/lib/wiflow/portal-client"
+            loop = root / "usr/lib/wiflow/portal-session-loop"
+            client.parent.mkdir(parents=True)
+            client.write_text(CLIENT)
+            loop.write_text(LOOP)
+            self.assertEqual(audit_captive_rebind_rootfs(root), [])
+            client.write_text(CLIENT.replace(
+                'portal_nft_add "$ip" "$mac"',
+                'test_no_authorized_restore "$ip" "$mac"'))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+            client.write_text(CLIENT)
+            loop.write_text(LOOP.replace(
+                'if ! client_session_write "$f"',
+                'if ! test_no_session_write "$f"'))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+            loop.unlink()
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+
+
 if __name__ == "__main__":
     unittest.main()
