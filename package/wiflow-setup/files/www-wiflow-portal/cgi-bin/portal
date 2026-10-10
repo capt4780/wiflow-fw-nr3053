@@ -45,6 +45,13 @@ case "$action" in
   exit 0;;
  authorize)
   sid="$(param session_id 2>/dev/null || true)"; validate_session "$sid" || { printf 'Status: 403 Forbidden\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
+  # Confirm is a state change; remote disable wins even if a stale session
+  # and pre-confirm grant remain valid during firewall teardown.
+  [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" = 1 ] &&
+  [ -f "$PORTAL_ACTIVE/portal.json" ] || {
+   printf 'Status: 403 Forbidden\r\nCache-Control: no-store\r\n\r\n'
+   exit 0
+  }
   if /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then printf 'Status: 204 No Content\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'; exit 0; fi
   : > "$HEARTBEAT_KICK" 2>/dev/null || true
   if /usr/lib/wiflow/portal-client authorize-session "$sid" "$cid" >/dev/null 2>&1; then event_enqueue content_interaction "$cid" "$sid" "$(date +%s)" || true; printf 'Status: 204 No Content\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'; else printf 'Status: 409 Conflict\r\nCache-Control: no-store\r\n\r\n'; fi
