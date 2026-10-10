@@ -36,7 +36,9 @@ if [ -r "$compatible_path" ]; then
  if tr '\000' '\n' < "$compatible_path" 2>/dev/null | grep -Eq '^viettel,nr3053$'; then
   report dt_compatible PASS nr3053_compatible_observed
  else
-  report dt_compatible WARN nr3053_compatible_not_observed
+  # An explicit, readable hardware mismatch is a blocking observation.
+ # Only a missing/unreadable device-tree remains WARN (unknown).
+ report dt_compatible BLOCK nr3053_compatible_mismatch
  fi
 else
  report dt_compatible WARN device_tree_compatible_unavailable
