@@ -42,6 +42,7 @@ const ctx={
     href:test==='foreign_origin'?'http://example.com/test':target
   },fetch:reply},
   URL,URLSearchParams,
+  validRuntime(){return true;},
   access:{disabled:false,setAttribute(){ }},
   confirm:{disabled:false},
   dialog:{hidden:false,setAttribute(){ }},
