@@ -15,15 +15,18 @@ SOURCE = (
 
 
 def production_authorize_branch():
+    # Exercise the production rollback helper AND its three actual call sites.
+    helper_start = SOURCE.index("rollback_authorization_pair(){")
+    helper_end = SOURCE.index('\ncase "$mode" in', helper_start)
     start = SOURCE.index("\nauthorize-session)\n") + len("\nauthorize-session)\n")
     stop = SOURCE.index("\n    ;;\nrevoke-session)", start)
-    return SOURCE[start:stop].replace(
+    return (SOURCE[helper_start:helper_end] + "\n" + SOURCE[start:stop]).replace(
         "/usr/lib/wiflow/portal-firewall disable", "fail_closed_disable"
     )
 
 
 class PortalAuthPersistenceTests(unittest.TestCase):
-    def exercise(self, *, persist=True, verify=True, deletion=True):
+    def exercise(self, *, persist=True, verify=True, deletion=True, readback=True, add_ok=True, firewall_ok=True):
         with tempfile.TemporaryDirectory(prefix="wiflow-auth-rollback-") as tmp:
             root = Path(tmp)
             session = root / "session"
@@ -49,7 +52,12 @@ portal_nft_pair_granted(){ return 0; }
 portal_nft_add(){
  printf "nft_add\n" >> "$LOG"
  : > "$PAIR_FILE"
+ [ "$TEST_ADD_OK" = 1 ]
 }
+portal_nft_pair_revoked(){
+ [ "$TEST_READBACK" = 1 ] && [ ! -f "$PAIR_FILE" ]
+}
+state_set(){ printf "state:%s\n" "$2" >> "$LOG"; }
 portal_nft_del(){
  printf "nft_del\n" >> "$LOG"
  [ "$TEST_DELETE" = 0 ] || rm -f "$PAIR_FILE"
@@ -68,6 +76,7 @@ event_enqueue(){ printf "event\n" >> "$EVENT_LOG"; }
 flush_captive_conntrack(){ printf "conntrack\n" >> "$LOG"; }
 fail_closed_disable(){
  printf "firewall_disabled\n" >> "$LOG"
+ [ "$TEST_FW_OK" = 1 ] || return 1
  rm -f "$PAIR_FILE"
 }
 """ + production_authorize_branch()
@@ -76,7 +85,10 @@ fail_closed_disable(){
                 env={**os.environ, "TEST_ROOT": str(root),
                      "TEST_PERSIST": "1" if persist else "0",
                      "TEST_VERIFY": "1" if verify else "0",
-                     "TEST_DELETE": "1" if deletion else "0"},
+                     "TEST_DELETE": "1" if deletion else "0",
+                     "TEST_READBACK": "1" if readback else "0",
+                     "TEST_ADD_OK": "1" if add_ok else "0",
+                     "TEST_FW_OK": "1" if firewall_ok else "0"},
                 timeout=8,
             )
             self.assertEqual(proc.stdout, "")
@@ -124,6 +136,46 @@ fail_closed_disable(){
         self.assertFalse(authed)
         self.assertFalse(event)
 
+    def test_nft_readback_error_after_persistence_failure_is_fail_closed(self):
+        code, log, authed, event = self.exercise(persist=False, readback=False)
+        self.assertEqual(code, 7)
+        self.assertIn("firewall_disabled", log)
+        self.assertIn("state:client_authorize_rollback_unverified", log)
+        self.assertIn("log:rollback_unverified", log)
+        self.assertNotIn("grant_consumed", log)
+        self.assertFalse(authed)
+        self.assertFalse(event)
+
+    def test_nft_add_partial_failure_always_attempts_verified_rollback(self):
+        code, log, authed, event = self.exercise(add_ok=False)
+        self.assertEqual(code, 5)
+        self.assertIn("nft_add", log)
+        self.assertIn("nft_del", log)
+        self.assertIn("log:policy_apply", log)
+        self.assertNotIn("persist_attempt", log)
+        self.assertFalse(authed)
+        self.assertFalse(event)
+
+    def test_nft_readback_failure_after_add_blocks_persistence(self):
+        code, log, authed, event = self.exercise(verify=False, readback=False)
+        self.assertEqual(code, 5)
+        self.assertIn("nft_del", log)
+        self.assertIn("firewall_disabled", log)
+        self.assertIn("log:rollback_unverified", log)
+        self.assertNotIn("persist_attempt", log)
+        self.assertFalse(authed)
+        self.assertFalse(event)
+
+    def test_rollback_readback_and_firewall_failure_is_explicit(self):
+        code, log, authed, event = self.exercise(persist=False, readback=False,
+                                                  firewall_ok=False)
+        self.assertEqual(code, 7)
+        self.assertIn("state:client_authorize_rollback_firewall_disable_failed", log)
+        self.assertIn("log:rollback_unverified", log)
+        self.assertFalse(event)
+        # No E5 claim: if nft readback and firewall disable both fail, the
+        # actual forwarding state is UNKNOWN and must be treated as BLOCK.
+
     def test_immutable_captive_post_session_and_grant_checks(self):
         s = production_authorize_branch()
         self.assertLess(s.index("acquire_session_lock"), s.index("portal_nft_add"))
@@ -145,7 +197,8 @@ fail_closed_disable(){
             self.assertEqual(audit_captive_commit_rootfs(root), [])
             for damaged in (
                 'if ! client_session_write "$f"',
-                'portal_nft_del "$ip" "$mac"',
+                'portal_nft_del "$rb_ip" "$rb_mac"',
+                'if ! portal_nft_pair_revoked "$rb_ip" "$rb_mac"; then',
                 '/usr/lib/wiflow/portal-firewall disable',
             ):
                 with self.subTest(damaged=damaged):
