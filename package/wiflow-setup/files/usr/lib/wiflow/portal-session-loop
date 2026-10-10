@@ -37,7 +37,7 @@ while true; do
                 had_grant=0
                 if [ "${authorized:-0}" != 0 ]; then
                     portal_nft_del "$ip" "$mac"
-                    if portal_nft_pair_authorized "$ip" "$mac"; then
+                    if ! portal_nft_pair_revoked "$ip" "$mac"; then
                         /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
                         state_set portal_error 'client_ip_old_authorization_revoke_failed'
                         continue
