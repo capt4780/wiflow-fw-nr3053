@@ -17,7 +17,7 @@ Its automated report always ends with **e5_complete=BLOCK** and
 ssh 'ACCOUNT@STOCK_ROUTER_IP' 'sh -s' < tools/nr3053-stock-preflight-readonly.sh > nr3053-stock-preflight-report.txt
 ~~~
 
-This reads the runtime board identifier and device-tree compatibility when available, existing OS metadata, the *presence* of an MTD partition table and a calibration-name hint, and optional live IP/radio observations. It deliberately prints no partition contents, MAC/SSID, serial, secret, login or raw MTD layout. It never changes stock firmware and ends with `first_flash_approval|BLOCK`, `bootloader_recovery|NOT_VERIFIED` and `wiflow_s5_runtime|NOT_TESTED`.
+This reads the runtime board identifier and device-tree compatibility when available, existing OS metadata, the *presence* of an MTD partition table and a calibration-name hint, and optional live IP/radio observations. A readable device-tree that explicitly lacks the NR3053 compatible identifier is **BLOCK** even when a board-name file claims NR3053; unreadable/missing data is **WARN**, never PASS. It deliberately prints no partition contents, MAC/SSID, serial, secret, login or raw MTD layout. It never changes stock firmware and ends with `first_flash_approval|BLOCK`, `bootloader_recovery|NOT_VERIFIED` and `wiflow_s5_runtime|NOT_TESTED`.
 
 If stock firmware does **not** provide an authorized shell/SSH (or access is Wi-Fi only), **do not force SSH, install packages, change bootloader settings or flash merely to run a test**. Collect the available non-sensitive board/revision and firmware-version details from the original UI and hardware label privately. An authorized technician may document the PCB/bootloader and a physically recoverable connection. This step cannot certify a recovery procedure.
 
@@ -101,12 +101,15 @@ below, record PASS/FAIL, minimal redacted evidence, and environment:
 
 ## Evidence and current source baseline
 
-As of 2026-10-10, current source baseline was commit
-`acae341c52cdadfdef4ff60e08afae218638b08c`.
-The exact hosted engineering image was built in
-[GitHub Actions #38011329173](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/38011329173);
-it is explicitly **NOT FOR FLASHING**. Firmware static audit is not a device test.
-Never substitute an earlier run's SHA256 or rootfs report for a newer image.
+The specific source commit, hosted image run, engineering artifact ID, and
+independently checked SHA256 must be resolved for **each** acceptance attempt
+from [live Issue #5](https://github.com/capt4780/wiflow-fw-nr3053/issues/5)
+and the exact matching GitHub Actions run. Historical checkpoints (including
+the 2026-10-10 S4-P36 image run
+[#38033834092](https://github.com/capt4780/wiflow-fw-nr3053/actions/runs/38033834092))
+do not certify the currently running source or hardware.
+All engineering images remain **NOT FOR FLASHING** until separately approved.
+Never substitute an older run's SHA256, rootfs audit, or success status for a newer image.
 
 S5 remains **NOT VERIFIED** and S6 **BLOCK** unless all real-device tests above
 are completed with independent recovery evidence. Do not silently convert host
