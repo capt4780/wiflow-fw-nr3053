@@ -106,6 +106,10 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
         "state_set portal_error 'captive_reload_failed'",
         "state_set portal_error 'captive_chains_missing'",
         "disable || state_set portal_error 'captive_rollback_failed'",
+        "captive_nft_objects_present(){",
+        "if captive_nft_objects_present; then changed=1; fi",
+        "state_set portal_error 'captive_disable_nft_unavailable'",
+        "state_set portal_error 'captive_disable_stale_nft_state'",
     ):
         if required not in captive_source:
             problems.append(f"Portal-owned forwarding lifecycle missing: {required}")

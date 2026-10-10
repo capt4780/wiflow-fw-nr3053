@@ -156,6 +156,33 @@ class GuestManagementGateTests(unittest.TestCase):
             issues = audit_guest_gate_rootfs(fake)
             self.assertTrue(any("redirect exception" in x for x in issues), issues)
 
+    def test_rootfs_auditor_rejects_removed_orphan_nft_disable_check(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-disable-rootfs-") as tmp:
+            fake = Path(tmp)
+            required = (
+                "usr/lib/wiflow/common.sh",
+                "usr/lib/wiflow/portal-firewall",
+                "usr/lib/wiflow/bootstrap",
+                "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
+                "www-wiflow-luci-gate/cgi-bin/unlock",
+                "www-wiflow/cgi-bin/gate",
+            )
+            for rel in required:
+                path = fake / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((SRC / rel).read_bytes())
+            self.assertEqual(audit_guest_gate_rootfs(fake), [])
+            captive = fake / "usr/lib/wiflow/portal-firewall"
+            source = captive.read_text()
+            for token in ("if captive_nft_objects_present; then changed=1; fi",
+                          "state_set portal_error 'captive_disable_stale_nft_state'"):
+                with self.subTest(token=token):
+                    captive.write_text(source.replace(token, ""))
+                    issues = audit_guest_gate_rootfs(fake)
+                    self.assertTrue(any("forwarding lifecycle" in issue for issue in issues),
+                                    issues)
+            captive.write_text(source)
+
     def test_guest_wan_default_is_fail_closed_without_snapshot(self):
         common = COMMON.read_text()
         scope = common[common.index("ensure_guest_network(){"):
