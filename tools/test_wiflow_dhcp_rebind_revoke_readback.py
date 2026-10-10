@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
-"""Guard both DHCP IP rebind paths against unverified nft revocation."""
-import pathlib
+"""Prevent DHCP rebind from authorizing a new IP without proved nft revocation."""
+from pathlib import Path
 import unittest
 
-ROOT = pathlib.Path(__file__).resolve().parents[1] / "package/wiflow-setup/files/usr/lib/wiflow"
+ROOT = Path(__file__).resolve().parents[1] / "package/wiflow-setup/files/usr/lib/wiflow"
 
 
 class DhcpRebindRevokeReadback(unittest.TestCase):
-    def test_rebind_paths_require_positive_absence_proof(self):
-        for file_name, old_ip in (("portal-client", "oldip"), ("portal-session-loop", "ip")):
-            with self.subTest(file=file_name):
-                source = (ROOT / file_name).read_text()
-                rebind_start = source.index("if [ \"\u0024{authorized:-0}\" != 0 ]") if file_name == "portal-client" else source.index("if [ \"\u0024{authorized:-0}\" != 0 ]; then", source.index("if [ \"\u0024newip\" != \"\u0024ip\" ]"))
-                section = source[rebind_start:rebind_start + 520]
-                self.assertIn(f'portal_nft_del "\u0024{old_ip}" "\u0024mac"', section)
-                self.assertIn(f'if ! portal_nft_pair_revoked "\u0024{old_ip}" "\u0024mac"; then', section)
-                self.assertNotIn(f'if portal_nft_pair_authorized "\u0024{old_ip}" "\u0024mac"; then', section)
+    def test_both_paths_require_positive_revocation_readback(self):
+        for name, old_ip in (("portal-client", "oldip"), ("portal-session-loop", "ip")):
+            with self.subTest(path=name):
+                source = (ROOT / name).read_text()
+                if name == "portal-client":
+                    start = source.index("# On DHCP IP rebind")
+                    end = source.index("\n    fi\n\n    # Stage 3", start)
+                else:
+                    start = source.index('if [ "$newip" != "$ip" ]; then')
+                    end = source.index('\n        else\n            [ "$absent"', start)
+                section = source[start:end]
+                revoke = f'if ! portal_nft_pair_revoked "${old_ip}" "$mac"; then'
+                self.assertIn(revoke, section)
+                self.assertNotIn(f'if portal_nft_pair_authorized "${old_ip}" "$mac"; then', section)
+                self.assertLess(section.index(f'portal_nft_del "${old_ip}" "$mac"'),
+                                section.index(revoke))
+                self.assertLess(section.index(revoke),
+                                section.index('if ! client_session_write "$f"'))
+                self.assertLess(section.index('if ! client_session_write "$f"'),
+                                section.index(f'portal_nft_add "${"ip" if name == "portal-client" else "newip"}" "$mac"'))
 
-    def test_revoke_helper_rejects_failed_read(self):
+    def test_revoke_helper_proves_read_success(self):
         source = (ROOT / "common.sh").read_text()
         section = source.split("portal_nft_pair_revoked(){", 1)[1].split("\n}", 1)[0]
         self.assertIn("nft list set inet fw4 wiflow_portal_authed", section)
