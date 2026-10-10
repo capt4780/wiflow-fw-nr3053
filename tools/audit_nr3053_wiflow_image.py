@@ -134,6 +134,32 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     return problems
 
 
+def audit_portal_disable_reporting_rootfs(fs: Path) -> list[str]:
+    """Ensure explicit WP disable failures are reported, never swallowed."""
+    file = fs / "usr/lib/wiflow/heartbeat-loop"
+    if not file.is_file():
+        return ["Portal heartbeat missing from compiled image"]
+    source = file.read_text(encoding="utf-8", errors="replace")
+    start = source.find("portal_runtime_disable(){")
+    end = source.find("\nportal_runtime_reconcile(){", start)
+    if start < 0 or end <= start:
+        return ["Portal disable authoritative function missing"]
+    body = source[start:end]
+    required = (
+        "if ! portal_runtime_set_enabled 0; then",
+        "state_set portal_error 'portal_disable_state_commit_failed'",
+        "if ! /usr/lib/wiflow/portal-firewall disable",
+        "state_set portal_error 'captive_firewall_disable_failed'",
+        '[ "$failed" = 0 ]',
+    )
+    if any(item not in body for item in required):
+        return ["Portal disable can hide state or firewall failure"]
+    reconcile = source[end:source.find("\ndelay=20", end)]
+    if '  portal_runtime_disable\n  return $?' not in reconcile:
+        return ["Portal remote disable reports unconditional success"]
+    return []
+
+
 def audit_portal_enable_owner_rootfs(fs: Path) -> list[str]:
     """Reject compiled images whose local poller overrides remote Portal disable."""
     path = fs / "usr/lib/wiflow/portal-mode-loop"
@@ -539,6 +565,7 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_portal_enable_owner_rootfs(fs))
+            issues.extend(audit_portal_disable_reporting_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))
             issues.extend(audit_capport_tls_gate_rootfs(fs))
