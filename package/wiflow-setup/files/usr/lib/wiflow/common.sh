@@ -365,135 +365,137 @@ portal_active_config(){ [ -f "$PORTAL_ACTIVE/portal.json" ] && printf '%s' "$POR
 
 tune_wiflow_runtime(){
     if uci -q get network.lan >/dev/null 2>&1; then
-        uci set network.lan.delegate='0'
+        uci set network.lan.delegate='0' || return 1
         uci -q delete network.lan.ip6assign >/dev/null 2>&1 || true
         uci -q delete network.lan.ip6hint >/dev/null 2>&1 || true
         uci -q delete network.lan.ip6ifaceid >/dev/null 2>&1 || true
     fi
     if uci -q get dhcp.lan >/dev/null 2>&1; then
-        uci set dhcp.lan.dhcpv6='disabled'
-        uci set dhcp.lan.ra='disabled'
-        uci set dhcp.lan.ndp='disabled'
+        uci set dhcp.lan.dhcpv6='disabled' || return 1
+        uci set dhcp.lan.ra='disabled' || return 1
+        uci set dhcp.lan.ndp='disabled' || return 1
     fi
     if uci -q get 'dhcp.@dnsmasq[0]' >/dev/null 2>&1; then
-        uci set 'dhcp.@dnsmasq[0].cachesize=1000'
-        uci set 'dhcp.@dnsmasq[0].logqueries=0'
-        uci set 'dhcp.@dnsmasq[0].logdhcp=0'
-        uci set 'dhcp.@dnsmasq[0].localservice=1'
+        uci set 'dhcp.@dnsmasq[0].cachesize=1000' || return 1
+        uci set 'dhcp.@dnsmasq[0].logqueries=0' || return 1
+        uci set 'dhcp.@dnsmasq[0].logdhcp=0' || return 1
+        uci set 'dhcp.@dnsmasq[0].localservice=1' || return 1
     fi
-    uci commit network >/dev/null 2>&1 || true
-    uci commit dhcp >/dev/null 2>&1 || true
+    uci commit network >/dev/null 2>&1 || return 1
+    uci commit dhcp >/dev/null 2>&1 || return 1
 }
 
 ensure_guest_network(){
     uci -q delete network.wiflow_guest >/dev/null 2>&1 || true
-    uci set network.wiflow_guest='interface'
-    uci set network.wiflow_guest.proto='static'
-    uci set network.wiflow_guest.device='br-wiflow'
-    uci set network.wiflow_guest.ipaddr='10.10.10.1'
-    uci set network.wiflow_guest.netmask='255.255.255.0'
-    uci set network.wiflow_guest.delegate='0'
+    uci set network.wiflow_guest='interface' || return 1
+    uci set network.wiflow_guest.proto='static' || return 1
+    uci set network.wiflow_guest.device='br-wiflow' || return 1
+    uci set network.wiflow_guest.ipaddr='10.10.10.1' || return 1
+    uci set network.wiflow_guest.netmask='255.255.255.0' || return 1
+    uci set network.wiflow_guest.delegate='0' || return 1
     uci -q delete network.wiflow_guest.ip6assign >/dev/null 2>&1 || true
     uci -q delete network.wiflow_guest.ip6hint >/dev/null 2>&1 || true
     uci -q delete network.wiflow_guest_dev >/dev/null 2>&1 || true
-    uci set network.wiflow_guest_dev='device'
-    uci set network.wiflow_guest_dev.name='br-wiflow'
-    uci set network.wiflow_guest_dev.type='bridge'
-    uci set network.wiflow_guest_dev.bridge_empty='1'
-    uci commit network
+    uci set network.wiflow_guest_dev='device' || return 1
+    uci set network.wiflow_guest_dev.name='br-wiflow' || return 1
+    uci set network.wiflow_guest_dev.type='bridge' || return 1
+    uci set network.wiflow_guest_dev.bridge_empty='1' || return 1
+    uci commit network || return 1
 
     uci -q delete dhcp.wiflow_guest >/dev/null 2>&1 || true
-    uci set dhcp.wiflow_guest='dhcp'
-    uci set dhcp.wiflow_guest.interface='wiflow_guest'
-    uci set dhcp.wiflow_guest.start='100'
-    uci set dhcp.wiflow_guest.limit='150'
-    uci set dhcp.wiflow_guest.leasetime='4h'
-    uci set dhcp.wiflow_guest.force='1'
+    uci set dhcp.wiflow_guest='dhcp' || return 1
+    uci set dhcp.wiflow_guest.interface='wiflow_guest' || return 1
+    uci set dhcp.wiflow_guest.start='100' || return 1
+    uci set dhcp.wiflow_guest.limit='150' || return 1
+    uci set dhcp.wiflow_guest.leasetime='4h' || return 1
+    uci set dhcp.wiflow_guest.force='1' || return 1
     # Router DNS is the DHCP default only. After authorization the firewall
     # does not intercept or force DNS, DoT or DoH, so clients may use their own
     # resolvers/tunnels as supported by the operating system and upstream WAN.
     uci -q delete dhcp.wiflow_guest.dhcp_option >/dev/null 2>&1 || true
-    uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1'
+    uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1' || return 1
     # Do not advertise CAPPORT (DHCPv4 Option 114) yet. RFC 8908 requires
     # an HTTPS API and TLS user-portal URL with a verifiable certificate.
     # Advertising the legacy HTTP endpoint would break standards-aware clients.
     # Keep HTTP captive fallback until a separately audited TLS deployment.
-    uci set dhcp.wiflow_guest.dhcpv6='disabled'
-    uci set dhcp.wiflow_guest.ra='disabled'
-    uci set dhcp.wiflow_guest.ndp='disabled'
-    uci commit dhcp
+    uci set dhcp.wiflow_guest.dhcpv6='disabled' || return 1
+    uci set dhcp.wiflow_guest.ra='disabled' || return 1
+    uci set dhcp.wiflow_guest.ndp='disabled' || return 1
+    uci commit dhcp || return 1
 
     uci -q delete firewall.wiflow_guest >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest='zone'
-    uci set firewall.wiflow_guest.name='wiflow_guest'
-    uci add_list firewall.wiflow_guest.network='wiflow_guest'
-    uci set firewall.wiflow_guest.input='REJECT'
-    uci set firewall.wiflow_guest.output='ACCEPT'
-    uci set firewall.wiflow_guest.forward='REJECT'
+    uci set firewall.wiflow_guest='zone' || return 1
+    uci set firewall.wiflow_guest.name='wiflow_guest' || return 1
+    uci add_list firewall.wiflow_guest.network='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest.input='REJECT' || return 1
+    uci set firewall.wiflow_guest.output='ACCEPT' || return 1
+    uci set firewall.wiflow_guest.forward='REJECT' || return 1
 
     uci -q delete firewall.wiflow_guest_dns >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_dns='rule'
-    uci set firewall.wiflow_guest_dns.name='Wiflow-Guest-DNS'
-    uci set firewall.wiflow_guest_dns.src='wiflow_guest'
-    uci set firewall.wiflow_guest_dns.dest_port='53'
-    uci add_list firewall.wiflow_guest_dns.proto='tcp'
-    uci add_list firewall.wiflow_guest_dns.proto='udp'
-    uci set firewall.wiflow_guest_dns.target='ACCEPT'
+    uci set firewall.wiflow_guest_dns='rule' || return 1
+    uci set firewall.wiflow_guest_dns.name='Wiflow-Guest-DNS' || return 1
+    uci set firewall.wiflow_guest_dns.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_dns.dest_port='53' || return 1
+    uci add_list firewall.wiflow_guest_dns.proto='tcp' || return 1
+    uci add_list firewall.wiflow_guest_dns.proto='udp' || return 1
+    uci set firewall.wiflow_guest_dns.target='ACCEPT' || return 1
 
     # Private DNS (Android/Samsung "Private DNS") must remain reachable even
     # before Portal authorization. Keep this as a normal fw4 rule so it does
     # not disappear when captive NAT rules are rebuilt.
     uci -q delete firewall.wiflow_guest_private_dns >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_private_dns='rule'
-    uci set firewall.wiflow_guest_private_dns.name='Wiflow-Guest-Private-DNS'
-    uci set firewall.wiflow_guest_private_dns.src='wiflow_guest'
-    uci set firewall.wiflow_guest_private_dns.dest='wan'
-    uci set firewall.wiflow_guest_private_dns.dest_port='853'
+    uci set firewall.wiflow_guest_private_dns='rule' || return 1
+    uci set firewall.wiflow_guest_private_dns.name='Wiflow-Guest-Private-DNS' || return 1
+    uci set firewall.wiflow_guest_private_dns.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_private_dns.dest='wan' || return 1
+    uci set firewall.wiflow_guest_private_dns.dest_port='853' || return 1
     # Android Private DNS uses DoT over TCP/853; UDP/853 is not part of the
     # pre-authorized contract and would open an additional WAN tunnel path.
-    uci add_list firewall.wiflow_guest_private_dns.proto='tcp'
-    uci set firewall.wiflow_guest_private_dns.target='ACCEPT'
+    uci add_list firewall.wiflow_guest_private_dns.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_private_dns.target='ACCEPT' || return 1
 
     uci -q delete firewall.wiflow_guest_dhcp >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_dhcp='rule'
-    uci set firewall.wiflow_guest_dhcp.name='Wiflow-Guest-DHCP'
-    uci set firewall.wiflow_guest_dhcp.src='wiflow_guest'
-    uci set firewall.wiflow_guest_dhcp.proto='udp'
-    uci set firewall.wiflow_guest_dhcp.dest_port='67-68'
-    uci set firewall.wiflow_guest_dhcp.target='ACCEPT'
+    uci set firewall.wiflow_guest_dhcp='rule' || return 1
+    uci set firewall.wiflow_guest_dhcp.name='Wiflow-Guest-DHCP' || return 1
+    uci set firewall.wiflow_guest_dhcp.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_dhcp.proto='udp' || return 1
+    uci set firewall.wiflow_guest_dhcp.dest_port='67-68' || return 1
+    uci set firewall.wiflow_guest_dhcp.target='ACCEPT' || return 1
 
     uci -q delete firewall.wiflow_guest_setup >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_setup='rule'
-    uci set firewall.wiflow_guest_setup.name='Wiflow-Guest-Setup-Access'
-    uci set firewall.wiflow_guest_setup.src='wiflow_guest'
-    uci set firewall.wiflow_guest_setup.dest_ip='10.0.0.1'
-    uci set firewall.wiflow_guest_setup.dest_port='80'
-    uci set firewall.wiflow_guest_setup.proto='tcp'
-    uci set firewall.wiflow_guest_setup.target='ACCEPT'
+    uci set firewall.wiflow_guest_setup='rule' || return 1
+    uci set firewall.wiflow_guest_setup.name='Wiflow-Guest-Setup-Access' || return 1
+    uci set firewall.wiflow_guest_setup.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_setup.dest_ip='10.0.0.1' || return 1
+    uci set firewall.wiflow_guest_setup.dest_port='80' || return 1
+    uci set firewall.wiflow_guest_setup.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_setup.target='ACCEPT' || return 1
     uci -q delete firewall.wiflow_guest_gate >/dev/null 2>&1 || true
-    uci set firewall.wiflow_guest_gate='rule'
-    uci set firewall.wiflow_guest_gate.name='Wiflow-LuCI-Security-Gate'
-    uci set firewall.wiflow_guest_gate.src='wiflow_guest'
-    uci set firewall.wiflow_guest_gate.dest_ip='10.0.0.2'
-    uci set firewall.wiflow_guest_gate.dest_port='80'
-    uci set firewall.wiflow_guest_gate.proto='tcp'
-    uci set firewall.wiflow_guest_gate.target='ACCEPT'
+    uci set firewall.wiflow_guest_gate='rule' || return 1
+    uci set firewall.wiflow_guest_gate.name='Wiflow-LuCI-Security-Gate' || return 1
+    uci set firewall.wiflow_guest_gate.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_gate.dest_ip='10.0.0.2' || return 1
+    uci set firewall.wiflow_guest_gate.dest_port='80' || return 1
+    uci set firewall.wiflow_guest_gate.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_gate.target='ACCEPT' || return 1
 
     # Fail closed while Portal has no active validated snapshot.
     # The captive firewall is the SOLE owner of the guest->WAN forwarding.
     uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
-    uci commit firewall
+    # Never tolerate stale guest->WAN forwarding if the delete failed.
+    uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && return 1
+    uci commit firewall || return 1
 }
 
 ensure_uplink_network(){
-    uci -q get network.wiflow_wwan >/dev/null 2>&1 || uci set network.wiflow_wwan='interface'
-    uci set network.wiflow_wwan.proto='dhcp'
-    uci set network.wiflow_wwan.metric='10'
-    uci commit network
+    uci -q get network.wiflow_wwan >/dev/null 2>&1 || uci set network.wiflow_wwan='interface' || return 1
+    uci set network.wiflow_wwan.proto='dhcp' || return 1
+    uci set network.wiflow_wwan.metric='10' || return 1
+    uci commit network || return 1
     z="$(wan_zone || true)"
     if [ -n "$z" ]; then
         uci -q del_list "firewall.$z.network=wiflow_wwan" >/dev/null 2>&1 || true
-        uci add_list "firewall.$z.network=wiflow_wwan"
-        uci commit firewall
+        uci add_list "firewall.$z.network=wiflow_wwan" || return 1
+        uci commit firewall || return 1
     fi
 }
