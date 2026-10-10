@@ -99,7 +99,7 @@ class PortalEnabledOwnerTests(unittest.TestCase):
             target.parent.mkdir(parents=True)
             bad = SOURCE.replace(
                 '  enabled="$(uci -q get wiflow.core.portal_enabled',
-                '  uci set wiflow.core.portal_enabled=1\\n'
+                '  uci set wiflow.core.portal_enabled=1\n'
                 '  enabled="$(uci -q get wiflow.core.portal_enabled', 1,
             )
             self.assertNotEqual(bad, SOURCE)
