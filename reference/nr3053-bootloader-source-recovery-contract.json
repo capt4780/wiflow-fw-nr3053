@@ -1,0 +1,75 @@
+{
+  "schema": "wiflow.nr3053.bootloader-source-capability.v1",
+  "provenance": {
+    "source_repository": "manhhaikd-dell/immortalwrt-mt798x-rebase",
+    "pinned_commit": "e39aded8420d454804a376e63400aff73da66247",
+    "uboot_patch": "package/boot/uboot-mediatek/patches/504-add-viettel-nr3053.patch",
+    "device_tree": "target/linux/mediatek/dts-ext/mt7981b-viettel-nr3053.dts",
+    "serial_config_from_dts": "ttyS0:115200n8",
+    "recorded_factory_fingerprint_date": "2026-10-07",
+    "physical_bootloader_verified": false
+  },
+  "potentially_nonwriting_menu_items": [
+    {
+      "id": "1",
+      "label": "Boot system via TFTP.",
+      "source_action": "run boot_tftp",
+      "classification": "RAM_BOOT_SOURCE_ONLY",
+      "requires_external_recovery_itb": true
+    },
+    {
+      "id": "2",
+      "label": "Boot production system from NAND.",
+      "source_action": "run boot_production",
+      "classification": "BOOT_ONLY_SOURCE_ONLY"
+    },
+    {
+      "id": "3",
+      "label": "Boot recovery system from NAND.",
+      "source_action": "run boot_recovery",
+      "classification": "BOOT_ONLY_UNVERIFIED_RECOVERY_VOLUME"
+    }
+  ],
+  "destructive_or_mutating_menu_items": [
+    {
+      "id": "0",
+      "label": "Initialize environment.",
+      "classification": "BOOTLOADER_ENVIRONMENT_MUTATION"
+    },
+    {
+      "id": "4",
+      "label": "Load production system via TFTP then write to NAND.",
+      "classification": "NAND_WRITE"
+    },
+    {
+      "id": "5",
+      "label": "Load recovery system via TFTP then write to NAND.",
+      "classification": "NAND_WRITE"
+    },
+    {
+      "id": "6",
+      "label": "Load BL31+U-Boot FIP via TFTP then write to NAND.",
+      "classification": "BOOTLOADER_NAND_WRITE"
+    },
+    {
+      "id": "7",
+      "label": "Load BL2 preloader via TFTP then write to NAND.",
+      "classification": "BOOTLOADER_NAND_WRITE"
+    },
+    {
+      "id": "9",
+      "label": "Reset all settings to factory defaults.",
+      "classification": "ENV_CONFIG_RESET"
+    }
+  ],
+  "important_caveats": [
+    "This describes upstream SOURCE, not the U-Boot binary currently on the owner's physical router.",
+    "A console transcript or exact menu label alone cannot prove physical bootloader authenticity or NAND restore success.",
+    "Original observed UBI inventory has no verified independent recovery volume.",
+    "Only a trained technician with verified 3.3V UART pinout and the exact appropriate recovery ITB should attempt an interactive RAM boot.",
+    "First flash is BLOCK until privately documented physical recovery is demonstrated."
+  ],
+  "first_flash_approval": "BLOCK",
+  "on_device_ramboot_tested": false,
+  "original_firmware_restore_tested": false
+}
