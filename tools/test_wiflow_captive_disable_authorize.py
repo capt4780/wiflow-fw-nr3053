@@ -51,7 +51,7 @@ class CaptiveDisabledAuthorizationTests(unittest.TestCase):
                         'PORTAL_ACTIVE="$ACTIVE"\n'
                         'sid=abcdefghijklmnop\n'
                         'uci(){ echo "$ENABLED"; }\n'
-                        'log_client_event(){ printf "%s\\n" "$4" > "$EVENT_FILE"; }\n'
+                        'log_client_event(){ printf "%s\\n" "$3" > "$EVENT_FILE"; }\n'
                         + body + '\nprintf "allowed\\n"\n'
                     )
                     proc = subprocess.run(["sh", "-c", script],
@@ -63,8 +63,8 @@ class CaptiveDisabledAuthorizationTests(unittest.TestCase):
                         self.assertIn("allowed", proc.stdout)
                     else:
                         self.assertNotEqual(proc.returncode, 0)
-                        self.assertIn(expected, proc.stdout + proc.stderr +
-                                      (base / "event").read_text() if (base / "event").exists() else "")
+                        self.assertTrue((base / "event").exists())
+                        self.assertIn(expected, (base / "event").read_text())
 
 
 if __name__ == "__main__":
