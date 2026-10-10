@@ -52,12 +52,17 @@ while true; do
                     state_set portal_error 'client_ip_state_write_failed'
                     continue
                 fi
-                if [ "${authorized:-0}" != 0 ]; then
-                    portal_nft_add "$newip" "$mac" ||
-                        state_set portal_error 'client_ip_authorization_restore_failed'
-                elif [ "$had_grant" = 1 ]; then
-                    portal_nft_grant_add "$newip" "$mac" ||
-                        state_set portal_error 'client_ip_grant_restore_failed'
+                # Rebind never defeats an explicit remote disable or
+                # restores authorization before the local Portal is ready.
+                if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" = 1 ] &&
+                   [ -f "$PORTAL_ACTIVE/portal.json" ] && portal_nft_ready; then
+                    if [ "${authorized:-0}" != 0 ]; then
+                        portal_nft_add "$newip" "$mac" ||
+                            state_set portal_error 'client_ip_authorization_restore_failed'
+                    elif [ "$had_grant" = 1 ]; then
+                        portal_nft_grant_add "$newip" "$mac" ||
+                            state_set portal_error 'client_ip_grant_restore_failed'
+                    fi
                 fi
             else
                 client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0 ||

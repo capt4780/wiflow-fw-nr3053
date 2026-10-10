@@ -450,6 +450,20 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
     )
     if any(x not in a for x in required_a) or any(x not in b for x in required_b):
         return ["guest DHCP rebind transaction guard incomplete"]
+    # A previously authorized client may rebind or poll during authoritative
+    # remote Portal disable. Never re-create its nft WAN rule unless WP enable,
+    # local active snapshot and nft chain readiness all still hold.
+    for path, body in (("portal-client", a), ("portal-session-loop", b)):
+        for guard in (
+            'uci -q get wiflow.core.portal_enabled',
+            '[ -f "$PORTAL_ACTIVE/portal.json" ]',
+            'portal_nft_ready',
+        ):
+            if guard not in body or body.index(guard) > body.index(
+                'portal_nft_add "$ip" "$mac"' if path == "portal-client"
+                else 'portal_nft_add "$newip" "$mac"'
+            ):
+                return [f"{path} can restore guest WAN before enabled snapshot guard"]
     if not (a.index('portal_nft_del "$oldip" "$mac"') <
             a.index('if ! portal_nft_pair_revoked "$oldip" "$mac"; then') <
             a.index('/usr/lib/wiflow/portal-firewall disable') <

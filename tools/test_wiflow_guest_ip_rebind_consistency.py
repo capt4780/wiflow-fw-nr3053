@@ -32,6 +32,9 @@ def session_loop_rebind():
 
 BASE_MOCKS = r"""
 LOG="$TEST_ROOT/log"
+PORTAL_ACTIVE="$TEST_ROOT"
+uci(){ [ "$TEST_PORTAL_ENABLED" = 1 ] && echo 1 || echo 0; }
+portal_nft_ready(){ [ "$TEST_NFT_READY" = 1 ]; }
 oldip=10.10.10.101
 ip=10.10.10.102
 newip=10.10.10.102
@@ -64,13 +67,19 @@ fail_closed_disable(){ printf "firewall_disable\n" >> "$LOG"; rm -f "$TEST_ROOT/
 
 class GuestIPRebindConsistencyTests(unittest.TestCase):
     def invoke(self, kind="client", *, write_ok=True, revoke_ok=True,
-               authorized=True, had_grant=False, nft_read_ok=True):
+               authorized=True, had_grant=False, nft_read_ok=True,
+               portal_enabled=True, snapshot=True, nft_ready=True,
+               same_ip=False):
         with tempfile.TemporaryDirectory(prefix="wiflow-rebind-") as temp:
             base = Path(temp)
             (base / "old").touch()
+            if snapshot:
+                (base / "portal.json").write_text('{"revision":27}')
             script = BASE_MOCKS + ("authorized=0\n" if not authorized else "")
             if kind == "client":
                 # Real fragment from production portal-client's existing-session branch.
+                if same_ip:
+                    script += "oldip=10.10.10.102\n"
                 script += client_rebind()
             else:
                 script += "\nip=10.10.10.101\nfor test_iteration in once; do\n" + session_loop_rebind() + "\n break\ndone\n"
@@ -81,7 +90,9 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                      "TEST_WRITE_OK": "1" if write_ok else "0",
                      "TEST_REVOKE_OK": "1" if revoke_ok else "0",
                      "TEST_GRANT": "1" if had_grant else "0",
-                     "TEST_NFT_READ_OK": "1" if nft_read_ok else "0"},
+                     "TEST_NFT_READ_OK": "1" if nft_read_ok else "0",
+                     "TEST_PORTAL_ENABLED": "1" if portal_enabled else "0",
+                     "TEST_NFT_READY": "1" if nft_ready else "0"},
             )
             log = (base / "log").read_text().splitlines() if (base / "log").exists() else []
             self.assertEqual(proc.stderr, "", proc.stderr)
@@ -91,6 +102,73 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
         code, events = self.invoke("client")
         self.assertEqual(code, 0)
         self.assertEqual(events, ["old_revoke", "session_write", "new_authorize"])
+
+    def test_same_ip_with_live_authorization_avoids_nft_rewrite(self):
+        code, events = self.invoke("client", same_ip=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["session_write"])
+
+    def test_missing_nft_pair_restored_for_enabled_active_session(self):
+        # Rebind first removes the old pair. The new pair is allowed only
+        # after its new IP is persisted and Portal remains enabled.
+        code, events = self.invoke("client", portal_enabled=True, snapshot=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "session_write", "new_authorize"])
+
+    def test_disabled_portal_never_restores_authorized_pair_on_rebind(self):
+        for kind in ("client", "loop"):
+            with self.subTest(kind=kind):
+                code, events = self.invoke(kind, portal_enabled=False)
+                self.assertEqual(code, 0)
+                self.assertIn("session_write", events)
+                self.assertNotIn("new_authorize", events)
+                self.assertNotIn("new_grant_add", events)
+
+    def test_missing_snapshot_never_restores_authorized_pair(self):
+        for kind in ("client", "loop"):
+            with self.subTest(kind=kind):
+                code, events = self.invoke(kind, snapshot=False)
+                self.assertEqual(code, 0)
+                self.assertNotIn("new_authorize", events)
+
+    def test_unready_nft_never_restores_authorized_pair(self):
+        for kind in ("client", "loop"):
+            with self.subTest(kind=kind):
+                code, events = self.invoke(kind, nft_ready=False)
+                self.assertEqual(code, 0)
+                self.assertNotIn("new_authorize", events)
+
+    def test_disabled_portal_never_restores_preauth_grant(self):
+        code, events = self.invoke("loop", authorized=False, had_grant=True,
+                                   portal_enabled=False)
+        self.assertEqual(code, 0)
+        self.assertNotIn("new_grant_add", events)
+
+    def test_compiled_image_audit_rejects_missing_remote_enable_guards(self):
+        from audit_nr3053_wiflow_image import audit_captive_rebind_rootfs
+        with tempfile.TemporaryDirectory(prefix="wiflow-rebind-guard-image-") as tmp:
+            root = Path(tmp)
+            sources = {
+                "portal-client": CLIENT,
+                "portal-session-loop": LOOP,
+            }
+            files = {}
+            for name, source in sources.items():
+                file = root / "usr/lib/wiflow" / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(source)
+                files[name] = file
+            self.assertEqual(audit_captive_rebind_rootfs(root), [])
+            for name, source in sources.items():
+                with self.subTest(component=name):
+                    damaged = source.replace(
+                        'uci -q get wiflow.core.portal_enabled',
+                        'uci -q get wiflow.core.deprecated_portal_enabled'
+                    )
+                    self.assertNotEqual(damaged, source)
+                    files[name].write_text(damaged)
+                    self.assertTrue(audit_captive_rebind_rootfs(root))
+                    files[name].write_text(source)
 
     def test_client_failed_session_write_must_not_authorize_new_ip(self):
         code, events = self.invoke("client", write_ok=False)

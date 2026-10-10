@@ -82,8 +82,18 @@ ensure)
             log_client_event policy_restore_failed "$sid" session_persist
             exit 1
         fi
-        if [ "${authorized:-0}" != 0 ]; then
-            if ! portal_nft_add "$ip" "$mac"; then log_client_event policy_restore_failed "$sid" nft; fi
+        # Re-install a previously confirmed pair only if the authoritative
+        # Portal flag and local snapshot still permit Internet. A remote
+        # disable must never be undone by background session polling.
+        # Do not delete/re-add an already live nft element every 5 seconds:
+        # that needlessly resets its timeout and can disturb established flows.
+        if [ "${authorized:-0}" != 0 ] &&
+           [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" = 1 ] &&
+           [ -f "$PORTAL_ACTIVE/portal.json" ] &&
+           portal_nft_ready && ! portal_nft_pair_authorized "$ip" "$mac"; then
+            if ! portal_nft_add "$ip" "$mac"; then
+                log_client_event policy_restore_failed "$sid" nft
+            fi
         fi
     fi
 
