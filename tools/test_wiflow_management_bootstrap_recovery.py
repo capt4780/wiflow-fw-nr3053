@@ -138,6 +138,8 @@ rollback_stock_configs
             "dnsmasq restart failed",
             "firewall reload failed",
             "management web listeners not confirmed",
+            "captive firewall activation failed",
+            "captive firewall disable failed",
         ):
             self.assertIn("bootstrap_fail '" + reason + "'", BOOT)
         self.assertLess(BOOT.index("backup_stock_configs ||"), BOOT.index("ensure_management_network ||"))
