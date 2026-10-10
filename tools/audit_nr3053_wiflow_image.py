@@ -164,6 +164,31 @@ def audit_portal_disable_reporting_rootfs(fs: Path) -> list[str]:
     return []
 
 
+def audit_bootstrap_remote_disable_rootfs(fs: Path) -> list[str]:
+    """Prevent reboot from enabling cached Portal against persisted WP disable."""
+    path = fs / "usr/lib/wiflow/bootstrap"
+    if not path.is_file():
+        return ["Portal bootstrap missing from compiled rootfs"]
+    source = path.read_text(encoding="utf-8", errors="replace")
+    start = source.find('saved_portal_enabled="$(uci -q get wiflow.core.portal_enabled')
+    end = source.find("\nuplink_radio=", start)
+    if start < 0 or end <= start:
+        return ["Portal bootstrap remote enabled state gate missing"]
+    body = source[start:end]
+    required = (
+        'if [ "$saved_portal_enabled" = 1 ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then',
+        '/usr/lib/wiflow/portal-firewall ensure',
+        '/usr/lib/wiflow/portal-firewall disable',
+        'if [ "$saved_portal_enabled" != 0 ]; then',
+        "uci set wiflow.core.portal_enabled='0'",
+    )
+    if any(item not in body for item in required):
+        return ["Portal bootstrap can override remote disable or ignore missing snapshot"]
+    if "uci set wiflow.core.portal_enabled='1'" in body:
+        return ["Portal bootstrap force-enables cached snapshot after remote disable"]
+    return []
+
+
 def audit_portal_enable_owner_rootfs(fs: Path) -> list[str]:
     """Reject compiled images whose local poller overrides remote Portal disable."""
     path = fs / "usr/lib/wiflow/portal-mode-loop"
@@ -613,6 +638,7 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_portal_enable_owner_rootfs(fs))
+            issues.extend(audit_bootstrap_remote_disable_rootfs(fs))
             issues.extend(audit_portal_disable_reporting_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))
