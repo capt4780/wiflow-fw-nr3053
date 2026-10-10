@@ -19,7 +19,7 @@ action="$(param action 2>/dev/null || true)"
 # through common.sh:param(). No strict Origin check: some captive browsers and
 # intercepted probe flows omit/change Origin. Session/IP/firewall checks remain.
 case "$action" in
- authorize|event)
+ authorize|event|status)
   if [ "${REQUEST_METHOD:-}" != POST ]; then
    printf 'Status: 405 Method Not Allowed\r\nAllow: POST\r\nCache-Control: no-store\r\n\r\n'
    exit 0
@@ -31,6 +31,18 @@ case "$action" in
   ;;
 esac
 case "$action" in
+ status)
+  # POST-only read-back for a potentially interrupted authorization response.
+  # Never infer success from HTTP availability or from an unverified IP.
+  sid="$(param session_id 2>/dev/null || true)"
+  validate_session "$sid" || json_error 'invalid_session'
+  enabled="$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)"
+  if [ "$enabled" = 1 ] && /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then
+   headers 'application/json; charset=utf-8'; echo '{"ok":true,"authorized":true}'
+  else
+   headers 'application/json; charset=utf-8'; echo '{"ok":true,"authorized":false}'
+  fi
+  exit 0;;
  authorize)
   sid="$(param session_id 2>/dev/null || true)"; validate_session "$sid" || { printf 'Status: 403 Forbidden\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
   if /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then printf 'Status: 204 No Content\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'; exit 0; fi
@@ -48,6 +60,19 @@ ip="${REMOTE_ADDR:-}"; valid_guest_ip "$ip" || { printf 'Status: 403 Forbidden\r
 session="$(/usr/lib/wiflow/portal-client ensure "$ip" 2>/dev/null || true)"; [ -n "$session" ] || { headers 'text/html; charset=utf-8'; echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="2"><p>Đang chuẩn bị kết nối WiFi…</p>'; exit 0; }
 cid="${session%%|*}"; sid="${session#*|}"
 if /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then printf 'Status: 204 No Content\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n'; exit 0; fi
+
+# HTTP captive probes can reach this handler with an external Host header.
+# Send a fixed, local canonical origin BEFORE rendering so JS authorization
+# remains same-origin without relaxing CORS or exposing session IDs to sites.
+# This is a pre-auth redirect, never a post-confirm redirect.
+case "${HTTP_HOST:-}" in
+ 10.10.10.1|10.10.10.1:2080) :;;
+ *)
+  if [ "${REQUEST_METHOD:-GET}" = GET ]; then
+   printf 'Status: 302 Found\r\nLocation: http://10.10.10.1:2080/cgi-bin/portal\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\n\r\n'
+   exit 0
+  fi;;
+esac
 
 event_enqueue portal_view "$cid" "$sid" "$(date +%s)" || true
 cfg="$PORTAL_ACTIVE/portal.json"
