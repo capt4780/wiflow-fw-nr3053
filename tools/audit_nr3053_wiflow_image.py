@@ -611,6 +611,8 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
         "ensure_luci_ip || bootstrap_fail",
         "wait_for_guest_ip || bootstrap_fail",
         "configure_web || bootstrap_fail",
+        "bootstrap_fail 'captive firewall activation failed'",
+        "bootstrap_fail 'captive firewall disable failed'",
         '/etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1',
     )
     if any(token not in src for token in required):
