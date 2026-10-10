@@ -66,10 +66,10 @@ bootstrap_fail(){
 }
 ensure_management_network(){
     uci -q get network.lan >/dev/null 2>&1 || return 1
-    uci set network.lan.proto='static'
-    uci set network.lan.ipaddr='10.0.0.1'
-    uci set network.lan.netmask='255.255.255.0'
-    uci set network.lan.delegate='0'
+    uci set network.lan.proto='static' || return 1
+    uci set network.lan.ipaddr='10.0.0.1' || return 1
+    uci set network.lan.netmask='255.255.255.0' || return 1
+    uci set network.lan.delegate='0' || return 1
     uci -q delete network.lan.ip6assign >/dev/null 2>&1 || true
     uci -q delete network.lan.ip6hint >/dev/null 2>&1 || true
     uci -q delete network.lan.ip6ifaceid >/dev/null 2>&1 || true
@@ -96,45 +96,48 @@ configure_web(){
     # protected by the six-digit Wiflow Security Gate at 10.0.0.2:80.
     uci -q delete uhttpd.main.listen_http >/dev/null 2>&1 || true
     uci -q delete uhttpd.main.listen_https >/dev/null 2>&1 || true
+    # Old non-gated web listeners must be absent, even if UCI delete failed.
+    uci -q get uhttpd.main.listen_http >/dev/null 2>&1 && return 1
+    uci -q get uhttpd.main.listen_https >/dev/null 2>&1 && return 1
     uci add_list uhttpd.main.listen_http='10.0.0.2:8081' || return 1
 
     uci -q delete uhttpd.wiflow_luci_gate >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow_luci_gate='uhttpd'
-    uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80'
-    uci set uhttpd.wiflow_luci_gate.home='/www-wiflow-luci-gate'
-    uci set uhttpd.wiflow_luci_gate.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow_luci_gate.index_page='index.html'
-    uci set uhttpd.wiflow_luci_gate.script_timeout='10'
-    uci set uhttpd.wiflow_luci_gate.network_timeout='5'
-    uci set uhttpd.wiflow_luci_gate.http_keepalive='5'
-    uci set uhttpd.wiflow_luci_gate.max_requests='2'
-    uci set uhttpd.wiflow_luci_gate.max_connections='8'
+    uci set uhttpd.wiflow_luci_gate='uhttpd' || return 1
+    uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80' || return 1
+    uci set uhttpd.wiflow_luci_gate.home='/www-wiflow-luci-gate' || return 1
+    uci set uhttpd.wiflow_luci_gate.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow_luci_gate.index_page='index.html' || return 1
+    uci set uhttpd.wiflow_luci_gate.script_timeout='10' || return 1
+    uci set uhttpd.wiflow_luci_gate.network_timeout='5' || return 1
+    uci set uhttpd.wiflow_luci_gate.http_keepalive='5' || return 1
+    uci set uhttpd.wiflow_luci_gate.max_requests='2' || return 1
+    uci set uhttpd.wiflow_luci_gate.max_connections='8' || return 1
 
     uci -q delete uhttpd.wiflow >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow='uhttpd'
-    uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80'
-    uci set uhttpd.wiflow.home='/www-wiflow'
-    uci set uhttpd.wiflow.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow.index_page='index.html'
-    uci set uhttpd.wiflow.script_timeout='20'
-    uci set uhttpd.wiflow.network_timeout='10'
-    uci set uhttpd.wiflow.http_keepalive='10'
-    uci set uhttpd.wiflow.max_requests='4'
-    uci set uhttpd.wiflow.max_connections='20'
+    uci set uhttpd.wiflow='uhttpd' || return 1
+    uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80' || return 1
+    uci set uhttpd.wiflow.home='/www-wiflow' || return 1
+    uci set uhttpd.wiflow.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow.index_page='index.html' || return 1
+    uci set uhttpd.wiflow.script_timeout='20' || return 1
+    uci set uhttpd.wiflow.network_timeout='10' || return 1
+    uci set uhttpd.wiflow.http_keepalive='10' || return 1
+    uci set uhttpd.wiflow.max_requests='4' || return 1
+    uci set uhttpd.wiflow.max_connections='20' || return 1
 
     uci -q delete uhttpd.wiflow_portal >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow_portal='uhttpd'
-    uci add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080'
-    uci set uhttpd.wiflow_portal.home='/www-wiflow-portal'
-    uci set uhttpd.wiflow_portal.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow_portal.index_page='index.html'
-    uci set uhttpd.wiflow_portal.error_page='/cgi-bin/portal'
-    uci set uhttpd.wiflow_portal.rfc1918_filter='0'
-    uci set uhttpd.wiflow_portal.script_timeout='10'
-    uci set uhttpd.wiflow_portal.network_timeout='5'
-    uci set uhttpd.wiflow_portal.http_keepalive='5'
-    uci set uhttpd.wiflow_portal.max_requests='4'
-    uci set uhttpd.wiflow_portal.max_connections='24'
+    uci set uhttpd.wiflow_portal='uhttpd' || return 1
+    uci add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080' || return 1
+    uci set uhttpd.wiflow_portal.home='/www-wiflow-portal' || return 1
+    uci set uhttpd.wiflow_portal.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow_portal.index_page='index.html' || return 1
+    uci set uhttpd.wiflow_portal.error_page='/cgi-bin/portal' || return 1
+    uci set uhttpd.wiflow_portal.rfc1918_filter='0' || return 1
+    uci set uhttpd.wiflow_portal.script_timeout='10' || return 1
+    uci set uhttpd.wiflow_portal.network_timeout='5' || return 1
+    uci set uhttpd.wiflow_portal.http_keepalive='5' || return 1
+    uci set uhttpd.wiflow_portal.max_requests='4' || return 1
+    uci set uhttpd.wiflow_portal.max_connections='24' || return 1
     uci commit uhttpd || return 1
     /etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1
     /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
@@ -152,9 +155,9 @@ ensure_device_id
 backup_stock_configs || { log 'BOOTSTRAP_BLOCK: incomplete stock configuration backup'; exit 1; }
 recover_uplink_transaction && log 'Recovered interrupted uplink transaction' || true
 ensure_management_network || bootstrap_fail 'management LAN configuration failed'
-ensure_guest_network
-ensure_uplink_network
-tune_wiflow_runtime
+ensure_guest_network || bootstrap_fail 'guest UCI configuration failed'
+ensure_uplink_network || bootstrap_fail 'uplink UCI configuration failed'
+tune_wiflow_runtime || bootstrap_fail 'runtime UCI configuration failed'
 ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || bootstrap_fail 'network reload failed'
 wait_for_management_ip || bootstrap_fail 'management IP 10.0.0.1 not confirmed'
 ensure_luci_ip || bootstrap_fail 'LuCI IP 10.0.0.2/32 not confirmed'
