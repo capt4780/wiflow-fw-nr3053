@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import unittest
 
+from audit_nr3053_wiflow_image import audit_captive_disabled_authorization_rootfs
+
 FILES = Path(__file__).resolve().parents[1] / "package/wiflow-setup/files"
 CLIENT = (FILES / "usr/lib/wiflow/portal-client").read_text()
 CGI = (FILES / "www-wiflow-portal/cgi-bin/portal").read_text()
@@ -34,6 +36,38 @@ class CaptiveDisabledAuthorizationTests(unittest.TestCase):
         self.assertLess(body.index('[ -f "$PORTAL_ACTIVE/portal.json" ]'),
                         body.index('portal-client authorize-session'))
         self.assertIn("Status: 403 Forbidden", body)
+
+    def test_compiled_image_gate_accepts_both_authorization_guards(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel, source in (
+                ("www-wiflow-portal/cgi-bin/portal", CGI),
+                ("usr/lib/wiflow/portal-client", CLIENT),
+            ):
+                target = root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(source)
+            self.assertEqual(audit_captive_disabled_authorization_rootfs(root), [])
+
+    def test_compiled_image_gate_rejects_stale_guardless_branch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cgi = root / "www-wiflow-portal/cgi-bin/portal"
+            client = root / "usr/lib/wiflow/portal-client"
+            cgi.parent.mkdir(parents=True)
+            client.parent.mkdir(parents=True)
+            cgi.write_text(CGI)
+            client.write_text(CLIENT)
+            for target, source in ((cgi, CGI), (client, CLIENT)):
+                with self.subTest(target=str(target)):
+                    damaged = source.replace(
+                        'uci -q get wiflow.core.portal_enabled',
+                        'uci -q get wiflow.core.portal_removed',
+                    )
+                    self.assertNotEqual(source, damaged)
+                    target.write_text(damaged)
+                    self.assertTrue(audit_captive_disabled_authorization_rootfs(root))
+                    target.write_text(source)
 
     def test_actual_backend_gate_denies_disabled_and_snapshot_missing(self):
         body = CLIENT[CLIENT.index('    # Remote Portal disable is authoritative'):
