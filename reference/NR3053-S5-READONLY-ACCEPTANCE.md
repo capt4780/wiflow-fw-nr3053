@@ -21,6 +21,40 @@ This reads the runtime board identifier and device-tree compatibility (NR3053 bo
 
 If stock firmware does **not** provide an authorized shell/SSH (or access is Wi-Fi only), **do not force SSH, install packages, change bootloader settings or flash merely to run a test**. Collect the available non-sensitive board/revision and firmware-version details from the original UI and hardware label privately. An authorized technician may document the PCB/bootloader and a physically recoverable connection. This step cannot certify a recovery procedure.
 
+### P48: offline verification against the already supplied 2026-10-07 fingerprint
+
+The owner's existing **nr3053-source-fingerprint.txt** includes a direct read
+of \`/dev/mtd2\` Factory SHA-256 and the actual \`/proc/mtd\` partition
+inventory. **Do not request those observations again.** A checksum is **not**
+a calibration backup and does not certify a physical rescue method.
+
+After an authorized technician has obtained two private/offline Factory
+backup copies through an independently approved procedure, optionally bind
+the existing local fingerprint document to the consistency check:
+
+~~~sh
+python3 tools/nr3053-s5a-verify-factory-backup.py \
+  --factory-a /PRIVATE/COPY-1.bin \
+  --factory-b /PRIVATE/COPY-2.bin \
+  --observed-fingerprint /PRIVATE/nr3053-source-fingerprint.txt
+~~~
+
+The checker validates full Factory size, distinct backup files, nonblank
+contents, identical backup bytes and agreement with the pre-existing
+on-device Factory digest. All raw inputs remain private: **never commit or
+upload** the fingerprint text or Factory dumps to GitHub, public chat,
+CI artifacts or third-party services. The script prints only verdict codes
+without the sensitive digest.
+
+A matching digest reduces the risk that the two backups come from a different
+state or unrelated device, but cannot rule out a forged fingerprint,
+read errors during the original capture, missing radio calibration validity,
+incomplete NAND backup or an unavailable restore path.
+
+Regardless of PASS here, **physical device origin** and **UART/bootloader
+restore test** remain **NOT_VERIFIED**; first flash and release remain
+**BLOCK** until independently evidenced. The script never writes the device.
+
 ### Optional S5-A offline Factory backup-copy consistency check
 
 **Only after an authorized technician has privately obtained Factory backup copies

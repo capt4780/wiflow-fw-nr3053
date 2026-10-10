@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import stat
 
@@ -76,7 +77,54 @@ def inspect(path: Path, expected: int) -> tuple[str, str, tuple[int, int] | None
         return "WARN", "file_unavailable_or_unreadable", None, None
 
 
-def run(first: Path, second: Path) -> int:
+
+def observed_factory_digest(fingerprint: Path) -> tuple[str, bytes | None]:
+    """Read a private stock-device fingerprint locally and never print its hash.
+
+    Matching two Factory dumps to a previously observed checksum is stronger
+    than comparing two dumps alone, but does not prove the original device.
+    """
+    try:
+        before = fingerprint.lstat()
+        if not stat.S_ISREG(before.st_mode) or not (100 <= before.st_size <= 2 * 1024 * 1024):
+            return "BLOCK", None
+        fd = os.open(fingerprint, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            opened = os.fstat(fd)
+            if ((opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino)
+                    or not stat.S_ISREG(opened.st_mode)):
+                return "BLOCK", None
+            buf = bytearray()
+            while len(buf) <= 2 * 1024 * 1024:
+                piece = os.read(fd, 128 * 1024)
+                if not piece:
+                    break
+                buf.extend(piece)
+            if len(buf) > 2 * 1024 * 1024 or len(buf) != opened.st_size:
+                return "BLOCK", None
+            after = os.fstat(fd)
+            if (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns) != (
+                    after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                return "BLOCK", None
+        finally:
+            os.close(fd)
+        document = buf.decode("utf-8", "strict")
+    except (OSError, UnicodeDecodeError, ValueError):
+        return "BLOCK", None
+    if not re.search(r'^mtd2:\s+00200000\s+[0-9a-fA-F]+\s+"Factory"\s*$', document, re.M):
+        return "BLOCK", None
+    section = document.split("===== FACTORY PARTITION FINGERPRINT", 1)
+    if len(section) != 2:
+        return "BLOCK", None
+    section = section[1].split("===== APK / FEEDS", 1)[0]
+    matches = re.findall(
+        r'^([0-9a-fA-F]{64})[ \t]+/dev/mtd2\s*$', section, re.M)
+    if len(matches) != 1 or "Factory device=/dev/mtd2" not in section:
+        return "BLOCK", None
+    return "PASS", bytes.fromhex(matches[0])
+
+
+def run(first: Path, second: Path, fingerprint: Path | None = None) -> int:
     report("stage", "INFO", "S5_A_PRIVATE_OFFLINE_FACTORY_BACKUP_CHECK")
     try:
         expected = factory_expected_size()
@@ -102,6 +150,21 @@ def run(first: Path, second: Path) -> int:
         else:
             report("factory_copy_pair", "PASS", "distinct_files_equal_sha256")
             status = 0
+    # A provided device fingerprint remains private/offline; no raw hash output.
+    if fingerprint is None:
+        report("factory_fingerprint_match", "NOT_VERIFIED", "private_observed_fingerprint_not_supplied")
+    elif status != 0:
+        report("factory_fingerprint_match", "NOT_TESTED", "valid_matching_backup_pair_required")
+    else:
+        fp_status, digest = observed_factory_digest(fingerprint)
+        if fp_status != "PASS" or digest is None:
+            report("factory_fingerprint_match", "BLOCK", "private_fingerprint_invalid")
+            status = 2
+        elif digest != a[3]:
+            report("factory_fingerprint_match", "BLOCK", "observed_device_factory_hash_mismatch")
+            status = 2
+        else:
+            report("factory_fingerprint_match", "PASS", "matching_observed_factory_hash")
     # Always keep the high-risk approval gates blocked. File copies can be forged.
     report("backup_device_origin", "NOT_VERIFIED", "technician_device_export_evidence_required")
     report("backup_restore_test", "NOT_VERIFIED", "independent_restore_evidence_required")
@@ -115,8 +178,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="NR3053 offline Factory backup copy integrity check (NO FLASH)")
     parser.add_argument("--factory-a", type=Path, required=True, help="Private Factory dump copy A")
     parser.add_argument("--factory-b", type=Path, required=True, help="Private Factory dump copy B")
+    parser.add_argument("--observed-fingerprint", type=Path,
+                        help="Private stock-device fingerprint; never upload to public GitHub")
     args = parser.parse_args()
-    return run(args.factory_a, args.factory_b)
+    return run(args.factory_a, args.factory_b, args.observed_fingerprint)
 
 
 if __name__ == "__main__":
