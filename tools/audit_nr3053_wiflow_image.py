@@ -142,15 +142,15 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
     if not path.is_file():
         return ["captive authorization CGI missing from compiled rootfs"]
     source = path.read_text(encoding="utf-8", errors="replace")
-    marker = 'case "$action" in\n authorize|event)'
-    successor = '\ncase "$action" in\n authorize)'
+    marker = 'case "$action" in\n authorize|event|status)'
+    successor = '\ncase "$action" in\n status)'
     if source.count(marker) != 1 or successor not in source:
         return ["captive authorization action guard absent"]
     start = source.index(marker)
     end = source.index(successor, start)
     guard = source[start:end]
     required = (
-        "authorize|event)",
+        "authorize|event|status)",
         '[ "${REQUEST_METHOD:-}" != POST ]',
         "Status: 405 Method Not Allowed",
         '[ -z "$BODY" ]',
@@ -161,6 +161,69 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
     if 'authorize-session "$sid" "$cid"' not in source[end:]:
         return ["captive authorization backend flow changed unexpectedly"]
     return []
+
+
+def audit_capport_tls_gate_rootfs(fs: Path) -> list[str]:
+    """Never ship an invalid HTTP CAPPORT DHCP advertisement.
+
+    Until TLS and per-client HTTPS CAPPORT are implemented/audited, no
+    DHCP 114 URI may be advertised. HTTP fallback continues independently.
+    """
+    common = fs / "usr/lib/wiflow/common.sh"
+    if not common.is_file():
+        return ["CAPPORT DHCP configuration owner missing from rootfs"]
+    text = common.read_text(encoding="utf-8", errors="replace")
+    problems = []
+    if "uci add_list dhcp.wiflow_guest.dhcp_option='114," in text:
+        problems.append("DHCP Option 114 must remain OFF until audited CAPPORT HTTPS is ready")
+    if "uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1'" not in text:
+        problems.append("fallback guest DNS DHCP option missing")
+    if (fs / "www-wiflow-portal/cgi-bin/captive-api").exists():
+        problems.append("obsolete insecure HTTP CAPPORT CGI must not be installed")
+    return problems
+
+
+def audit_captive_noredirect_rootfs(fs: Path) -> list[str]:
+    """Block images missing a safe, navigation-free captive confirmation.
+
+    The HTTPS CAPPORT endpoint is a separate gated feature. This gate only
+    verifies the HTTP-fallback Portal has a same-origin POST and status check.
+    """
+    problems = []
+    for mode in ("website", "image", "video"):
+        path = fs / f"www-wiflow-portal/template-{mode}.html"
+        if not path.is_file():
+            problems.append(f"no-redirect captive template missing: {mode}")
+            continue
+        content = path.read_text(encoding="utf-8", errors="replace")
+        required = (
+            "const commit=async()=>",
+            "const response=await send('authorize')",
+            "const status=await send('status')",
+            "confirmed=response.status===204",
+            "new URL(authorizeUrl,window.location.href).origin!==window.location.origin",
+            "mode:'same-origin'",
+            "redirect:'error'",
+            "body:new URLSearchParams({action,session_id:sessionId}).toString()",
+            "state='authorized'",
+        )
+        if any(piece not in content for piece in required) or "form.submit()" in content:
+            problems.append(f"captive mode {mode} lost safe non-navigation confirmation")
+    cgi = fs / "www-wiflow-portal/cgi-bin/portal"
+    if not cgi.is_file():
+        problems.append("read-back status CGI missing")
+    else:
+        src = cgi.read_text(encoding="utf-8", errors="replace")
+        for piece in (
+            " authorize|event|status)",
+            " status)",
+            'validate_session "$sid"',
+            'is-authorized "$sid"',
+            'Location: http://10.10.10.1:2080/cgi-bin/portal',
+        ):
+            if piece not in src:
+                problems.append(f"captive CGI status/canonical-origin gate missing: {piece}")
+    return problems
 
 
 def audit_captive_commit_rootfs(fs: Path) -> list[str]:
@@ -337,6 +400,8 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
+            issues.extend(audit_captive_noredirect_rootfs(fs))
+            issues.extend(audit_capport_tls_gate_rootfs(fs))
             issues.extend(audit_captive_commit_rootfs(fs))
             issues.extend(audit_wp_ack_receipt_rootfs(fs))
             issues.extend(audit_captive_rebind_rootfs(fs))
