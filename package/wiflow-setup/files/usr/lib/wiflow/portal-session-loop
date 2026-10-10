@@ -32,15 +32,35 @@ while true; do
         if grep -qx "$mac" "$current" 2>/dev/null; then
             newip="$(awk -v m="$mac" 'toupper($2)==m{print $3;exit}' /tmp/dhcp.leases 2>/dev/null || true)"; [ -n "$newip" ] || newip="$ip"
             if [ "$newip" != "$ip" ]; then
+                # A DHCP reassignment is a state transition. Revoke the old
+                # pair and persist the new IP BEFORE opening any new pair.
+                had_grant=0
                 if [ "${authorized:-0}" != 0 ]; then
                     portal_nft_del "$ip" "$mac"
-                    portal_nft_add "$newip" "$mac" || true
+                    if portal_nft_pair_authorized "$ip" "$mac"; then
+                        /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+                        state_set portal_error 'client_ip_old_authorization_revoke_failed'
+                        continue
+                    fi
                 elif portal_nft_pair_granted "$ip" "$mac"; then
+                    had_grant=1
                     portal_nft_grant_del "$ip" "$mac"
-                    portal_nft_grant_add "$newip" "$mac" || true
                 fi
+                if ! client_session_write "$f" "$mac" "$cid" "$sid" "$newip" "$connected" "${authorized:-0}" "$now" 0; then
+                    state_set portal_error 'client_ip_state_write_failed'
+                    continue
+                fi
+                if [ "${authorized:-0}" != 0 ]; then
+                    portal_nft_add "$newip" "$mac" ||
+                        state_set portal_error 'client_ip_authorization_restore_failed'
+                elif [ "$had_grant" = 1 ]; then
+                    portal_nft_grant_add "$newip" "$mac" ||
+                        state_set portal_error 'client_ip_grant_restore_failed'
+                fi
+            else
+                client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0 ||
+                    state_set portal_error 'client_session_refresh_failed'
             fi
-            client_session_write "$f" "$mac" "$cid" "$sid" "$newip" "$connected" "${authorized:-0}" "$now" 0 || true
         else
             [ "$absent" -gt 0 ] || absent="$now"
             elapsed=$((now-absent))
