@@ -214,11 +214,11 @@ class PortalActiveAckReplayTests(unittest.TestCase):
 
     def test_firewall_disable_does_not_commit_when_already_disabled(self):
         firewall = (FILES / "usr/lib/wiflow/portal-firewall").read_text()
-        begin = firewall.index("\ndisable(){")
+        begin = firewall.index("\ncaptive_nft_objects_present(){")
         end = firewall.index('\ncase "$MODE" in', begin)
         actual_disable = firewall[begin:end].replace(
             "/etc/init.d/firewall", "firewall_reload_test"
-        )
+        ).replace("/usr/sbin/nft", "nft_test")
         with tempfile.TemporaryDirectory(prefix="wiflow-firewall-disabled-") as tmp:
             nft = Path(tmp) / "30-wiflow-captive.nft"
             log = Path(tmp) / "writes.log"
@@ -231,6 +231,8 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 ' esac\n'
                 '}\n'
                 'firewall_reload_test(){ printf "reload\n" >> "$TEST_LOG"; }\n'
+                'nft_test(){ [ "$1" = list ] && [ "$2" = table ]; }\n'
+                'state_set(){ echo "error:$2" >> "$TEST_LOG"; }\n'
                 + actual_disable + "\ndisable\n"
             )
             env = {**os.environ, "TEST_NFT_FILE": str(nft), "TEST_LOG": str(log)}
