@@ -135,6 +135,10 @@ rollback_stock_configs
         self.assertLess(BOOT.index("backup_stock_configs ||"), BOOT.index("ensure_management_network ||"))
         self.assertLess(BOOT.index("configure_web || bootstrap_fail"),
                         BOOT.index("/usr/lib/wiflow/minimal-profile"))
+        self.assertLess(BOOT.index("configure_web || bootstrap_fail"),
+                        BOOT.index("\ncleanup_legacy_management_ips\n"))
+        self.assertLess(BOOT.index("\ncleanup_legacy_management_ips\n"),
+                        BOOT.index('command_result_set "$cid" "$act" success'))
 
     def test_failed_bootstrap_rolls_back_with_nonzero_exit(self):
         action = """backup_stock_configs || exit 20
