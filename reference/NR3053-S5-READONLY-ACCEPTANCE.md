@@ -5,7 +5,27 @@ flash, configure, restart services, authorize guest Internet, or recover hardwar
 Its automated report always ends with **e5_complete=BLOCK** and
 **flash_authorization=BLOCK** until independent lab acceptance is documented.
 
-## Preconditions
+## Actual starting state — S5-A before the first Wiflow flash
+
+**As confirmed by the owner on 2026-10-10: no NR3053 has Wiflow installed or running.** The current devices are on their existing/stock firmware. It is **incorrect** to ask the owner to run `nr3053-s5-readonly.sh` against a device already running Wiflow; no such device exists. A hosted Wiflow FIT build cannot establish device-runtime E5 PASS.
+
+**S5-A** starts on the original existing firmware. The separate read-only [stock inventory tool](../tools/nr3053-stock-preflight-readonly.sh) does not depend on Wiflow:
+
+~~~sh
+# Only if your existing stock firmware already offers authorized SSH access.
+# Replace the literal account/address placeholder using your known stock access.
+ssh 'ACCOUNT@STOCK_ROUTER_IP' 'sh -s' < tools/nr3053-stock-preflight-readonly.sh > nr3053-stock-preflight-report.txt
+~~~
+
+This reads the runtime board identifier and device-tree compatibility when available, existing OS metadata, the *presence* of an MTD partition table and a calibration-name hint, and optional live IP/radio observations. It deliberately prints no partition contents, MAC/SSID, serial, secret, login or raw MTD layout. It never changes stock firmware and ends with `first_flash_approval|BLOCK`, `bootloader_recovery|NOT_VERIFIED` and `wiflow_s5_runtime|NOT_TESTED`.
+
+If stock firmware does **not** provide an authorized shell/SSH (or access is Wi-Fi only), **do not force SSH, install packages, change bootloader settings or flash merely to run a test**. Collect the available non-sensitive board/revision and firmware-version details from the original UI and hardware label privately. An authorized technician may document the PCB/bootloader and a physically recoverable connection. This step cannot certify a recovery procedure.
+
+**Gate between S5-A and S5-B (not yet met):** match the exact stock hardware variant to Golden, determine and independently validate an offline backup of calibration and partitions, confirm bootloader/UART recovery with a second management path on dedicated lab hardware, and approve a *separate* controlled first-flash plan. Do not treat GitHub Actions green tests or a readable MTD table as any of those proofs.
+
+**S5-B** begins *only if* a designated lab NR3053 has actually booted a reviewed Wiflow candidate through an approved, recoverable process. The remainder of this runbook, including `nr3053-s5-readonly.sh`, applies to S5-B and **cannot be run as a Wiflow acceptance test on stock firmware**.
+
+## Preconditions — S5-B only
 
 1. Confirm exact hardware ID, PCB/bootloader revisions and radio/calibration map on
    the *actual* Viettel NR3053. A successful hosted FIT build is NOT evidence that
@@ -17,7 +37,7 @@ Its automated report always ends with **e5_complete=BLOCK** and
    script. On original stock firmware, missing Wiflow files are normal and will
    produce BLOCK; do not use that result as a reason to flash.
 
-## Device-side evidence collection — no changes
+## S5-B Wiflow device-side evidence collection — no changes
 
 From a trusted management workstation with a reviewed copy of the script in this
 repository, and only when the device is already reachable over a safe management
