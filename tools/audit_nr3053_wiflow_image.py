@@ -590,10 +590,14 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
     """
     bootstrap = fs / "usr/lib/wiflow/bootstrap"
     service = fs / "etc/init.d/wiflow-setup"
-    if not bootstrap.is_file() or not service.is_file():
+    profile = fs / "usr/lib/wiflow/minimal-profile"
+    if not bootstrap.is_file() or not service.is_file() or not profile.is_file():
         return ["management recovery boot scripts missing"]
     src = bootstrap.read_text(encoding="utf-8", errors="replace")
     init = service.read_text(encoding="utf-8", errors="replace")
+    minimal = profile.read_text(encoding="utf-8", errors="replace")
+    if "OPTIONAL_SERVICES='nodogsplash opennds wifidog'" not in minimal:
+        return ["unrelated management/recovery services may be disabled on firstboot"]
     required = (
         "backup_stock_configs(){",
         "rollback_stock_configs(){",
