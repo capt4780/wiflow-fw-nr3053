@@ -132,5 +132,43 @@ fail_closed_disable(){
         self.assertIn("portal_nft_pair_authorized", s)
 
 
+    def test_compiled_rootfs_auditor_blocks_regressed_authorize_transaction(self):
+        from audit_nr3053_wiflow_image import audit_captive_commit_rootfs
+        with tempfile.TemporaryDirectory(prefix="wiflow-captive-image-") as temp:
+            root = Path(temp)
+            file = root / "usr/lib/wiflow/portal-client"
+            file.parent.mkdir(parents=True)
+            file.write_text(SOURCE)
+            self.assertEqual(audit_captive_commit_rootfs(root), [])
+            for damaged in (
+                'if ! client_session_write "$f"',
+                'portal_nft_del "$ip" "$mac"',
+                '/usr/lib/wiflow/portal-firewall disable',
+            ):
+                with self.subTest(damaged=damaged):
+                    file.write_text(SOURCE.replace(damaged, "# stripped for negative test"))
+                    self.assertTrue(audit_captive_commit_rootfs(root))
+            file.unlink()
+            self.assertTrue(audit_captive_commit_rootfs(root))
+
+    def test_compiled_rootfs_auditor_requires_wp_ack_business_success(self):
+        from audit_nr3053_wiflow_image import audit_wp_ack_receipt_rootfs
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "package/wiflow-setup/files/usr/lib/wiflow/portal-sync"
+        ).read_text()
+        with tempfile.TemporaryDirectory(prefix="wiflow-ack-image-") as temp:
+            root = Path(temp)
+            file = root / "usr/lib/wiflow/portal-sync"
+            file.parent.mkdir(parents=True)
+            file.write_text(source)
+            self.assertEqual(audit_wp_ack_receipt_rootfs(root), [])
+            file.write_text(source.replace(
+                'jsonfilter -i "$ack" -e \'@.ok\'', "echo true"))
+            self.assertTrue(audit_wp_ack_receipt_rootfs(root))
+            file.unlink()
+            self.assertTrue(audit_wp_ack_receipt_rootfs(root))
+
+
 if __name__ == "__main__":
     unittest.main()
