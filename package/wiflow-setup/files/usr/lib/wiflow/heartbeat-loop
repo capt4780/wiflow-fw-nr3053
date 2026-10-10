@@ -37,17 +37,26 @@ portal_runtime_set_enabled(){
 }
 
 portal_runtime_disable(){
- # An explicit disable invalidates our local WP active ACK receipt.
+ # An explicit disable invalidates the WP active ACK receipt. Report both
+ # persistent-state and firewall failures; neither is a successful disable.
  rm -f "$PORTAL_ACK_CONFIRMED"
- portal_runtime_set_enabled 0 || state_set portal_error 'portal_disable_state_commit_failed'
- /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+ failed=0
+ if ! portal_runtime_set_enabled 0; then
+  state_set portal_error 'portal_disable_state_commit_failed'
+  failed=1
+ fi
+ if ! /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1; then
+  state_set portal_error 'captive_firewall_disable_failed'
+  failed=1
+ fi
+ [ "$failed" = 0 ]
 }
 
 portal_runtime_reconcile(){
  wanted="$1"; desired="$2"; current="$3"
  if [ "$wanted" != 1 ] || [ "$desired" -le 0 ]; then
   portal_runtime_disable
-  return 0
+  return $?
  fi
  # Also reconcile a missing active ACK receipt, even when the media
  # revision already matches. The Portal sync fast path re-ACKs without
