@@ -811,10 +811,23 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
     if(!dialog.hidden)scheduleAutoSlider();
     if(restoreFocus&&termsOpen)termsOpen.focus();
   };
-  const commit=()=>{
+  const commit=async()=>{
     if(state!=='ready')return;
     if(preview){closeDialog(true);return;}
-    if(!validRuntime()){setError('Phiên kết nối chưa sẵn sàng. Vui lòng kết nối lại Wi‑Fi.');closeDialog(false);return;}
+    if(!validRuntime()||typeof window.fetch!=='function'||typeof URLSearchParams!=='function'){
+      closeDialog(false);
+      setError('Phiên kết nối chưa sẵn sàng. Vui lòng kết nối lại Wi-Fi.');
+      return;
+    }
+    // HTTP probe interception can carry a foreign Host. Never send session
+    // identifiers through a cross-origin request or disable CORS to fix it.
+    try{
+      if(new URL(authorizeUrl,window.location.href).origin!==window.location.origin)throw new Error('portal_origin');
+    }catch(_error){
+      closeDialog(false);
+      setError('Vui lòng mở lại trang Wiflow trên Wi-Fi.');
+      return;
+    }
     state='committing';
     stopAutoSlider();
     confirm.disabled=true;
@@ -822,18 +835,44 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
     access.setAttribute('aria-disabled','true');
     dialog.hidden=true;
     dialog.setAttribute('aria-hidden','true');
+    if(runtimeError){runtimeError.hidden=false;runtimeError.textContent='Đang xác nhận quyền truy cập…';}
 
-    const form=document.createElement('form');
-    form.method='post';
-    form.action=authorizeUrl;
-    form.style.display='none';
-    const action=document.createElement('input');
-    action.type='hidden';action.name='action';action.value='authorize';
-    const sid=document.createElement('input');
-    sid.type='hidden';sid.name='session_id';sid.value=sessionId;
-    form.append(action,sid);
-    document.body.appendChild(form);
-    form.submit();
+    const send=action=>window.fetch(authorizeUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body:new URLSearchParams({action,session_id:sessionId}).toString(),
+      credentials:'same-origin',
+      mode:'same-origin',
+      redirect:'error',
+      cache:'no-store'
+    });
+    let confirmed=false;
+    try{
+      const response=await send('authorize');
+      confirmed=response.status===204;
+    }catch(_error){}
+    if(!confirmed){
+      // nft may have opened Internet even if Android's captive mini-browser
+      // lost the original response. Reconcile with the *actual session*.
+      try{
+        const status=await send('status');
+        if(status.status===200){
+          const body=await status.json();
+          confirmed=body&&body.ok===true&&body.authorized===true;
+        }
+      }catch(_error){}
+    }
+    if(confirmed){
+      state='authorized';
+      if(runtimeError){runtimeError.hidden=false;runtimeError.textContent='Đã xác nhận kết nối. Bạn có thể đóng cửa sổ này.';}
+      return;
+    }
+    // No optimistic success and no blank-page navigation on HTTP 409/timeouts.
+    state='ready';
+    confirm.disabled=false;
+    access.disabled=false;
+    access.setAttribute('aria-disabled','false');
+    if(runtimeError){runtimeError.hidden=false;runtimeError.textContent='Chưa xác nhận được kết nối. Vui lòng thử lại.';}
   };
 
   access.disabled=true;
