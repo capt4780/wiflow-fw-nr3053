@@ -183,6 +183,34 @@ class GuestManagementGateTests(unittest.TestCase):
                                     issues)
             captive.write_text(source)
 
+    def test_compiled_auditor_requires_nft_failure_cleanup_before_uci_forward(self):
+        with tempfile.TemporaryDirectory(prefix="wiflow-disable-order-image-") as tmp:
+            root = Path(tmp)
+            sources = (
+                "usr/lib/wiflow/common.sh",
+                "usr/lib/wiflow/portal-firewall",
+                "usr/lib/wiflow/bootstrap",
+                "usr/share/nftables.d/chain-pre/input/25-wiflow-luci-gate.nft",
+                "www-wiflow-luci-gate/cgi-bin/unlock",
+                "www-wiflow/cgi-bin/gate",
+            )
+            for rel in sources:
+                target = root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((SRC / rel).read_bytes())
+            self.assertEqual(audit_guest_gate_rootfs(root), [])
+            captive = root / "usr/lib/wiflow/portal-firewall"
+            original = captive.read_text()
+            for fragment in (
+                'table_ready=1',
+                'if [ "$changed" = 0 ]; then',
+            ):
+                with self.subTest(fragment=fragment):
+                    self.assertIn(fragment, original)
+                    captive.write_text(original.replace(fragment, "# removed by mutation"))
+                    self.assertTrue(audit_guest_gate_rootfs(root))
+            captive.write_text(original)
+
     def test_guest_wan_default_is_fail_closed_without_snapshot(self):
         common = COMMON.read_text()
         scope = common[common.index("ensure_guest_network(){"):
