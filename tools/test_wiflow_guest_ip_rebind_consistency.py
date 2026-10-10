@@ -72,7 +72,7 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                 # Real fragment from production portal-client's existing-session branch.
                 script += client_rebind()
             else:
-                script += "\nwhile :; do\n" + session_loop_rebind() + "\n break\ndone\n"
+                script += "\nip=10.10.10.101\nwhile :; do\n" + session_loop_rebind() + "\n break\ndone\n"
             proc = subprocess.run(
                 ["sh", "-c", script],
                 capture_output=True, text=True, timeout=6,
