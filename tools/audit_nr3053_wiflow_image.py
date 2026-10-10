@@ -305,14 +305,34 @@ def audit_captive_disabled_authorization_rootfs(fs: Path) -> list[str]:
 
 
 def audit_captive_commit_rootfs(fs: Path) -> list[str]:
-    """Enforce fail-closed Page 6 transaction ordering in the BUILT rootfs.
+    """Enforce verified rollback and Page 6 transaction ordering in built rootfs.
 
-    Static implementation gate only; external IP/MAC packet testing remains S5.
+    Static inspection only; actual NR3053 nft behavior still requires S5.
     """
     path = fs / "usr/lib/wiflow/portal-client"
     if not path.is_file():
         return ["captive transaction implementation missing from compiled rootfs"]
     source = path.read_text(encoding="utf-8", errors="replace")
+
+    helper_start = source.find("rollback_authorization_pair(){")
+    helper_end = source.find('\ncase "$mode" in', helper_start)
+    if helper_start < 0 or helper_end <= helper_start:
+        return ["captive authorization rollback owner missing"]
+    helper = source[helper_start:helper_end]
+    required_helper = (
+        'portal_nft_del "$rb_ip" "$rb_mac"',
+        'if ! portal_nft_pair_revoked "$rb_ip" "$rb_mac"; then',
+        '/usr/lib/wiflow/portal-firewall disable',
+        "state_set portal_error 'client_authorize_rollback_unverified'",
+        "state_set portal_error 'client_authorize_rollback_firewall_disable_failed'",
+    )
+    if any(x not in helper for x in required_helper):
+        return ["captive authorization rollback lacks positive nft readback/fail-closed"]
+    if not (helper.index('portal_nft_del "$rb_ip" "$rb_mac"') <
+            helper.index('if ! portal_nft_pair_revoked "$rb_ip" "$rb_mac"; then') <
+            helper.index('/usr/lib/wiflow/portal-firewall disable')):
+        return ["captive authorization rollback ordering unsafe"]
+
     start = source.find("\nauthorize-session)\n")
     end = source.find("\n    ;;\nrevoke-session)", start)
     if start == -1 or end <= start:
@@ -320,24 +340,34 @@ def audit_captive_commit_rootfs(fs: Path) -> list[str]:
     body = source[start:end]
     required = (
         'portal_nft_pair_granted "$ip" "$mac"',
-        'portal_nft_add "$ip" "$mac"',
+        'if ! portal_nft_add "$ip" "$mac"; then',
         'if ! portal_nft_pair_authorized "$ip" "$mac"; then',
         'if ! client_session_write "$f"',
-        'portal_nft_del "$ip" "$mac"',
-        '/usr/lib/wiflow/portal-firewall disable',
         'portal_nft_grant_del "$ip" "$mac"',
     )
     if any(x not in body for x in required):
-        return ["captive authorization rollback/commit guard missing"]
-    if not (body.index('portal_nft_add "$ip" "$mac"') <
+        return ["captive authorization commit checks missing"]
+    if body.count('rollback_authorization_pair "$ip" "$mac" "$sid"') != 3:
+        return ["captive failed nft add/readback/write lacks unified verified rollback"]
+    if not (body.index('if ! portal_nft_add "$ip" "$mac"; then') <
+            body.index('if ! portal_nft_pair_authorized "$ip" "$mac"; then') <
             body.index('if ! client_session_write "$f"') <
             body.index('portal_nft_grant_del "$ip" "$mac"')):
-        return ["captive grant consumed before authorized session persisted"]
-    failure = body[body.index('if ! client_session_write "$f"'):
-                   body.index('portal_nft_grant_del "$ip" "$mac"')]
-    if 'portal_nft_del "$ip" "$mac"' not in failure or "exit 7" not in failure:
-        return ["captive session write failure can leave a live nft authorization"]
+        return ["captive grant consumed before verified session persistence"]
+    sections = (
+        (body.index('if ! portal_nft_add "$ip" "$mac"; then'),
+         body.index('if ! portal_nft_pair_authorized "$ip" "$mac"; then'), "exit 5"),
+        (body.index('if ! portal_nft_pair_authorized "$ip" "$mac"; then'),
+         body.index('if ! client_session_write "$f"'), "exit 5"),
+        (body.index('if ! client_session_write "$f"'),
+         body.index('portal_nft_grant_del "$ip" "$mac"'), "exit 7"),
+    )
+    for left, right, exit_token in sections:
+        fragment = body[left:right]
+        if 'rollback_authorization_pair "$ip" "$mac" "$sid"' not in fragment or exit_token not in fragment:
+            return ["captive failed authorization path does not revoke before failure"]
     return []
+
 
 
 def audit_wp_ack_receipt_rootfs(fs: Path) -> list[str]:
