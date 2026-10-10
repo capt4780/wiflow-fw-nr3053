@@ -101,25 +101,39 @@ class ExplicitPortalDisableReportingTests(unittest.TestCase):
         self.assertEqual(log, ["firewall:disable"])
 
     def exercise_firewall_disable(self, *, orphan=False, rules=False,
-                                  table_ok=True, reload_ok=True, stale_after_reload=False):
+                                  table_ok=True, reload_ok=True, stale_after_reload=False,
+                                  wan_owner=False, table_recovers_on_reload=False):
         with tempfile.TemporaryDirectory(prefix="wiflow-firewall-disable-") as tmp:
             base = Path(tmp)
             if orphan:
                 (base / "orphan").touch()
             if rules:
                 (base / "captive.nft").write_text("test")
+            if wan_owner:
+                (base / "wan_owner").write_text("forwarding")
             script = r'''
 NFT_FILE="$TEST_ROOT/captive.nft"
 uci(){
  case "$1" in
- -q) return 1 ;;
+ -q)
+  if [ "$2" = get ] && [ "$3" = firewall.wiflow_guest_wan ]; then
+   [ -f "$TEST_ROOT/wan_owner" ]; return
+  fi
+  if [ "$2" = delete ] && [ "$3" = firewall.wiflow_guest_wan ]; then
+   if [ -f "$TEST_ROOT/wan_owner" ]; then
+    rm -f "$TEST_ROOT/wan_owner"
+    echo wan_owner_removed >> "$TEST_ROOT/log"
+   fi
+   return 0
+  fi
+  return 1 ;;
  commit) echo commit >> "$TEST_ROOT/log"; return 0 ;;
  esac
  return 0
 }
 nft_test(){
  if [ "$1" = list ] && [ "$2" = table ]; then
-  [ "$TABLE_OK" = 1 ]; return
+  [ "$TABLE_OK" = 1 ] || [ -f "$TEST_ROOT/recovered" ]; return
  fi
  [ -f "$TEST_ROOT/orphan" ]
 }
@@ -127,6 +141,7 @@ firewall_reload_test(){
  echo reload >> "$TEST_ROOT/log"
  [ "$RELOAD_OK" = 1 ] || return 1
  [ "$STALE" = 1 ] || rm -f "$TEST_ROOT/orphan"
+ [ "$RECOVER_TABLE" = 1 ] && touch "$TEST_ROOT/recovered"
  return 0
 }
 state_set(){ echo "error:$2" >> "$TEST_ROOT/log"; }
@@ -136,7 +151,8 @@ state_set(){ echo "error:$2" >> "$TEST_ROOT/log"; }
                 env={**os.environ, "TEST_ROOT": str(base),
                      "TABLE_OK": "1" if table_ok else "0",
                      "RELOAD_OK": "1" if reload_ok else "0",
-                     "STALE": "1" if stale_after_reload else "0"},
+                     "STALE": "1" if stale_after_reload else "0",
+                     "RECOVER_TABLE": "1" if table_recovers_on_reload else "0"},
             )
             log = (base / "log").read_text().splitlines() if (base / "log").exists() else []
             self.assertEqual(result.stderr, "")
@@ -161,6 +177,33 @@ state_set(){ echo "error:$2" >> "$TEST_ROOT/log"; }
         code, log = self.exercise_firewall_disable(table_ok=False)
         self.assertNotEqual(code, 0)
         self.assertIn("error:captive_disable_nft_unavailable", log)
+
+    def test_disable_absent_nft_with_stale_wan_owner_still_cleans_uci(self):
+        code, log = self.exercise_firewall_disable(
+            table_ok=False, wan_owner=True)
+        self.assertNotEqual(code, 0)
+        self.assertIn("wan_owner_removed", log)
+        self.assertLess(log.index("wan_owner_removed"), log.index("reload"))
+        self.assertIn("error:captive_disable_nft_unavailable", log)
+
+    def test_disable_absent_nft_with_generated_rule_cleans_before_reload(self):
+        code, log = self.exercise_firewall_disable(
+            table_ok=False, rules=True)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(log, ["commit", "reload",
+                               "error:captive_disable_nft_unavailable"])
+
+    def test_disable_unavailable_nft_recovers_after_removing_stale_wan_owner(self):
+        code, log = self.exercise_firewall_disable(
+            table_ok=False, wan_owner=True, table_recovers_on_reload=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(log, ["wan_owner_removed", "commit", "reload"])
+
+    def test_disable_healthy_nft_with_stale_wan_owner_cleans_once(self):
+        code, log = self.exercise_firewall_disable(
+            table_ok=True, wan_owner=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(log, ["wan_owner_removed", "commit", "reload"])
 
     def test_disable_firewall_reload_failure_propagates(self):
         code, log = self.exercise_firewall_disable(orphan=True, reload_ok=False)
