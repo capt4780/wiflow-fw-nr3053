@@ -25,18 +25,11 @@ record_services(){
     done
 }
 
-# Services not required by Wiflow's transport, Wi-Fi AP/uplink, DHCP/DNS,
-# firewall/NAT, captive portal, local UI, API/heartbeat or rescue access.
-# Keep core/recovery services such as network, dnsmasq, firewall, wpad/hostapd,
-# uhttpd, rpcd, dropbear, sysntpd, logd, ubus and procd untouched.
-OPTIONAL_SERVICES='\
-adblock adblock-fast banip sqm qos mwan3 ddns miniupnpd \
-samba samba4 ksmbd minidlna transmission aria2 collectd luci_statistics \
-dockerd tailscale zerotier openvpn nodogsplash opennds wifidog \
-travelmate umdns avahi-daemon p910nd vsftpd nfsd snmpd ttyd \
-odhcpd nlbwmon usteer wifischedule wifi-schedule vnstat vnstat2 \
-haproxy nginx lighttpd apache2 php8-fastcgi php7-fastcgi mosquitto \
-xinetd inetd'
+# Only competing captive-portal daemons are stopped automatically.
+# Other optional services (especially VPN, ttyd, remote access and diagnostics)
+# may be the owner's only recovery path on a single physical router.
+# Avoid silently disabling unrelated existing behavior.
+OPTIONAL_SERVICES='nodogsplash opennds wifidog'
 
 # Append state for services introduced by newer Wiflow versions instead of
 # replacing the existing rollback file. This preserves the true pre-Wiflow
