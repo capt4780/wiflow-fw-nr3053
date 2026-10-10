@@ -97,7 +97,13 @@ class NR3053StockPreflightTests(unittest.TestCase):
     def test_wrong_board_remains_blocked(self):
         data = self.evaluate(board="xiaomi,other", compatible=False)
         self.assertEqual(data["board_identity"][0], "BLOCK")
-        self.assertEqual(data["dt_compatible"][0], "WARN")
+        self.assertEqual(data["dt_compatible"][0], "BLOCK")
+
+    def test_expected_board_name_does_not_override_incompatible_device_tree(self):
+        data = self.evaluate(board="viettel,nr3053", compatible=False)
+        self.assertEqual(data["board_identity"][0], "PASS")
+        self.assertEqual(data["dt_compatible"], ("BLOCK", "nr3053_compatible_mismatch"))
+        self.assertEqual(data["first_flash_approval"][0], "BLOCK")
 
     def test_missing_board_mtd_and_os_are_explicitly_unknown(self):
         data = self.evaluate(board=None, compatible=None, release=False, mtd=False)
