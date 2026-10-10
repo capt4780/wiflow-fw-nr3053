@@ -141,11 +141,31 @@ revoke-session)
     trap 'release_session_lock' EXIT HUP INT TERM
     f="$(client_find_file_by_session "$sid" 2>/dev/null || true)"; [ -n "$f" ] && [ -f "$f" ] || exit 0
     IFS='|' read -r mac cid stored_sid ip connected authorized last absent < "$f" 2>/dev/null || exit 0
+    # Session revocation is fail-closed. A best-effort nft delete must not
+    # be reported as success while an authorized IP/MAC still forwards.
     portal_nft_del "$ip" "$mac"
+    now="$(date +%s)"
+    if ! portal_nft_ready || portal_nft_pair_authorized "$ip" "$mac"; then
+        /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+        # Never preserve an authorized session which could be auto-restored
+        # on the next firewall ensure after the emergency disable.
+        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" 0 "$now" "${absent:-0}" || rm -f "$f"
+        state_set portal_error 'client_revoke_unverified'
+        log_client_event revoke_failed "$sid" policy_revoke
+        exit 5
+    fi
     portal_nft_grant_del "$ip" "$mac"
-    now="$(date +%s)"; client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" 0 "$now" "${absent:-0}" || true
+    if ! client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" 0 "$now" "${absent:-0}"; then
+        # Authorization was removed, but a stale authorized record could
+        # later restore it. Fail closed and retire the unpersistable record.
+        /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+        rm -f "$f" 2>/dev/null || true
+        state_set portal_error 'client_revoke_persist_failed'
+        log_client_event revoke_failed "$sid" session_persist
+        exit 7
+    fi
     : > "$HEARTBEAT_KICK" 2>/dev/null || true
-    log_client_event revoked "$sid" ok
+    log_client_event revoked "$sid" verified
     ;;
 is-authorized)
     sid="$value"; f="$(client_find_file_by_session "$sid" 2>/dev/null || true)"; [ -n "$f" ] && [ -f "$f" ] || exit 1
