@@ -28,6 +28,7 @@ class PortalAuthPersistenceTests(unittest.TestCase):
             root = Path(tmp)
             session = root / "session"
             session.write_text("02:11:22:33:44:55|client1|abcdef1234567890abcdef12|10.10.10.101|10|0|20|0\n")
+            (root / "portal.json").write_text('{"revision":27}\n')
             script = r"""
 value=abcdef1234567890abcdef12
 expected_client=client1
@@ -35,7 +36,9 @@ HEARTBEAT_KICK="$TEST_ROOT/kick"
 EVENT_LOG="$TEST_ROOT/events"
 PAIR_FILE="$TEST_ROOT/authorized"
 TEST_SESSION="$TEST_ROOT/session"
+PORTAL_ACTIVE="$TEST_ROOT"
 LOG="$TEST_ROOT/log"
+uci(){ echo 1; }
 log_client_event(){ printf "log:%s\n" "$3" >> "$LOG"; }
 acquire_session_lock(){ return 0; }
 release_session_lock(){ :; }
