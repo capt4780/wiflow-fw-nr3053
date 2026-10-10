@@ -174,7 +174,7 @@ class GuestManagementGateTests(unittest.TestCase):
             self.assertEqual(audit_guest_gate_rootfs(fake), [])
             captive = fake / "usr/lib/wiflow/portal-firewall"
             source = captive.read_text()
-            for token in ("if captive_nft_objects_present; then changed=1; fi",
+            for token in ('if [ "$table_ready" = 1 ] && captive_nft_objects_present; then',
                           "state_set portal_error 'captive_disable_stale_nft_state'"):
                 with self.subTest(token=token):
                     captive.write_text(source.replace(token, ""))
