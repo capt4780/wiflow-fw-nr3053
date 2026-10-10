@@ -13,15 +13,20 @@ portal_reconcile_local(){
     /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1 || true
   fi
 
-  # Local-first invariant: once a valid snapshot exists, captive Portal stays
-  # active even if WP is temporarily unavailable or returns a transient flag.
-  # Unpair explicitly clears storage and disables captive via pairing_clear_local.
-  if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
-    if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" != 1 ]; then
-      uci set wiflow.core.portal_enabled='1'
-      uci commit wiflow >/dev/null 2>&1 || true
+  # Heartbeat owns the remote portal_enabled decision. A cached local
+  # snapshot must survive a WP outage, but its mere existence cannot
+  # override an explicit disable and re-open guest forwarding. In either
+  # state, reconcile firewall with the authoritative local enabled flag.
+  enabled="$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)"
+  if [ "$enabled" = 1 ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then
+    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 ||
+      state_set portal_error 'captive_firewall_enable_failed'
+  else
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 ||
+      state_set portal_error 'captive_firewall_disable_failed'
+    if [ "$enabled" = 1 ]; then
+      state_set portal_error 'snapshot_missing'
     fi
-    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || state_set portal_error 'captive_firewall_enable_failed'
   fi
 }
 
