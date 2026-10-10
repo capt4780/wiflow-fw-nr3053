@@ -303,10 +303,13 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
         'portal_nft_del "$oldip" "$mac"',
         'if ! client_session_write "$f"',
         'portal_nft_add "$ip" "$mac"',
-        'portal_nft_pair_authorized "$oldip" "$mac"',
+        'if ! portal_nft_pair_revoked "$oldip" "$mac"; then',
+        '/usr/lib/wiflow/portal-firewall disable',
     )
     required_b = (
         'portal_nft_del "$ip" "$mac"',
+        'if ! portal_nft_pair_revoked "$ip" "$mac"; then',
+        '/usr/lib/wiflow/portal-firewall disable',
         'if ! client_session_write "$f"',
         'portal_nft_add "$newip" "$mac"',
         'portal_nft_grant_add "$newip" "$mac"',
@@ -314,10 +317,14 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
     if any(x not in a for x in required_a) or any(x not in b for x in required_b):
         return ["guest DHCP rebind transaction guard incomplete"]
     if not (a.index('portal_nft_del "$oldip" "$mac"') <
+            a.index('if ! portal_nft_pair_revoked "$oldip" "$mac"; then') <
+            a.index('/usr/lib/wiflow/portal-firewall disable') <
             a.index('if ! client_session_write "$f"') <
             a.index('portal_nft_add "$ip" "$mac"')):
         return ["guest IP restore precedes local session persistence"]
     if not (b.index('portal_nft_del "$ip" "$mac"') <
+            b.index('if ! portal_nft_pair_revoked "$ip" "$mac"; then') <
+            b.index('/usr/lib/wiflow/portal-firewall disable') <
             b.index('if ! client_session_write "$f"') <
             b.index('portal_nft_add "$newip" "$mac"')):
         return ["session loop reauthorizes changed IP before persisting new session"]

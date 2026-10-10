@@ -47,6 +47,7 @@ portal_nft_del(){
  [ "$TEST_REVOKE_OK" = 0 ] || rm -f "$TEST_ROOT/old"
 }
 portal_nft_pair_authorized(){ [ -f "$TEST_ROOT/old" ]; }
+portal_nft_pair_revoked(){ [ "$TEST_NFT_READ_OK" = 1 ] && [ ! -f "$TEST_ROOT/old" ]; }
 portal_nft_pair_granted(){ [ "$TEST_GRANT" = 1 ]; }
 portal_nft_grant_del(){ printf "old_grant_del\n" >> "$LOG"; }
 portal_nft_grant_add(){ printf "new_grant_add\n" >> "$LOG"; }
@@ -63,7 +64,7 @@ fail_closed_disable(){ printf "firewall_disable\n" >> "$LOG"; rm -f "$TEST_ROOT/
 
 class GuestIPRebindConsistencyTests(unittest.TestCase):
     def invoke(self, kind="client", *, write_ok=True, revoke_ok=True,
-               authorized=True, had_grant=False):
+               authorized=True, had_grant=False, nft_read_ok=True):
         with tempfile.TemporaryDirectory(prefix="wiflow-rebind-") as temp:
             base = Path(temp)
             (base / "old").touch()
@@ -79,7 +80,8 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                 env={**os.environ, "TEST_ROOT": str(base),
                      "TEST_WRITE_OK": "1" if write_ok else "0",
                      "TEST_REVOKE_OK": "1" if revoke_ok else "0",
-                     "TEST_GRANT": "1" if had_grant else "0"},
+                     "TEST_GRANT": "1" if had_grant else "0",
+                     "TEST_NFT_READ_OK": "1" if nft_read_ok else "0"},
             )
             log = (base / "log").read_text().splitlines() if (base / "log").exists() else []
             self.assertEqual(proc.stderr, "", proc.stderr)
@@ -100,6 +102,18 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(events, ["old_revoke", "firewall_disable", "log:old_ip_revoke"])
 
+    def test_client_nft_read_error_must_fail_closed_even_after_delete(self):
+        code, events = self.invoke("client", nft_read_ok=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(events, ["old_revoke", "firewall_disable", "log:old_ip_revoke"])
+        self.assertNotIn("new_authorize", events)
+
+    def test_client_read_error_with_old_pair_present_must_fail_closed(self):
+        code, events = self.invoke("client", revoke_ok=False, nft_read_ok=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(events, ["old_revoke", "firewall_disable", "log:old_ip_revoke"])
+        self.assertNotIn("session_write", events)
+
     def test_session_loop_success_rebind_commits_before_nft_add(self):
         code, events = self.invoke("loop")
         self.assertEqual(code, 0)
@@ -110,6 +124,21 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(events, ["old_revoke", "session_write",
                                   "state_error:client_ip_state_write_failed"])
+
+    def test_session_loop_nft_read_error_must_fail_closed(self):
+        code, events = self.invoke("loop", nft_read_ok=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "firewall_disable",
+                                  "state_error:client_ip_old_authorization_revoke_failed"])
+        self.assertNotIn("new_authorize", events)
+        self.assertNotIn("session_write", events)
+
+    def test_session_loop_stale_pair_and_read_error_must_fail_closed(self):
+        code, events = self.invoke("loop", revoke_ok=False, nft_read_ok=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "firewall_disable",
+                                  "state_error:client_ip_old_authorization_revoke_failed"])
+        self.assertNotIn("new_authorize", events)
 
     def test_session_loop_preauthorization_grant_rebind_is_also_ordered(self):
         code, events = self.invoke("loop", authorized=False, had_grant=True)
@@ -137,6 +166,15 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
             client.write_text(CLIENT.replace(
                 'portal_nft_add "$ip" "$mac"',
                 'test_no_authorized_restore "$ip" "$mac"'))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+            client.write_text(CLIENT.replace(
+                'if ! portal_nft_pair_revoked "$oldip" "$mac"; then',
+                'if portal_nft_pair_authorized "$oldip" "$mac"; then'))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+            client.write_text(CLIENT)
+            loop.write_text(LOOP.replace(
+                'if ! portal_nft_pair_revoked "$ip" "$mac"; then',
+                'if portal_nft_pair_authorized "$ip" "$mac"; then'))
             self.assertTrue(audit_captive_rebind_rootfs(root))
             client.write_text(CLIENT)
             loop.write_text(LOOP.replace(

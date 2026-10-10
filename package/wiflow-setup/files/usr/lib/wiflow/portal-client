@@ -53,7 +53,7 @@ ensure)
         # session record is committed. Revoke any old IP/MAC rule first.
         if [ "${authorized:-0}" != 0 ] && [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then
             portal_nft_del "$oldip" "$mac"
-            if portal_nft_pair_authorized "$oldip" "$mac"; then
+            if ! portal_nft_pair_revoked "$oldip" "$mac"; then
                 /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
                 log_client_event policy_restore_failed "$sid" old_ip_revoke
                 exit 1
