@@ -607,6 +607,7 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
         "ensure_luci_ip || bootstrap_fail",
         "wait_for_guest_ip || bootstrap_fail",
         "configure_web || bootstrap_fail",
+        '/etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1',
     )
     if any(token not in src for token in required):
         return ["built bootstrap lacks management rollback or fail-closed checks"]
@@ -615,7 +616,9 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
         src.index("ensure_management_network || bootstrap_fail") <
         src.index("wait_for_management_ip || bootstrap_fail") <
         src.index("configure_web || bootstrap_fail") <
-        src.index("/usr/lib/wiflow/minimal-profile")
+        src.index("/usr/lib/wiflow/minimal-profile") <
+        src.index("\ncleanup_legacy_management_ips\n") <
+        src.index("command_result_set \"$cid\" \"$act\" success")
     ):
         return ["bootstrap may mutate network or minimize services before validation"]
     if not (
