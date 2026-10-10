@@ -67,11 +67,7 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="wiflow-rebind-") as temp:
             base = Path(temp)
             (base / "old").touch()
-            script = (
-                BASE_MOCKS
-                + ("authorized=0\n" if not authorized else "")
-                + ("else\n" + client_rebind() + "\n" if False else "")
-            )
+            script = BASE_MOCKS + ("authorized=0\n" if not authorized else "")
             if kind == "client":
                 # Real fragment from production portal-client's existing-session branch.
                 script += client_rebind()
