@@ -23,8 +23,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: nr3053-wiflow-public-experimental
-  cancel-in-progress: false
+  # One lane per PR/main ref. Superseded PR commits cannot monopolize CI.
+  # Release/main builds are never cancelled automatically.
+  group: nr3053-wiflow-public-experimental-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
