@@ -53,9 +53,9 @@ report board_identity PASS matching_nr3053_board
 
 compatible="$root/proc/device-tree/compatible"
 [ -r "$compatible" ] || block dt_compatible device_tree_missing
-tr '\\000' '\\n' < "$compatible" | grep -Fqx 'viettel,nr3053' ||
+tr '\000' '\n' < "$compatible" | grep -Fqx 'viettel,nr3053' ||
     block dt_compatible nr3053_not_in_device_tree
-tr '\\000' '\\n' < "$compatible" | grep -Fqx 'mediatek,mt7981' ||
+tr '\000' '\n' < "$compatible" | grep -Fqx 'mediatek,mt7981' ||
     block soc_compatible mt7981_not_in_device_tree
 report dt_compatible PASS matching_nr3053_dt
 report soc_compatible PASS matching_mt7981
