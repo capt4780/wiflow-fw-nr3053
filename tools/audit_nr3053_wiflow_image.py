@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "usr/lib/wiflow/portal-sync",
     "usr/lib/wiflow/portal-firewall",
     "usr/lib/wiflow/portal-client",
+    "usr/lib/wiflow/portal-mode-loop",
     "usr/lib/wiflow/heartbeat-loop",
     "etc/init.d/wiflow-setup",
     "etc/config/wiflow",
@@ -131,6 +132,30 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
         if token not in texts[key]:
             problems.append(f"guest Gate web/gating path missing: {key}: {token}")
     return problems
+
+
+def audit_portal_enable_owner_rootfs(fs: Path) -> list[str]:
+    """Reject compiled images whose local poller overrides remote Portal disable."""
+    path = fs / "usr/lib/wiflow/portal-mode-loop"
+    if not path.is_file():
+        return ["Portal mode owner missing from compiled rootfs"]
+    source = path.read_text(encoding="utf-8", errors="replace")
+    start = source.find("portal_reconcile_local(){")
+    end = source.find("\nwhile true; do", start)
+    if start < 0 or end <= start:
+        return ["Portal mode reconciliation function missing"]
+    body = source[start:end]
+    required = (
+        'enabled="$(uci -q get wiflow.core.portal_enabled',
+        'if [ "$enabled" = 1 ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then',
+        '/usr/lib/wiflow/portal-firewall ensure',
+        '/usr/lib/wiflow/portal-firewall disable',
+    )
+    if any(piece not in body for piece in required):
+        return ["Portal mode poller does not honor heartbeat-owned enable state"]
+    if 'uci set wiflow.core.portal_enabled' in body or 'uci commit wiflow' in body:
+        return ["Portal mode poller can override WordPress explicit disable"]
+    return []
 
 
 def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
@@ -464,6 +489,7 @@ def audit(path: Path) -> dict:
             if "tcp dport 8081 drop" not in luci_nft:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
+            issues.extend(audit_portal_enable_owner_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))
             issues.extend(audit_capport_tls_gate_rootfs(fs))
