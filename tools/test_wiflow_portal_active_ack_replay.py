@@ -32,7 +32,7 @@ def production_heartbeat_functions():
 
 
 class PortalActiveAckReplayTests(unittest.TestCase):
-    def invoke(self, failure=False):
+    def invoke(self, failure=False, server_reject=False):
         with tempfile.TemporaryDirectory(prefix="wiflow-ack-test-") as temp:
             path = Path(temp) / "ack.log"
             log = Path(temp) / "error.log"
@@ -43,7 +43,10 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 "WIFLOW_PORTAL_API=https://example.invalid/wiflow/wp-json/portal\n"
                 'PORTAL_ACK_CONFIRMED="$ACK_MARKER"\n'
                 "wiflow_post(){ printf '%s|%s\\n' \"$2\" \"$3\" >> \"$ACK_OUTPUT\"; "
+                'if [ "$ACK_REJECT" = 1 ]; then echo \'{"ok":false}\' > "$1"; '
+                'else echo \'{"ok":true}\' > "$1"; fi; '
                 '[ "$ACK_FAIL" = 0 ]; }\n'
+                'jsonfilter(){ grep -q \'"ok":true\' "$2" && echo true || echo false; }\n'
                 'logger(){ printf "%s\\n" "$*" >> "$ERROR_OUTPUT"; }\n'
                 + production_ack_function()
                 + "\nack_active_revision\nack_active_revision\n"
@@ -53,7 +56,8 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 capture_output=True, text=True, check=False, timeout=5,
                 env={**os.environ, "ACK_OUTPUT": str(path),
                      "ERROR_OUTPUT": str(log), "ACK_MARKER": str(marker),
-                     "ACK_FAIL": "1" if failure else "0"},
+                     "ACK_FAIL": "1" if failure else "0",
+                     "ACK_REJECT": "1" if server_reject else "0"},
             )
             self.assertEqual(proc.stdout, "")
             self.assertEqual(proc.stderr, "")
@@ -66,8 +70,8 @@ class PortalActiveAckReplayTests(unittest.TestCase):
                 self.assertEqual(json.loads(payload), {
                     "revision": 27, "status": "active", "data_generation": 4,
                 })
-            if failure:
-                self.assertFalse(marker.exists(), "a failed ACK must remain retryable")
+            if failure or server_reject:
+                self.assertFalse(marker.exists(), "a failed/rejected ACK must remain retryable")
             else:
                 self.assertEqual(marker.read_text(), "27\n")
             return log.read_text().splitlines() if log.exists() else []
@@ -115,6 +119,12 @@ class PortalActiveAckReplayTests(unittest.TestCase):
         for message in messages:
             self.assertIn("ack=retry_needed revision=27", message)
             self.assertNotIn("example.invalid", message)
+
+    def test_http_200_business_rejection_does_not_mark_ack_complete(self):
+        messages = self.invoke(server_reject=True)
+        self.assertEqual(len(messages), 2)
+        for message in messages:
+            self.assertIn("ack=retry_needed revision=27", message)
 
     def test_existing_revision_fast_path_replays_ack_before_return(self):
         begin = SOURCE.index('if [ "$current" -eq "$REV" ]')

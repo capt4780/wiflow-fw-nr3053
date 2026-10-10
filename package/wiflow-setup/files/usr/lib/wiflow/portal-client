@@ -88,14 +88,30 @@ authorize-session)
     if [ "${authorized:-0}" != 0 ] && portal_nft_pair_authorized "$ip" "$mac"; then exit 0; fi
     now="$(date +%s)"
     portal_nft_add "$ip" "$mac" || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
-    portal_nft_pair_authorized "$ip" "$mac" || { log_client_event authorize_failed "$sid" policy_verify; exit 5; }
-    portal_nft_grant_del "$ip" "$mac"
+    if ! portal_nft_pair_authorized "$ip" "$mac"; then
+        portal_nft_del "$ip" "$mac"
+        log_client_event authorize_failed "$sid" policy_verify
+        exit 5
+    fi
 
-    # Persist authorization before clearing stale captive NAT state so any
-    # immediate Android connectivity re-probe is recognized as authorized.
+    # A successful nft add is not enough: record the same authorization in
+    # the local session before consuming the pre-authorized grant. Otherwise
+    # a tmpfs/IO write failure could leave this client online with no
+    # corresponding authorized session. Fail closed and retain the grant
+    # so a subsequent confirmed request can safely retry.
     newly_authorized=0
     if [ "${authorized:-0}" = 0 ]; then authorized="$now"; newly_authorized=1; fi
-    client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0 || exit 1
+    if ! client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0; then
+        portal_nft_del "$ip" "$mac"
+        if portal_nft_pair_authorized "$ip" "$mac"; then
+            # Deletion of a live authorization must not fail open silently.
+            /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+            log_client_event authorize_failed "$sid" rollback_unverified
+        fi
+        log_client_event authorize_failed "$sid" persist
+        exit 7
+    fi
+    portal_nft_grant_del "$ip" "$mac"
 
     # A pre-auth HTTP probe may still have a conntrack/NAT entry redirected to
     # :2080. Remove it best-effort so the next probe is evaluated against the

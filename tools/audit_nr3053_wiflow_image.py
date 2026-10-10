@@ -163,6 +163,65 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
     return []
 
 
+def audit_captive_commit_rootfs(fs: Path) -> list[str]:
+    """Enforce fail-closed Page 6 transaction ordering in the BUILT rootfs.
+
+    Static implementation gate only; external IP/MAC packet testing remains S5.
+    """
+    path = fs / "usr/lib/wiflow/portal-client"
+    if not path.is_file():
+        return ["captive transaction implementation missing from compiled rootfs"]
+    source = path.read_text(encoding="utf-8", errors="replace")
+    start = source.find("\nauthorize-session)\n")
+    end = source.find("\n    ;;\nrevoke-session)", start)
+    if start == -1 or end <= start:
+        return ["captive authorization transaction branch missing"]
+    body = source[start:end]
+    required = (
+        'portal_nft_pair_granted "$ip" "$mac"',
+        'portal_nft_add "$ip" "$mac"',
+        'if ! portal_nft_pair_authorized "$ip" "$mac"; then',
+        'if ! client_session_write "$f"',
+        'portal_nft_del "$ip" "$mac"',
+        '/usr/lib/wiflow/portal-firewall disable',
+        'portal_nft_grant_del "$ip" "$mac"',
+    )
+    if any(x not in body for x in required):
+        return ["captive authorization rollback/commit guard missing"]
+    if not (body.index('portal_nft_add "$ip" "$mac"') <
+            body.index('if ! client_session_write "$f"') <
+            body.index('portal_nft_grant_del "$ip" "$mac"')):
+        return ["captive grant consumed before authorized session persisted"]
+    failure = body[body.index('if ! client_session_write "$f"'):
+                   body.index('portal_nft_grant_del "$ip" "$mac"')]
+    if 'portal_nft_del "$ip" "$mac"' not in failure or "exit 7" not in failure:
+        return ["captive session write failure can leave a live nft authorization"]
+    return []
+
+
+def audit_wp_ack_receipt_rootfs(fs: Path) -> list[str]:
+    """Do not mark WP active ACK on HTTP transport alone."""
+    path = fs / "usr/lib/wiflow/portal-sync"
+    if not path.is_file():
+        return ["Portal ACK replay implementation missing from compiled rootfs"]
+    source = path.read_text(encoding="utf-8", errors="replace")
+    start = source.find("ack_active_revision(){")
+    end = source.find("\nRESP=", start)
+    if start == -1 or end <= start:
+        return ["Portal ACK replay helper missing"]
+    body = source[start:end]
+    required = (
+        'wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack"',
+        'jsonfilter -i "$ack" -e \'@.ok\'',
+        '[ "$ack_ok" = true ] || [ "$ack_ok" = 1 ]',
+        'mv "$PORTAL_ACK_CONFIRMED.$$" "$PORTAL_ACK_CONFIRMED"',
+        'rm -f "$PORTAL_ACK_CONFIRMED"',
+    )
+    if any(x not in body for x in required):
+        return ["Portal ACK receipt can be marked without a confirmed WP response"]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -236,6 +295,8 @@ def audit(path: Path) -> dict:
                 issues.append("LuCI gated-backend deny missing")
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
+            issues.extend(audit_captive_commit_rootfs(fs))
+            issues.extend(audit_wp_ack_receipt_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
