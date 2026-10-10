@@ -33,14 +33,22 @@ esac
 
 compatible_path="$(path /proc/device-tree/compatible)"
 if [ -r "$compatible_path" ]; then
- if tr '\000' '\n' < "$compatible_path" 2>/dev/null | grep -Eq '^viettel,nr3053$'; then
+ # The pinned Golden device tree requires both the NR3053 board and MT7981 SoC.
+ # Only emit sanitized verdicts, never raw hardware strings.
+ compatible="$(tr '\000' '\n' < "$compatible_path" 2>/dev/null || true)"
+ if printf '%s\n' "$compatible" | grep -Fqx 'viettel,nr3053'; then
   report dt_compatible PASS nr3053_compatible_observed
  else
-  # An explicit, readable mismatch blocks acceptance; unknown remains WARN.
   report dt_compatible BLOCK nr3053_compatible_mismatch
+ fi
+ if printf '%s\n' "$compatible" | grep -Fqx 'mediatek,mt7981'; then
+  report soc_compatible PASS mt7981_compatible_observed
+ else
+  report soc_compatible BLOCK mt7981_compatible_mismatch
  fi
 else
  report dt_compatible WARN device_tree_compatible_unavailable
+ report soc_compatible WARN device_tree_compatible_unavailable
 fi
 
 if [ -r "$(path /etc/openwrt_release)" ]; then

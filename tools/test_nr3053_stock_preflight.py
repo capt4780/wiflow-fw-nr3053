@@ -27,10 +27,13 @@ class NR3053StockPreflightTests(unittest.TestCase):
             device_tree = root / "proc/device-tree"
             device_tree.mkdir(parents=True)
             if compatible is not None:
-                (device_tree / "compatible").write_bytes(
-                    b"viettel,nr3053\x00mediatek,mt7981\x00" if compatible
-                    else b"another,vendor\x00"
-                )
+                compatible_data = {
+                    True: b"viettel,nr3053\x00mediatek,mt7981\x00",
+                    False: b"another,vendor\x00",
+                    "wrong_soc": b"viettel,nr3053\x00mediatek,mt7986\x00",
+                    "wrong_board_right_soc": b"other,board\x00mediatek,mt7981\x00",
+                }
+                (device_tree / "compatible").write_bytes(compatible_data[compatible])
             if release:
                 osdir = root / "etc"
                 osdir.mkdir(exist_ok=True)
@@ -87,7 +90,7 @@ class NR3053StockPreflightTests(unittest.TestCase):
     def test_expected_stock_board_never_grants_flash_authorization(self):
         data = self.evaluate()
         for field in ("board_identity", "dt_compatible", "stock_os_metadata",
-                      "flash_partition_inventory"):
+                      "flash_partition_inventory", "soc_compatible"):
             self.assertEqual(data[field][0], "PASS")
         self.assertEqual(data["calibration_partition_hint"][0], "INFO")
         self.assertEqual(data["wiflow_installation"][0], "INFO")
@@ -98,17 +101,32 @@ class NR3053StockPreflightTests(unittest.TestCase):
         data = self.evaluate(board="xiaomi,other", compatible=False)
         self.assertEqual(data["board_identity"][0], "BLOCK")
         self.assertEqual(data["dt_compatible"][0], "BLOCK")
+        self.assertEqual(data["soc_compatible"][0], "BLOCK")
 
     def test_expected_board_name_does_not_override_incompatible_device_tree(self):
         data = self.evaluate(board="viettel,nr3053", compatible=False)
         self.assertEqual(data["board_identity"][0], "PASS")
         self.assertEqual(data["dt_compatible"], ("BLOCK", "nr3053_compatible_mismatch"))
+        self.assertEqual(data["soc_compatible"][0], "BLOCK")
+        self.assertEqual(data["first_flash_approval"][0], "BLOCK")
+
+    def test_valid_nr3053_marker_with_incompatible_soc_is_blocked(self):
+        data = self.evaluate(compatible="wrong_soc")
+        self.assertEqual(data["board_identity"][0], "PASS")
+        self.assertEqual(data["dt_compatible"][0], "PASS")
+        self.assertEqual(data["soc_compatible"], ("BLOCK", "mt7981_compatible_mismatch"))
+        self.assertEqual(data["first_flash_approval"][0], "BLOCK")
+
+    def test_mt7981_soc_alone_does_not_satisfy_nr3053_board(self):
+        data = self.evaluate(compatible="wrong_board_right_soc")
+        self.assertEqual(data["dt_compatible"][0], "BLOCK")
+        self.assertEqual(data["soc_compatible"][0], "PASS")
         self.assertEqual(data["first_flash_approval"][0], "BLOCK")
 
     def test_missing_board_mtd_and_os_are_explicitly_unknown(self):
         data = self.evaluate(board=None, compatible=None, release=False, mtd=False)
         for field in ("board_identity", "dt_compatible", "stock_os_metadata",
-                      "flash_partition_inventory", "calibration_partition_hint"):
+                      "flash_partition_inventory", "calibration_partition_hint", "soc_compatible"):
             self.assertEqual(data[field][0], "WARN")
 
     def test_missing_named_calibration_partition_is_warning(self):
