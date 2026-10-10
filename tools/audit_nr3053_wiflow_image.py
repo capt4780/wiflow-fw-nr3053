@@ -583,6 +583,75 @@ def audit_captive_revoke_rootfs(fs: Path) -> list[str]:
     return []
 
 
+def audit_management_recovery_rootfs(fs: Path) -> list[str]:
+    """Enforce compiled firstboot's management fail-closed owner, not just source tests.
+
+    Static gate only: a passing image cannot prove physical recovery.
+    """
+    bootstrap = fs / "usr/lib/wiflow/bootstrap"
+    service = fs / "etc/init.d/wiflow-setup"
+    profile = fs / "usr/lib/wiflow/minimal-profile"
+    common = fs / "usr/lib/wiflow/common.sh"
+    if not bootstrap.is_file() or not service.is_file() or not profile.is_file() or not common.is_file():
+        return ["management recovery boot scripts missing"]
+    src = bootstrap.read_text(encoding="utf-8", errors="replace")
+    init = service.read_text(encoding="utf-8", errors="replace")
+    minimal = profile.read_text(encoding="utf-8", errors="replace")
+    common_src = common.read_text(encoding="utf-8", errors="replace")
+    if "OPTIONAL_SERVICES='nodogsplash opennds wifidog'" not in minimal:
+        return ["unrelated management/recovery services may be disabled on firstboot"]
+    required = (
+        "backup_stock_configs(){",
+        "rollback_stock_configs(){",
+        'cp "$b/$f" "/etc/config/$f" || return 1',
+        'bootstrap_fail(){',
+        'log "BOOTSTRAP_BLOCK: $reason"',
+        'log "BOOTSTRAP_ROLLBACK_FAILED: recovery access not guaranteed"',
+        "backup_stock_configs || { log 'BOOTSTRAP_BLOCK:",
+        "ensure_management_network || bootstrap_fail",
+        "wait_for_management_ip || bootstrap_fail",
+        "ensure_luci_ip || bootstrap_fail",
+        "wait_for_guest_ip || bootstrap_fail",
+        "configure_web || bootstrap_fail",
+        "ensure_guest_network || bootstrap_fail",
+        "ensure_uplink_network || bootstrap_fail",
+        "tune_wiflow_runtime || bootstrap_fail",
+        "uci -q get uhttpd.main.listen_http >/dev/null 2>&1 && return 1",
+        "uci -q get uhttpd.main.listen_https >/dev/null 2>&1 && return 1",
+        "bootstrap_fail 'captive firewall activation failed'",
+        "bootstrap_fail 'captive firewall disable failed'",
+        '/etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1',
+    )
+    if any(token not in src for token in required):
+        return ["built bootstrap lacks management rollback or fail-closed checks"]
+    common_required = (
+        "uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && return 1",
+        "uci commit network >/dev/null 2>&1 || return 1",
+        "uci commit dhcp >/dev/null 2>&1 || return 1",
+        "uci set firewall.wiflow_guest.forward='REJECT' || return 1",
+        "uci set network.wiflow_guest.ipaddr='10.10.10.1' || return 1",
+    )
+    if any(token not in common_src for token in common_required):
+        return ["built common UCI owner lacks guest/uplink fail-closed checks"]
+    if not (
+        src.index("backup_stock_configs ||") <
+        src.index("ensure_management_network || bootstrap_fail") <
+        src.index("wait_for_management_ip || bootstrap_fail") <
+        src.index("configure_web || bootstrap_fail") <
+        src.index("/usr/lib/wiflow/minimal-profile") <
+        src.index("\ncleanup_legacy_management_ips\n") <
+        src.index("command_result_set \"$cid\" \"$act\" success")
+    ):
+        return ["bootstrap may mutate network or minimize services before validation"]
+    if not (
+        "if ! /usr/lib/wiflow/bootstrap" in init and
+        "return 1" in init and
+        init.index("return 1") < init.index("procd_open_instance heartbeat")
+    ):
+        return ["service may start Portal loops despite failed management bootstrap"]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -657,6 +726,7 @@ def audit(path: Path) -> dict:
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_portal_enable_owner_rootfs(fs))
             issues.extend(audit_bootstrap_remote_disable_rootfs(fs))
+            issues.extend(audit_management_recovery_rootfs(fs))
             issues.extend(audit_portal_disable_reporting_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))

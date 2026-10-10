@@ -16,19 +16,60 @@ ensure_device_id(){
     printf 'WIFDID-NR3053-%06d\n' "$pin" > "$ROOT/device-id"
     chmod 600 "$ROOT/device-id"
 }
+# On-device configuration snapshot is only a bootstrap rollback aid.
+# It is NOT an off-device Factory backup or bootloader firmware recovery.
 backup_stock_configs(){
     b="$ROOT/stock"
-    [ -f "$b/.complete" ] && return 0
+    if [ -e "$b/.complete" ]; then
+        for f in network wireless firewall dhcp uhttpd; do
+            [ -f "$b/$f" ] || return 1
+        done
+        return 0
+    fi
     mkdir -p "$b" || return 1
-    for f in network wireless firewall dhcp uhttpd; do [ -f "/etc/config/$f" ] && cp "/etc/config/$f" "$b/$f" 2>/dev/null || true; done
-    : > "$b/.complete"; chmod -R go-rwx "$b" 2>/dev/null || true
+    chmod 700 "$b" || return 1
+    for f in network wireless firewall dhcp uhttpd; do
+        [ -f "/etc/config/$f" ] || return 1
+        cp "/etc/config/$f" "$b/$f" || return 1
+        chmod 600 "$b/$f" || return 1
+    done
+    : > "$b/.complete" || return 1
+    chmod 600 "$b/.complete" || return 1
+}
+rollback_stock_configs(){
+    b="$ROOT/stock"
+    [ -f "$b/.complete" ] || return 1
+    for f in network wireless firewall dhcp uhttpd; do
+        [ -f "$b/$f" ] || return 1
+    done
+    # Verify every backup before overwriting any live configuration.
+    for f in network wireless firewall dhcp uhttpd; do
+        cp "$b/$f" "/etc/config/$f" || return 1
+    done
+    /etc/init.d/network reload >/dev/null 2>&1 || return 1
+    /etc/init.d/dnsmasq restart >/dev/null 2>&1 || return 1
+    /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
+    /etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1
+    wifi reload >/dev/null 2>&1 || return 1
+}
+bootstrap_fail(){
+    reason="$1"
+    log "BOOTSTRAP_BLOCK: $reason"
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 ||
+        log "BOOTSTRAP_BLOCK: guest firewall disable failed"
+    if rollback_stock_configs; then
+        log "BOOTSTRAP_ROLLBACK: configuration restored; operator inspection required"
+    else
+        log "BOOTSTRAP_ROLLBACK_FAILED: recovery access not guaranteed"
+    fi
+    exit 1
 }
 ensure_management_network(){
     uci -q get network.lan >/dev/null 2>&1 || return 1
-    uci set network.lan.proto='static'
-    uci set network.lan.ipaddr='10.0.0.1'
-    uci set network.lan.netmask='255.255.255.0'
-    uci set network.lan.delegate='0'
+    uci set network.lan.proto='static' || return 1
+    uci set network.lan.ipaddr='10.0.0.1' || return 1
+    uci set network.lan.netmask='255.255.255.0' || return 1
+    uci set network.lan.delegate='0' || return 1
     uci -q delete network.lan.ip6assign >/dev/null 2>&1 || true
     uci -q delete network.lan.ip6hint >/dev/null 2>&1 || true
     uci -q delete network.lan.ip6ifaceid >/dev/null 2>&1 || true
@@ -55,48 +96,51 @@ configure_web(){
     # protected by the six-digit Wiflow Security Gate at 10.0.0.2:80.
     uci -q delete uhttpd.main.listen_http >/dev/null 2>&1 || true
     uci -q delete uhttpd.main.listen_https >/dev/null 2>&1 || true
+    # Old non-gated web listeners must be absent, even if UCI delete failed.
+    uci -q get uhttpd.main.listen_http >/dev/null 2>&1 && return 1
+    uci -q get uhttpd.main.listen_https >/dev/null 2>&1 && return 1
     uci add_list uhttpd.main.listen_http='10.0.0.2:8081' || return 1
 
     uci -q delete uhttpd.wiflow_luci_gate >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow_luci_gate='uhttpd'
-    uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80'
-    uci set uhttpd.wiflow_luci_gate.home='/www-wiflow-luci-gate'
-    uci set uhttpd.wiflow_luci_gate.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow_luci_gate.index_page='index.html'
-    uci set uhttpd.wiflow_luci_gate.script_timeout='10'
-    uci set uhttpd.wiflow_luci_gate.network_timeout='5'
-    uci set uhttpd.wiflow_luci_gate.http_keepalive='5'
-    uci set uhttpd.wiflow_luci_gate.max_requests='2'
-    uci set uhttpd.wiflow_luci_gate.max_connections='8'
+    uci set uhttpd.wiflow_luci_gate='uhttpd' || return 1
+    uci add_list uhttpd.wiflow_luci_gate.listen_http='10.0.0.2:80' || return 1
+    uci set uhttpd.wiflow_luci_gate.home='/www-wiflow-luci-gate' || return 1
+    uci set uhttpd.wiflow_luci_gate.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow_luci_gate.index_page='index.html' || return 1
+    uci set uhttpd.wiflow_luci_gate.script_timeout='10' || return 1
+    uci set uhttpd.wiflow_luci_gate.network_timeout='5' || return 1
+    uci set uhttpd.wiflow_luci_gate.http_keepalive='5' || return 1
+    uci set uhttpd.wiflow_luci_gate.max_requests='2' || return 1
+    uci set uhttpd.wiflow_luci_gate.max_connections='8' || return 1
 
     uci -q delete uhttpd.wiflow >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow='uhttpd'
-    uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80'
-    uci set uhttpd.wiflow.home='/www-wiflow'
-    uci set uhttpd.wiflow.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow.index_page='index.html'
-    uci set uhttpd.wiflow.script_timeout='20'
-    uci set uhttpd.wiflow.network_timeout='10'
-    uci set uhttpd.wiflow.http_keepalive='10'
-    uci set uhttpd.wiflow.max_requests='4'
-    uci set uhttpd.wiflow.max_connections='20'
+    uci set uhttpd.wiflow='uhttpd' || return 1
+    uci add_list uhttpd.wiflow.listen_http='10.0.0.1:80' || return 1
+    uci set uhttpd.wiflow.home='/www-wiflow' || return 1
+    uci set uhttpd.wiflow.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow.index_page='index.html' || return 1
+    uci set uhttpd.wiflow.script_timeout='20' || return 1
+    uci set uhttpd.wiflow.network_timeout='10' || return 1
+    uci set uhttpd.wiflow.http_keepalive='10' || return 1
+    uci set uhttpd.wiflow.max_requests='4' || return 1
+    uci set uhttpd.wiflow.max_connections='20' || return 1
 
     uci -q delete uhttpd.wiflow_portal >/dev/null 2>&1 || true
-    uci set uhttpd.wiflow_portal='uhttpd'
-    uci add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080'
-    uci set uhttpd.wiflow_portal.home='/www-wiflow-portal'
-    uci set uhttpd.wiflow_portal.cgi_prefix='/cgi-bin'
-    uci add_list uhttpd.wiflow_portal.index_page='index.html'
-    uci set uhttpd.wiflow_portal.error_page='/cgi-bin/portal'
-    uci set uhttpd.wiflow_portal.rfc1918_filter='0'
-    uci set uhttpd.wiflow_portal.script_timeout='10'
-    uci set uhttpd.wiflow_portal.network_timeout='5'
-    uci set uhttpd.wiflow_portal.http_keepalive='5'
-    uci set uhttpd.wiflow_portal.max_requests='4'
-    uci set uhttpd.wiflow_portal.max_connections='24'
+    uci set uhttpd.wiflow_portal='uhttpd' || return 1
+    uci add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080' || return 1
+    uci set uhttpd.wiflow_portal.home='/www-wiflow-portal' || return 1
+    uci set uhttpd.wiflow_portal.cgi_prefix='/cgi-bin' || return 1
+    uci add_list uhttpd.wiflow_portal.index_page='index.html' || return 1
+    uci set uhttpd.wiflow_portal.error_page='/cgi-bin/portal' || return 1
+    uci set uhttpd.wiflow_portal.rfc1918_filter='0' || return 1
+    uci set uhttpd.wiflow_portal.script_timeout='10' || return 1
+    uci set uhttpd.wiflow_portal.network_timeout='5' || return 1
+    uci set uhttpd.wiflow_portal.http_keepalive='5' || return 1
+    uci set uhttpd.wiflow_portal.max_requests='4' || return 1
+    uci set uhttpd.wiflow_portal.max_connections='24' || return 1
     uci commit uhttpd || return 1
-    /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
-    /etc/init.d/firewall reload >/dev/null 2>&1 || true
+    /etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1
+    /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
 
     i=0
     while [ "$i" -lt 10 ]; do
@@ -106,27 +150,20 @@ configure_web(){
     return 1
 }
 
-wait_for_br_lan || { log 'br-lan unavailable'; exit 0; }
-/usr/lib/wiflow/minimal-profile >/dev/null 2>&1 || log 'Minimal runtime profile could not be fully applied'
+wait_for_br_lan || { log 'BOOTSTRAP_BLOCK: br-lan unavailable'; exit 1; }
 ensure_device_id
-if [ "$(uci -q get wiflow.core.last_command_status 2>/dev/null || true)" = rebooting ]; then
-    cid="$(uci -q get wiflow.core.last_command_id 2>/dev/null || true)"
-    act="$(uci -q get wiflow.core.last_command_action 2>/dev/null || echo reboot)"
-    [ -n "$cid" ] && command_result_set "$cid" "$act" success 'Thiết bị đã khởi động lại' || true
-fi
-backup_stock_configs || log 'Could not save stock configuration backup'
+backup_stock_configs || { log 'BOOTSTRAP_BLOCK: incomplete stock configuration backup'; exit 1; }
 recover_uplink_transaction && log 'Recovered interrupted uplink transaction' || true
-ensure_management_network || log 'Could not update LAN management subnet'
-ensure_guest_network
-ensure_uplink_network
-tune_wiflow_runtime
-ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || true
-wait_for_management_ip || log 'Management IP 10.0.0.1 not confirmed'
-ensure_luci_ip || log 'LuCI IP 10.0.0.2/32 not confirmed'
-cleanup_legacy_management_ips
-wait_for_guest_ip || log 'Guest IP 10.10.10.1 not confirmed'
-/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
-/etc/init.d/firewall reload >/dev/null 2>&1 || true
+ensure_management_network || bootstrap_fail 'management LAN configuration failed'
+ensure_guest_network || bootstrap_fail 'guest UCI configuration failed'
+ensure_uplink_network || bootstrap_fail 'uplink UCI configuration failed'
+tune_wiflow_runtime || bootstrap_fail 'runtime UCI configuration failed'
+ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || bootstrap_fail 'network reload failed'
+wait_for_management_ip || bootstrap_fail 'management IP 10.0.0.1 not confirmed'
+ensure_luci_ip || bootstrap_fail 'LuCI IP 10.0.0.2/32 not confirmed'
+wait_for_guest_ip || bootstrap_fail 'guest IP 10.10.10.1 not confirmed'
+/etc/init.d/dnsmasq restart >/dev/null 2>&1 || bootstrap_fail 'dnsmasq restart failed'
+/etc/init.d/firewall reload >/dev/null 2>&1 || bootstrap_fail 'firewall reload failed'
 secure_configs
 # The last confirmed remote enable/disable state is authoritative across
 # reboots. An existing cached snapshot does not override an explicit WP
@@ -134,7 +171,7 @@ secure_configs
 saved_portal_enabled="$(uci -q get wiflow.core.portal_enabled 2>/dev/null || true)"
 if [ "$saved_portal_enabled" = 1 ] && [ -f "$PORTAL_ACTIVE/portal.json" ]; then
     /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 ||
-        log 'Captive portal firewall could not be enabled'
+        bootstrap_fail 'captive firewall activation failed'
 else
     # Missing snapshot is fail-closed even if a stale enabled flag survived.
     # Do not write UCI flash repeatedly for an already disabled Portal.
@@ -143,7 +180,7 @@ else
         uci commit wiflow >/dev/null 2>&1 || log 'Could not persist disabled Portal state'
     fi
     /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 ||
-        log 'Captive portal firewall could not be disabled'
+        bootstrap_fail 'captive firewall disable failed'
 fi
 uplink_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
 uplink_ssid="$(uci -q get wireless.wiflow_uplink.ssid 2>/dev/null || true)"
@@ -154,6 +191,14 @@ else
     /usr/lib/wiflow/radio-policy setup >/dev/null 2>&1 || log 'Initial radio policy could not be applied'
 fi
 wifi reload >/dev/null 2>&1 || true
-if configure_web; then log 'Wiflow Setup active on 10.0.0.1; Security Gate on 10.0.0.2:80; LuCI on 10.0.0.2:8081'; else log 'Wiflow web listener configuration failed'; fi
+configure_web || bootstrap_fail 'management web listeners not confirmed'
+/usr/lib/wiflow/minimal-profile >/dev/null 2>&1 || log 'Minimal runtime profile could not be fully applied'
+cleanup_legacy_management_ips
+if [ "$(uci -q get wiflow.core.last_command_status 2>/dev/null || true)" = rebooting ]; then
+    cid="$(uci -q get wiflow.core.last_command_id 2>/dev/null || true)"
+    act="$(uci -q get wiflow.core.last_command_action 2>/dev/null || echo reboot)"
+    [ -n "$cid" ] && command_result_set "$cid" "$act" success 'Thiết bị đã khởi động lại' || true
+fi
+log 'Wiflow Setup active on 10.0.0.1; Security Gate on 10.0.0.2:80; LuCI on 10.0.0.2:8081'
 rm -f /etc/wiflow/reboot-required >/dev/null 2>&1 || true
 exit 0

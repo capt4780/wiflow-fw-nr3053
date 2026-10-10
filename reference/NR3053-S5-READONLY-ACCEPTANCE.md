@@ -5,6 +5,41 @@ flash, configure, restart services, authorize guest Internet, or recover hardwar
 Its automated report always ends with **e5_complete=BLOCK** and
 **flash_authorization=BLOCK** until independent lab acceptance is documented.
 
+## Single-router risk gate (ProjifyLab v5)
+
+The owner has **only one NR3053**. Passing the host/source CI does not justify
+testing its only bootable NAND image. In particular:
+
+1. Preserve the owner's previously supplied `nr3053-source-fingerprint.txt`
+   (2026-10-07) as **observed device evidence** for board, device tree, MTD
+   partition names/sizes, UBI `fit` and `rootfs_data`, and the Factory
+   *hash*. Do **not** repeatedly ask to recapture those known facts.
+   A Factory hash does **not** constitute an off-device calibration backup.
+2. A software snapshot in `/etc/wiflow/stock` is taken after booting the
+   **new** firmware and only helps reverse its own startup UCI changes.
+   This is not an image of the previous operating system, bootloader,
+   Factory partition or EEPROM. Depending on sysupgrade's *keep settings*
+   choice, it may also lack the previous router's private configuration.
+3. P46 management-bootstrap recovery is a **best-effort** OS-level mechanism:
+   failure can leave different management IPs active, the rollback service
+   restart can itself fail, and no shell script runs if kernel/rootfs fails
+   before procd. Do not equate P46 host tests with a guaranteed recovery.
+4. **Before LuCI upload/upgrade**: an independently stored and independently
+   validated backup of device-specific partitions, a privately documented
+   UART/bootloader or equivalent hardware recovery and a tested original
+   firmware restore procedure are required. Only authorized personnel should
+   handle raw Factory/calibration data. Keep them out of public GitHub/chat.
+5. Verify the exact candidate digest and source revision, stock-firmware
+   `sysupgrade -T` image acceptance without writing flash, the FIT/UBI
+   upgrade method, and one reviewed `keep settings` policy. Never override
+   compatibility rejection with `-F`/Force Flash.
+6. If any recovery evidence is missing, first-flash authorization is
+   **BLOCK**, regardless of a new successful image build or 100% host CI.
+   With one router and no proven physical rescue, use a second identical lab
+   unit instead of risking the only unit.
+
+A successful P46 source patch is not a waiver of any of these conditions.
+
 ## Actual starting state — S5-A before the first Wiflow flash
 
 **As confirmed by the owner on 2026-10-10: no NR3053 has Wiflow installed or running.** The current devices are on their existing/stock firmware. It is **incorrect** to ask the owner to run `nr3053-s5-readonly.sh` against a device already running Wiflow; no such device exists. A hosted Wiflow FIT build cannot establish device-runtime E5 PASS.
