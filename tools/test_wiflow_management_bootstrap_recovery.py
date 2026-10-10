@@ -30,7 +30,7 @@ def isolated_production_functions() -> str:
 
 
 class ManagementBootstrapRollbackTests(unittest.TestCase):
-    def run_case(self, action, missing=None, tamper=None, service_ok=True):
+    def run_case(self, action, missing=None, service_ok=True):
         with tempfile.TemporaryDirectory(prefix="wiflow-p46-") as tmp:
             root = Path(tmp)
             cfg = root / "etc" / "config"
@@ -121,7 +121,7 @@ rollback_stock_configs
 
     def test_minimal_profile_keeps_independent_rescue_services(self):
         self.assertIn("OPTIONAL_SERVICES='nodogsplash opennds wifidog'", MINIMAL)
-        optional = MINIMAL.split("OPTIONAL_SERVICES=", 1)[1].split("\\n", 1)[0]
+        optional = MINIMAL.split("OPTIONAL_SERVICES=", 1)[1].splitlines()[0]
         for rescue in ("tailscale", "zerotier", "openvpn", "ttyd", "nginx"):
             self.assertNotIn(rescue, optional)
 
