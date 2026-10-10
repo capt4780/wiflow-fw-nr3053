@@ -327,6 +327,54 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
     return []
 
 
+
+def audit_captive_revoke_rootfs(fs: Path) -> list[str]:
+    """Compiled image must verify guest authorization removal before retiring sessions."""
+    client = fs / "usr/lib/wiflow/portal-client"
+    loop = fs / "usr/lib/wiflow/portal-session-loop"
+    if not client.is_file() or not loop.is_file():
+        return ["captive revoke runtime missing from compiled rootfs"]
+    a = client.read_text(encoding="utf-8", errors="replace")
+    b = loop.read_text(encoding="utf-8", errors="replace")
+    ai = a.find("\nrevoke-session)\n")
+    ae = a.find("\n    ;;\nis-authorized)", ai)
+    bi = b.find('if [ "$elapsed" -ge "$DISCONNECT_GRACE" ]; then')
+    be = b.find('\n            else\n                client_session_write', bi)
+    if min(ai, ae, bi, be) < 0 or ae <= ai or be <= bi:
+        return ["captive revoke/disconnect branch missing"]
+    a = a[ai:ae]
+    b = b[bi:be]
+    required_a = (
+        'portal_nft_del "$ip" "$mac"',
+        'if ! portal_nft_ready || portal_nft_pair_authorized "$ip" "$mac"; then',
+        '/usr/lib/wiflow/portal-firewall disable',
+        "state_set portal_error 'client_revoke_unverified'",
+        'if ! client_session_write "$f"',
+        "state_set portal_error 'client_revoke_persist_failed'",
+    )
+    required_b = (
+        'portal_nft_del "$ip" "$mac"',
+        'if ! portal_nft_ready || portal_nft_pair_authorized "$ip" "$mac"; then',
+        '/usr/lib/wiflow/portal-firewall disable',
+        "state_set portal_error 'client_disconnect_revoke_unverified'",
+        'continue',
+        'rm -f "$f"',
+    )
+    if any(x not in a for x in required_a) or any(x not in b for x in required_b):
+        return ["guest revocation must fail closed on nft verify/persistence failure"]
+    if not (a.index('portal_nft_del "$ip" "$mac"') <
+            a.index('if ! portal_nft_ready || portal_nft_pair_authorized') <
+            a.index('portal_nft_grant_del "$ip" "$mac"') <
+            a.index('log_client_event revoked "$sid" verified')):
+        return ["guest revoke marks success before verifying nft removal"]
+    if not (b.index('portal_nft_del "$ip" "$mac"') <
+            b.index('if ! portal_nft_ready || portal_nft_pair_authorized') <
+            b.index('portal_nft_grant_del "$ip" "$mac"') <
+            b.index('rm -f "$f"')):
+        return ["guest disconnect retires session before verifying nft removal"]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -405,6 +453,7 @@ def audit(path: Path) -> dict:
             issues.extend(audit_captive_commit_rootfs(fs))
             issues.extend(audit_wp_ack_receipt_rootfs(fs))
             issues.extend(audit_captive_rebind_rootfs(fs))
+            issues.extend(audit_captive_revoke_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
