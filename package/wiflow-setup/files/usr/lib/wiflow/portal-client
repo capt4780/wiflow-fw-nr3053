@@ -49,11 +49,23 @@ ensure)
         event_enqueue connected "$cid" "$sid" "$now" || true
         log_client_event connected "$sid" ok
     else
+        # On DHCP IP rebind, never authorize a new IP before its matching
+        # session record is committed. Revoke any old IP/MAC rule first.
+        if [ "${authorized:-0}" != 0 ] && [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then
+            portal_nft_del "$oldip" "$mac"
+            if portal_nft_pair_authorized "$oldip" "$mac"; then
+                /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+                log_client_event policy_restore_failed "$sid" old_ip_revoke
+                exit 1
+            fi
+        fi
+        if ! client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0; then
+            log_client_event policy_restore_failed "$sid" session_persist
+            exit 1
+        fi
         if [ "${authorized:-0}" != 0 ]; then
-            [ -z "$oldip" ] || [ "$oldip" = "$ip" ] || portal_nft_del "$oldip" "$mac"
             if ! portal_nft_add "$ip" "$mac"; then log_client_event policy_restore_failed "$sid" nft; fi
         fi
-        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0 || exit 1
     fi
 
     # Stage 3 is a REAL router-side grant. Validate WAN + captive firewall,
