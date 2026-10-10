@@ -140,16 +140,53 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                                   "state_error:client_ip_old_authorization_revoke_failed"])
         self.assertNotIn("new_authorize", events)
 
+    def test_client_unauthorized_rebind_retires_stale_nft_pair(self):
+        code, events = self.invoke("client", authorized=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "session_write"])
+        self.assertNotIn("new_authorize", events)
+
+    def test_client_unauthorized_old_pair_write_failure_is_fail_closed(self):
+        code, events = self.invoke("client", authorized=False, revoke_ok=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(events, ["old_revoke", "firewall_disable", "log:old_ip_revoke"])
+        self.assertNotIn("session_write", events)
+
+    def test_client_unauthorized_old_pair_read_error_is_fail_closed(self):
+        code, events = self.invoke("client", authorized=False, nft_read_ok=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(events, ["old_revoke", "firewall_disable", "log:old_ip_revoke"])
+
+    def test_session_loop_unauthorized_rebind_retires_stale_nft_pair(self):
+        code, events = self.invoke("loop", authorized=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "session_write"])
+        self.assertNotIn("new_authorize", events)
+
+    def test_session_loop_unauthorized_old_pair_write_failure_is_fail_closed(self):
+        code, events = self.invoke("loop", authorized=False, revoke_ok=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "firewall_disable",
+                                  "state_error:client_ip_old_authorization_revoke_failed"])
+        self.assertNotIn("session_write", events)
+
+    def test_session_loop_unauthorized_old_pair_read_error_is_fail_closed(self):
+        code, events = self.invoke("loop", authorized=False, nft_read_ok=False)
+        self.assertEqual(code, 0)
+        self.assertEqual(events, ["old_revoke", "firewall_disable",
+                                  "state_error:client_ip_old_authorization_revoke_failed"])
+        self.assertNotIn("session_write", events)
+
     def test_session_loop_preauthorization_grant_rebind_is_also_ordered(self):
         code, events = self.invoke("loop", authorized=False, had_grant=True)
         self.assertEqual(code, 0)
-        self.assertEqual(events, ["old_grant_del", "session_write", "new_grant_add"])
+        self.assertEqual(events, ["old_revoke", "old_grant_del", "session_write", "new_grant_add"])
 
     def test_session_loop_preauthorization_failed_write_does_not_grant(self):
         code, events = self.invoke("loop", authorized=False, had_grant=True,
                                    write_ok=False)
         self.assertEqual(code, 0)
-        self.assertEqual(events, ["old_grant_del", "session_write",
+        self.assertEqual(events, ["old_revoke", "old_grant_del", "session_write",
                                   "state_error:client_ip_state_write_failed"])
 
 
