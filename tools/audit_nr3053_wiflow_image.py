@@ -116,6 +116,21 @@ def audit_guest_gate_rootfs(fs: Path) -> list[str]:
     ):
         if required not in captive_source:
             problems.append(f"Portal-owned forwarding lifecycle missing: {required}")
+    # If nft is temporarily unqueryable, the disable path must still
+    # remove persistent UCI guest-WAN forwarding before reloading fw4.
+    # Guard the *order* in the built image, not just token presence.
+    disable = captive_source[captive_source.find("\ndisable(){"):]
+    ordered = (
+        '/usr/sbin/nft list table inet fw4 >/dev/null 2>&1 || table_ready=0',
+        'if [ "$changed" = 0 ]; then',
+        'rm -f "$NFT_FILE" || return 1',
+        'uci -q delete firewall.wiflow_guest_wan',
+        'uci commit firewall',
+        '/etc/init.d/firewall reload',
+    )
+    positions = [disable.find(token) for token in ordered]
+    if min(positions) < 0 or positions != sorted(positions):
+        problems.append("Portal disable must retire persistent WAN forwarding before fw4 reload")
     for target in ("10.0.0.1", "10.0.0.2"):
         expected = f"ip saddr 10.10.10.0/24 ip daddr {target} return"
         if expected not in texts["captive"]:
