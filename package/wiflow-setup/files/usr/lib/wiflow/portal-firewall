@@ -117,21 +117,46 @@ ensure(){
  enable
 }
 
+# A clean UCI/definition-file state does not imply the *running* nft
+# firewall is clean: a previous reload may have failed after config deletion.
+# Every disabled fast path must verify fw4 is queryable and captive objects
+# are absent. We never treat a failed nft table query as proof of revocation.
+captive_nft_objects_present(){
+ /usr/sbin/nft list chain inet fw4 wiflow_portal_forward >/dev/null 2>&1 ||
+ /usr/sbin/nft list chain inet fw4 wiflow_portal_prerouting >/dev/null 2>&1 ||
+ /usr/sbin/nft list set inet fw4 wiflow_portal_authed >/dev/null 2>&1 ||
+ /usr/sbin/nft list set inet fw4 wiflow_portal_granted >/dev/null 2>&1 ||
+ /usr/sbin/nft list set inet fw4 wiflow_portal_web4 >/dev/null 2>&1
+}
 disable(){
  changed=0
  [ -f "$NFT_FILE" ] && changed=1
  uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
  uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && changed=1
- # Disabled is the steady state for an unpublished/inactive Portal.
- # Avoid committing firewall config to flash every heartbeat when no captive
- # rules or forwarding exist. Still remove any failed-write temporary file.
- if [ "$changed" = 0 ]; then rm -f "$NFT_FILE.tmp"; return 0; fi
- rm -f "$NFT_FILE" "$NFT_FILE.tmp" || return 1
+ # Avoid repeated fw4 reloads and flash commits when truly disabled.
+ # But inspect kernel nft state, not just files and UCI sections.
+ rm -f "$NFT_FILE.tmp" || return 1
+ if ! /usr/sbin/nft list table inet fw4 >/dev/null 2>&1; then
+  state_set portal_error 'captive_disable_nft_unavailable'
+  return 1
+ fi
+ if captive_nft_objects_present; then changed=1; fi
+ [ "$changed" = 1 ] || return 0
+ rm -f "$NFT_FILE" || return 1
  uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true
  uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
  uci commit firewall >/dev/null 2>&1 || return 1
- if [ "$changed" = 1 ]; then
-  /etc/init.d/firewall reload >/dev/null 2>&1 || return 1
+ if ! /etc/init.d/firewall reload >/dev/null 2>&1; then
+  state_set portal_error 'captive_disable_reload_failed'
+  return 1
+ fi
+ if ! /usr/sbin/nft list table inet fw4 >/dev/null 2>&1; then
+  state_set portal_error 'captive_disable_nft_unavailable'
+  return 1
+ fi
+ if captive_nft_objects_present; then
+  state_set portal_error 'captive_disable_stale_nft_state'
+  return 1
  fi
  return 0
 }
