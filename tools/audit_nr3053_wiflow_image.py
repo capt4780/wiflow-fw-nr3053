@@ -251,6 +251,33 @@ def audit_captive_noredirect_rootfs(fs: Path) -> list[str]:
     return problems
 
 
+def audit_captive_disabled_authorization_rootfs(fs: Path) -> list[str]:
+    """Require a fresh Portal enable+snapshot guard in both authorize owners."""
+    paths = (
+        ("www-wiflow-portal/cgi-bin/portal", "\\n authorize)\\n", "\\n event)\\n"),
+        ("usr/lib/wiflow/portal-client", "\\nauthorize-session)\\n", "\\n    ;;\\nrevoke-session)"),
+    )
+    issues = []
+    for path, start_mark, end_mark in paths:
+        file = fs / path
+        if not file.is_file():
+            issues.append("Portal disabled authorize owner missing: " + path)
+            continue
+        content = file.read_text(encoding="utf-8", errors="replace")
+        start, end = content.find(start_mark), content.find(end_mark)
+        if start < 0 or end <= start:
+            issues.append("Portal disabled authorize branch missing: " + path)
+            continue
+        branch = content[start:end]
+        enabled = branch.find("uci -q get wiflow.core.portal_enabled")
+        snapshot = branch.find('[ -f "$PORTAL_ACTIVE/portal.json" ]')
+        downstream = (branch.find("portal-client is-authorized")
+                      if path.startswith("www-") else branch.find('portal_nft_add "$ip" "$mac"'))
+        if min(enabled, snapshot, downstream) < 0 or enabled >= downstream or snapshot >= downstream:
+            issues.append("Portal disabled can authorize stale session: " + path)
+    return issues
+
+
 def audit_captive_commit_rootfs(fs: Path) -> list[str]:
     """Enforce fail-closed Page 6 transaction ordering in the BUILT rootfs.
 
@@ -515,6 +542,7 @@ def audit(path: Path) -> dict:
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))
             issues.extend(audit_capport_tls_gate_rootfs(fs))
+            issues.extend(audit_captive_disabled_authorization_rootfs(fs))
             issues.extend(audit_captive_commit_rootfs(fs))
             issues.extend(audit_wp_ack_receipt_rootfs(fs))
             issues.extend(audit_captive_rebind_rootfs(fs))
