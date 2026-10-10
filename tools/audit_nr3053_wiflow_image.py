@@ -163,6 +163,26 @@ def audit_captive_mutation_rootfs(fs: Path) -> list[str]:
     return []
 
 
+def audit_capport_tls_gate_rootfs(fs: Path) -> list[str]:
+    """Never ship an invalid HTTP CAPPORT DHCP advertisement.
+
+    Until TLS and per-client HTTPS CAPPORT are implemented/audited, no
+    DHCP 114 URI may be advertised. HTTP fallback continues independently.
+    """
+    common = fs / "usr/lib/wiflow/common.sh"
+    if not common.is_file():
+        return ["CAPPORT DHCP configuration owner missing from rootfs"]
+    text = common.read_text(encoding="utf-8", errors="replace")
+    problems = []
+    if "uci add_list dhcp.wiflow_guest.dhcp_option='114," in text:
+        problems.append("DHCP Option 114 must remain OFF until audited CAPPORT HTTPS is ready")
+    if "uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1'" not in text:
+        problems.append("fallback guest DNS DHCP option missing")
+    if (fs / "www-wiflow-portal/cgi-bin/captive-api").exists():
+        problems.append("obsolete insecure HTTP CAPPORT CGI must not be installed")
+    return problems
+
+
 def audit_captive_noredirect_rootfs(fs: Path) -> list[str]:
     """Block images missing a safe, navigation-free captive confirmation.
 
@@ -381,6 +401,7 @@ def audit(path: Path) -> dict:
             issues.extend(audit_guest_gate_rootfs(fs))
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_noredirect_rootfs(fs))
+            issues.extend(audit_capport_tls_gate_rootfs(fs))
             issues.extend(audit_captive_commit_rootfs(fs))
             issues.extend(audit_wp_ack_receipt_rootfs(fs))
             issues.extend(audit_captive_rebind_rootfs(fs))
