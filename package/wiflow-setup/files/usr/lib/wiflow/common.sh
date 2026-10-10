@@ -406,10 +406,10 @@ ensure_guest_network(){
     # resolvers/tunnels as supported by the operating system and upstream WAN.
     uci -q delete dhcp.wiflow_guest.dhcp_option >/dev/null 2>&1 || true
     uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1'
-    # RFC 7710/8910 captive-portal advertisement. This is additive to the
-    # classic HTTP redirect and gives modern Android/iOS a deterministic local
-    # captive status endpoint without depending on public probe DNS.
-    uci add_list dhcp.wiflow_guest.dhcp_option='114,http://10.10.10.1:2080/cgi-bin/captive-api'
+    # Do not advertise CAPPORT (DHCPv4 Option 114) yet. RFC 8908 requires
+    # an HTTPS API and TLS user-portal URL with a verifiable certificate.
+    # Advertising the legacy HTTP endpoint would break standards-aware clients.
+    # Keep HTTP captive fallback until a separately audited TLS deployment.
     uci set dhcp.wiflow_guest.dhcpv6='disabled'
     uci set dhcp.wiflow_guest.ra='disabled'
     uci set dhcp.wiflow_guest.ndp='disabled'
