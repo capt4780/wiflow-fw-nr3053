@@ -68,7 +68,7 @@ while true; do
                 portal_nft_del "$ip" "$mac"
                 # Never retire the session while its old forwarding grant
                 # might still exist. Without nft readback, assume unsafe.
-                if ! portal_nft_ready || portal_nft_pair_authorized "$ip" "$mac"; then
+                if ! portal_nft_pair_revoked "$ip" "$mac"; then
                     /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
                     state_set portal_error 'client_disconnect_revoke_unverified'
                     continue
