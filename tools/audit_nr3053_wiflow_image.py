@@ -254,8 +254,8 @@ def audit_captive_noredirect_rootfs(fs: Path) -> list[str]:
 def audit_captive_disabled_authorization_rootfs(fs: Path) -> list[str]:
     """Require a fresh Portal enable+snapshot guard in both authorize owners."""
     paths = (
-        ("www-wiflow-portal/cgi-bin/portal", "\\n authorize)\\n", "\\n event)\\n"),
-        ("usr/lib/wiflow/portal-client", "\\nauthorize-session)\\n", "\\n    ;;\\nrevoke-session)"),
+        ("www-wiflow-portal/cgi-bin/portal", "\n authorize)\n", "\n event)\n"),
+        ("usr/lib/wiflow/portal-client", "\nauthorize-session)\n", "\n    ;;\nrevoke-session)"),
     )
     issues = []
     for path, start_mark, end_mark in paths:
