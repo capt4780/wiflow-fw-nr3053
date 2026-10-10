@@ -29,9 +29,17 @@ build_events_json(){
 
 sleep_with_kick(){ seconds="$1"; i=0; while [ "$i" -lt "$seconds" ]; do [ -f "$HEARTBEAT_KICK" ] && { rm -f "$HEARTBEAT_KICK"; return 0; }; sleep 1; i=$((i+1)); done; }
 
+# Avoid rewriting OpenWrt UCI config/flash on each successful heartbeat.
+portal_runtime_set_enabled(){
+ [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || true)" = "$1" ] && return 0
+ uci set "wiflow.core.portal_enabled=$1" || return 1
+ uci commit wiflow >/dev/null 2>&1
+}
+
 portal_runtime_disable(){
- uci set wiflow.core.portal_enabled='0'
- uci commit wiflow >/dev/null 2>&1 || true
+ # An explicit disable invalidates our local WP active ACK receipt.
+ rm -f "$PORTAL_ACK_CONFIRMED"
+ portal_runtime_set_enabled 0 || state_set portal_error 'portal_disable_state_commit_failed'
  /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
 }
 
@@ -41,13 +49,17 @@ portal_runtime_reconcile(){
   portal_runtime_disable
   return 0
  fi
- if [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ]; then
+ # Also reconcile a missing active ACK receipt, even when the media
+ # revision already matches. The Portal sync fast path re-ACKs without
+ # downloading, replacing, or disturbing the current local media.
+ # Once ACK succeeds, a volatile marker avoids 20-second repeat requests.
+ if [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ] ||
+    [ "$(cat "$PORTAL_ACK_CONFIRMED" 2>/dev/null || true)" != "$desired" ]; then
   if ! /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1; then
    # Never tear down a known-good captive Portal because a newer revision
    # failed to sync. Keep the active local snapshot serving clients.
    if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
-    uci set wiflow.core.portal_enabled='1'
-    uci commit wiflow >/dev/null 2>&1 || true
+    portal_runtime_set_enabled 1 || state_set portal_error 'portal_enable_state_commit_failed'
     /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || true
     return 1
    fi
@@ -56,9 +68,10 @@ portal_runtime_reconcile(){
   fi
  fi
  [ -f "$PORTAL_ACTIVE/portal.json" ] || { portal_runtime_disable; return 1; }
- uci set wiflow.core.portal_enabled='1'
- uci commit wiflow >/dev/null 2>&1 || true
- if ! /usr/lib/wiflow/portal-firewall enable >/dev/null 2>&1; then
+ portal_runtime_set_enabled 1 || state_set portal_error 'portal_enable_state_commit_failed'
+ # Idempotent: avoid firewall reload on every successful WP heartbeat.
+ # portal-firewall ensure still invokes enable when the chains are missing.
+ if ! /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1; then
   portal_runtime_disable
   state_set portal_error 'captive_firewall_enable_failed'
   return 1
@@ -84,7 +97,18 @@ while true; do
    generation="$(jsonfilter -i "$resp" -e '@.data_generation' 2>/dev/null || true)"
    if [ "$generation" != "$WIFLOW_DATA_GENERATION" ]; then
     state_set wp_online 0; state_set api_error "generation_mismatch:$generation"; delay=60
-    portal_runtime_disable
+    # A WP rollout/API mismatch must not destroy an already-approved, valid
+    # local Portal snapshot. Never accept incompatible remote control data.
+    # Still fail closed if no active snapshot or captive firewall is broken.
+    if [ -f "$PORTAL_ACTIVE/portal.json" ] &&
+       [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || true)" = 1 ]; then
+     if ! /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1; then
+      portal_runtime_disable
+      state_set portal_error 'captive_firewall_ensure_failed'
+     fi
+    else
+     portal_runtime_disable
+    fi
    else
     state_set wp_online 1; state_set wp_last_ok "$(date +%s)"; state_set api_error ''; delay=20
     account_public_id="$(jsonfilter -i "$resp" -e '@.account_public_id' 2>/dev/null || true)"
