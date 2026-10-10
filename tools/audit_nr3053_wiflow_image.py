@@ -222,6 +222,48 @@ def audit_wp_ack_receipt_rootfs(fs: Path) -> list[str]:
     return []
 
 
+def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
+    """Static gate: DHCP IP changes cannot bypass session persistence."""
+    client = fs / "usr/lib/wiflow/portal-client"
+    loop = fs / "usr/lib/wiflow/portal-session-loop"
+    if not client.is_file() or not loop.is_file():
+        return ["guest DHCP rebind runtime missing from compiled rootfs"]
+    a = client.read_text(encoding="utf-8", errors="replace")
+    b = loop.read_text(encoding="utf-8", errors="replace")
+    ai = a.find("# On DHCP IP rebind, never authorize a new IP")
+    bi = b.find('if [ "$newip" != "$ip" ]; then')
+    if ai < 0 or bi < 0:
+        return ["guest DHCP IP rebind fail-closed guard missing"]
+    a = a[ai:a.find("\n    fi\n\n    # Stage 3", ai)]
+    b = b[bi:b.find('\n        else\n            [ "$absent"', bi)]
+    required_a = (
+        'portal_nft_del "$oldip" "$mac"',
+        'if ! client_session_write "$f"',
+        'portal_nft_add "$ip" "$mac"',
+        'portal_nft_pair_authorized "$oldip" "$mac"',
+    )
+    required_b = (
+        'portal_nft_del "$ip" "$mac"',
+        'if ! client_session_write "$f"',
+        'portal_nft_add "$newip" "$mac"',
+        'portal_nft_grant_add "$newip" "$mac"',
+    )
+    if any(x not in a for x in required_a) or any(x not in b for x in required_b):
+        return ["guest DHCP rebind transaction guard incomplete"]
+    if not (a.index('portal_nft_del "$oldip" "$mac"') <
+            a.index('if ! client_session_write "$f"') <
+            a.index('portal_nft_add "$ip" "$mac"')):
+        return ["guest IP restore precedes local session persistence"]
+    if not (b.index('portal_nft_del "$ip" "$mac"') <
+            b.index('if ! client_session_write "$f"') <
+            b.index('portal_nft_add "$newip" "$mac"')):
+        return ["session loop reauthorizes changed IP before persisting new session"]
+    if b.index('if ! client_session_write "$f"') > b.index(
+            'portal_nft_grant_add "$newip" "$mac"'):
+        return ["session loop grants changed IP before persisting new session"]
+    return []
+
+
 def audit(path: Path) -> dict:
     image = read_image(path)
     tree = fdt_nodes(image)
@@ -297,6 +339,7 @@ def audit(path: Path) -> dict:
             issues.extend(audit_captive_mutation_rootfs(fs))
             issues.extend(audit_captive_commit_rootfs(fs))
             issues.extend(audit_wp_ack_receipt_rootfs(fs))
+            issues.extend(audit_captive_rebind_rootfs(fs))
         return {
             "phase": "EXPERIMENTAL_APP_PACKAGE_OFFLINE_ROOTFS_AUDIT",
             "static_gate": "BLOCK" if issues else "PASS",
