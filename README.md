@@ -2,6 +2,14 @@
 
 This is the public source and engineering-build repository for NR3053. **Not a flash-ready Wiflow release.** Original Wiflow NR3053 source and test/build glue are provided under the [MIT License](LICENSE), subject to separate third-party upstream licenses. Never commit account data, API/device tokens, private media or application baseline archives. The openly documented fixed emergency Gate `WIFDIDNR3053` is a deliberate project requirement, **not a secret or substitute for account authentication**.
 
+## First-device reality — no NR3053 running Wiflow (2026-10-10)
+
+**Confirmed directly by the owner:** every NR3053 has its original/existing firmware; no NR3053 has yet booted the new Wiflow image. Hosted image compilation and offline checks are S1–S4 engineering evidence only. **S5 hardware/runtime has not started** and S6 is BLOCK.
+
+Use **S5-A stock preflash inventory** first: [read-only stock diagnostics](tools/nr3053-stock-preflight-readonly.sh) plus the [two-stage lab acceptance instructions](reference/NR3053-S5-READONLY-ACCEPTANCE.md). Authorized existing stock shell is optional; if unavailable, collect non-sensitive board/hardware evidence from the original UI. **Do not flash a Wi-Fi-only device or proceed without an independently verified bootloader/UART recovery plan.**
+
+Only after a controlled first Wiflow boot on dedicated, recoverable lab hardware may **S5-B Wiflow runtime diagnostics** be used. The existing [Wiflow-specific script](tools/nr3053-s5-readonly.sh) is **not meant for stock firmware**. Neither script grants flash approval.
+
 ## Canonical state — 2026-10-10 (verified live)
 
 - **Latest source baseline:** `main=ab3632d6624a8d34ed01476ba1ceacbc8cf52bcb` (S5 read-only acceptance tools; no device package changes).
