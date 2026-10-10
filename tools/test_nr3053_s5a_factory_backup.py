@@ -38,6 +38,29 @@ class S5AFactoryBackupCheckerTests(unittest.TestCase):
             self.assertEqual(fields["factory_copy_pair"], ["PASS", "distinct_files_equal_sha256"])
             self.assertEqual(fields["first_flash_approval"][0], "BLOCK")
 
+    def test_all_erased_ff_factory_copies_are_not_consistency_pass(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d)/"erased-a", Path(d)/"erased-b"
+            a.write_bytes(b"\xff" * EXPECTED_FACTORY_BYTES)
+            b.write_bytes(b"\xff" * EXPECTED_FACTORY_BYTES)
+            p, fields = self.invoke(a, b)
+            self.assertEqual(p.returncode, 2)
+            self.assertEqual(fields["factory_copy_a"],
+                             ["BLOCK", "blank_factory_copy_no_calibration_evidence"])
+            self.assertEqual(fields["factory_copy_b"][0], "BLOCK")
+            self.assertEqual(fields["factory_copy_pair"][0], "NOT_TESTED")
+
+    def test_all_zero_factory_copies_are_not_consistency_pass(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d)/"zero-a", Path(d)/"zero-b"
+            a.write_bytes(b"\x00" * EXPECTED_FACTORY_BYTES)
+            b.write_bytes(b"\x00" * EXPECTED_FACTORY_BYTES)
+            p, fields = self.invoke(a, b)
+            self.assertEqual(p.returncode, 2)
+            self.assertEqual(fields["factory_copy_a"],
+                             ["BLOCK", "blank_factory_copy_no_calibration_evidence"])
+            self.assertEqual(fields["factory_copy_pair"][0], "NOT_TESTED")
+
     def test_same_size_but_different_content_is_blocked(self):
         with tempfile.TemporaryDirectory() as d:
             a, b = Path(d)/"a", Path(d)/"b"
