@@ -66,6 +66,13 @@ while true; do
             elapsed=$((now-absent))
             if [ "$elapsed" -ge "$DISCONNECT_GRACE" ]; then
                 portal_nft_del "$ip" "$mac"
+                # Never retire the session while its old forwarding grant
+                # might still exist. Without nft readback, assume unsafe.
+                if ! portal_nft_pair_revoked "$ip" "$mac"; then
+                    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+                    state_set portal_error 'client_disconnect_revoke_unverified'
+                    continue
+                fi
                 portal_nft_grant_del "$ip" "$mac"
                 when="${last:-$now}"; case "$when" in ''|*[!0-9]*) when="$now";; esac
                 event_enqueue disconnected "$cid" "$sid" "$when" || true

@@ -291,6 +291,14 @@ portal_nft_pair_granted(){
     /usr/sbin/nft list set inet fw4 wiflow_portal_granted 2>/dev/null | grep -Fiq "$ipx . $mac"
 }
 portal_nft_del(){ ipx="$1"; mac="$2"; printf 'delete element inet fw4 wiflow_portal_authed { %s . %s }\n' "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || true; }
+# Unlike portal_nft_pair_authorized, this helper MUST prove a successful nft
+# readback. A failed list/read command is never proof of revocation.
+portal_nft_pair_revoked(){
+    ipx="$1"; mac="$2"
+    dump="$(/usr/sbin/nft list set inet fw4 wiflow_portal_authed 2>/dev/null)" || return 1
+    ! printf '%s\n' "$dump" | grep -Fiq "$ipx . $mac"
+}
+
 portal_nft_add(){
     ipx="$1"; mac="$2"; valid_guest_ip "$ipx" || return 1; portal_nft_ready || return 1
     portal_nft_del "$ipx" "$mac"
