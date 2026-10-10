@@ -197,10 +197,17 @@ class GuestRevokeVerificationTests(unittest.TestCase):
             root = Path(temp)
             a = root / "usr/lib/wiflow/portal-client"
             b = root / "usr/lib/wiflow/portal-session-loop"
+            c = root / "usr/lib/wiflow/common.sh"
             a.parent.mkdir(parents=True)
             a.write_text(CLIENT)
             b.write_text(LOOP)
+            c.write_text(COMMON)
             self.assertEqual(audit_captive_revoke_rootfs(root), [])
+            c.write_text(COMMON.replace(
+                "dump=\"$(/usr/sbin/nft list set inet fw4 wiflow_portal_authed",
+                "dump=\"$(echo unknown status"))
+            self.assertTrue(audit_captive_revoke_rootfs(root))
+            c.write_text(COMMON)
             a.write_text(CLIENT.replace(
                 "state_set portal_error 'client_revoke_unverified'",
                 "echo bypassed"))
