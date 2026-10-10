@@ -208,6 +208,19 @@ class GuestIPRebindConsistencyTests(unittest.TestCase):
                 'if ! portal_nft_pair_revoked "$oldip" "$mac"; then',
                 'if portal_nft_pair_authorized "$oldip" "$mac"; then'))
             self.assertTrue(audit_captive_rebind_rootfs(root))
+            client.write_text(CLIENT.replace(
+                'if [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then',
+                'if [ "${authorized:-0}" != 0 ] && [ -n "$oldip" ] && [ "$oldip" != "$ip" ]; then'
+            ))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
+            client.write_text(CLIENT)
+            loop.write_text(LOOP.replace(
+                'portal_nft_del "$ip" "$mac"\n                if ! portal_nft_pair_revoked',
+                'if [ "${authorized:-0}" != 0 ]; then\n'
+                '                    portal_nft_del "$ip" "$mac"\n'
+                '                fi\n                if ! portal_nft_pair_revoked', 1,
+            ))
+            self.assertTrue(audit_captive_rebind_rootfs(root))
             client.write_text(CLIENT)
             loop.write_text(LOOP.replace(
                 'if ! portal_nft_pair_revoked "$ip" "$mac"; then',
