@@ -303,10 +303,11 @@ def audit_captive_rebind_rootfs(fs: Path) -> list[str]:
         'portal_nft_del "$oldip" "$mac"',
         'if ! client_session_write "$f"',
         'portal_nft_add "$ip" "$mac"',
-        'portal_nft_pair_authorized "$oldip" "$mac"',
+        'if ! portal_nft_pair_revoked "$oldip" "$mac"; then',
     )
     required_b = (
         'portal_nft_del "$ip" "$mac"',
+        'if ! portal_nft_pair_revoked "$ip" "$mac"; then',
         'if ! client_session_write "$f"',
         'portal_nft_add "$newip" "$mac"',
         'portal_nft_grant_add "$newip" "$mac"',
