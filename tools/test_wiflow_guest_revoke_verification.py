@@ -12,6 +12,7 @@ BASE = Path(__file__).resolve().parents[1]
 FILES = BASE / "package/wiflow-setup/files/usr/lib/wiflow"
 CLIENT = (FILES / "portal-client").read_text(encoding="utf-8")
 LOOP = (FILES / "portal-session-loop").read_text(encoding="utf-8")
+COMMON = (FILES / "common.sh").read_text(encoding="utf-8")
 SID = "abcdef1234567890abcdef12"
 
 
@@ -30,6 +31,12 @@ def disconnect_branch():
     return LOOP[begin:end].replace(
         "/usr/lib/wiflow/portal-firewall disable", "fail_closed_disable"
     )
+
+
+def nft_readback_helper():
+    begin = COMMON.index("portal_nft_pair_revoked(){")
+    end = COMMON.index("\nportal_nft_add(){", begin)
+    return COMMON[begin:end].replace("/usr/sbin/nft", "nft_mock")
 
 
 MOCK = r"""
@@ -54,8 +61,7 @@ portal_nft_del(){
   [ "$TEST_DELETE" = 1 ] && rm -f "$TEST_ROOT/pair"
   return 0
 }
-portal_nft_ready(){ [ "$TEST_READY" = 1 ]; }
-portal_nft_pair_authorized(){ [ -f "$TEST_ROOT/pair" ]; }
+portal_nft_pair_revoked(){ [ "$TEST_READY" = 1 ] && [ ! -f "$TEST_ROOT/pair" ]; }
 portal_nft_grant_del(){ echo grant_del >> "$LOG"; }
 client_session_write(){
   echo persist >> "$LOG"
@@ -159,6 +165,31 @@ class GuestRevokeVerificationTests(unittest.TestCase):
         self.assertIsNotNone(state)
         self.assertIn("firewall_disable", log)
         self.assertNotIn("disconnected_event", log)
+
+    def test_actual_nft_readback_does_not_confuse_command_failure_with_absence(self):
+        source = nft_readback_helper()
+        for read_ok, present, expected in (
+            (True, False, 0), (True, True, 1), (False, False, 1),
+        ):
+            with self.subTest(read_ok=read_ok, present=present):
+                with tempfile.TemporaryDirectory(prefix="wiflow-nft-readback-") as temp:
+                    p = Path(temp)
+                    pair = "10.10.10.101 . 02:11:22:33:44:55"
+                    (p / "dump").write_text(
+                        ("elements = { " + pair + " }\n") if present else "elements = { }\n"
+                    )
+                    script = (
+                        'nft_mock(){ [ "$TEST_READ_OK" = 1 ] || return 1; cat "$TEST_ROOT/dump"; }\n'
+                        + source
+                        + '\nportal_nft_pair_revoked 10.10.10.101 02:11:22:33:44:55\n'
+                    )
+                    proc = subprocess.run(
+                        ["sh", "-c", script], capture_output=True, text=True,
+                        env={**os.environ, "TEST_ROOT": str(p),
+                             "TEST_READ_OK": "1" if read_ok else "0"}, timeout=5,
+                    )
+                    self.assertEqual(proc.returncode, expected)
+                    self.assertEqual(proc.stderr, "")
 
     def test_compiled_rootfs_auditor_blocks_missing_revoke_guards(self):
         from audit_nr3053_wiflow_image import audit_captive_revoke_rootfs
