@@ -19,8 +19,8 @@ class CaptiveActionGuardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = PORTAL.read_text(encoding="utf-8")
-        start = cls.source.index('case "$action" in\n authorize|event)')
-        end = cls.source.index('\ncase "$action" in\n authorize)', start)
+        start = cls.source.index('case "$action" in\n authorize|event|status)')
+        end = cls.source.index('\ncase "$action" in\n status)', start)
         cls.guard = cls.source[start:end]
 
     def run_guard(self, action, method, origin, body="action=authorize&session_id=test"):
@@ -33,7 +33,7 @@ class CaptiveActionGuardTests(unittest.TestCase):
         )
 
     def test_all_local_mutations_accept_post_independent_of_origin(self):
-        for action in ("authorize", "event"):
+        for action in ("authorize", "event", "status"):
             for origin in ("http://10.10.10.1:2080", "", "null",
                            "http://example.org"):
                 with self.subTest(action=action, origin=origin):
@@ -52,7 +52,7 @@ class CaptiveActionGuardTests(unittest.TestCase):
                 self.assertIn("Allow: POST", result.stdout)
 
     def test_post_with_empty_body_fails_even_with_query_string(self):
-        for action in ("authorize", "event"):
+        for action in ("authorize", "event", "status"):
             with self.subTest(action=action):
                 result = self.run_guard(action, "POST", "", body="")
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -67,22 +67,29 @@ class CaptiveActionGuardTests(unittest.TestCase):
 
     def test_guard_precedes_session_authorization_and_event(self):
         source = self.source
-        self.assertLess(source.index('case "$action" in\n authorize|event)'),
+        self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
                         source.index('case "$action" in\n authorize)'))
-        self.assertLess(source.index('case "$action" in\n authorize|event)'),
+        self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
                         source.index('authorize-session "$sid" "$cid"'))
-        self.assertLess(source.index('case "$action" in\n authorize|event)'),
+        self.assertLess(source.index('case "$action" in\n authorize|event|status)'),
                         source.index('event_enqueue "$ev"'))
         self.assertIn('validate_session "$sid"', source)
         self.assertIn('is-authorized "$sid"', source)
 
-    def test_existing_templates_use_post_confirm_without_ui_rewrite(self):
+    def test_all_modes_use_same_origin_post_without_navigation(self):
         for path in TEMPLATES:
             with self.subTest(template=path.name):
                 html = path.read_text(encoding="utf-8")
-                self.assertIn("form.method='post'", html)
-                self.assertIn("action.value='authorize'", html)
-                self.assertIn("sid.name='session_id'", html)
+                self.assertIn("const commit=async()=>", html)
+                self.assertIn("const response=await send('authorize')", html)
+                self.assertIn("const status=await send('status')", html)
+                self.assertIn("confirmed=response.status===204", html)
+                self.assertIn("body:new URLSearchParams({action,session_id:sessionId}).toString()", html)
+                self.assertIn("new URL(authorizeUrl,window.location.href).origin!==window.location.origin", html)
+                self.assertIn("mode:'same-origin'", html)
+                self.assertIn("redirect:'error'", html)
+                self.assertNotIn("form.submit()", html)
+                self.assertNotIn("window.location.assign(", html)
                 self.assertIn('data-local-authorize-url="http://10.10.10.1:2080/cgi-bin/portal"', html)
 
     def test_exact_image_auditor_requires_compiled_guard(self):
