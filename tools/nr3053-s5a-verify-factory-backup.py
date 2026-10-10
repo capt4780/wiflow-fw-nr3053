@@ -50,6 +50,8 @@ def inspect(path: Path, expected: int) -> tuple[str, str, tuple[int, int] | None
                 return "BLOCK", "wrong_golden_factory_size", None, None
             digest = hashlib.sha256()
             total = 0
+            all_zero = True
+            all_erased = True
             while True:
                 piece = os.read(fd, CHUNK)
                 if not piece:
@@ -58,9 +60,15 @@ def inspect(path: Path, expected: int) -> tuple[str, str, tuple[int, int] | None
                 if total > expected:
                     return "BLOCK", "file_changed_during_read", None, None
                 digest.update(piece)
+                # Two equal dumps of blank NAND are not usable calibration evidence.
+                # Check in-stream without exposing any content or adding an extra read.
+                all_zero = all_zero and piece.count(0) == len(piece)
+                all_erased = all_erased and piece.count(255) == len(piece)
             after = os.fstat(fd)
             if total != expected or (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns, opened.st_ino, opened.st_dev) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns, after.st_ino, after.st_dev):
                 return "BLOCK", "file_changed_during_read", None, None
+            if all_zero or all_erased:
+                return "BLOCK", "blank_factory_copy_no_calibration_evidence", None, None
             return "PASS", "golden_size_and_read_complete", (opened.st_dev, opened.st_ino), digest.digest()
         finally:
             os.close(fd)
