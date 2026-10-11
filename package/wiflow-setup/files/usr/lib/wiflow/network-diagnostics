@@ -1,0 +1,51 @@
+#!/bin/sh
+# P52: read-only network evidence for tablet/phone Wiflow Setup.
+# Never reset/reload interfaces, modify UCI, invoke a radio scan, or flash.
+set -u
+
+netroot="${NET_SYS_ROOT:-/sys/class/net}"
+wan_dev="$(uci -q get network.wan.device 2>/dev/null || true)"
+wan_proto="$(uci -q get network.wan.proto 2>/dev/null || true)"
+# A device name is used only as one allowlisted sysfs path component.
+case "$wan_dev" in ''|*[!A-Za-z0-9_.:-]*) wan_dev='';; esac
+case "$wan_proto" in dhcp|static|pppoe|none) :;; *) wan_proto='unknown';; esac
+
+port_json() {
+    dev="$1"
+    present=false
+    carrier='missing'
+    operstate='missing'
+    if [ -d "$netroot/$dev" ]; then
+        present=true
+        if [ -r "$netroot/$dev/carrier" ]; then
+            carrier="$(cat "$netroot/$dev/carrier" 2>/dev/null || true)"
+            case "$carrier" in 0|1) :;; *) carrier='unknown';; esac
+        else
+            carrier='unknown'
+        fi
+        if [ -r "$netroot/$dev/operstate" ]; then
+            operstate="$(cat "$netroot/$dev/operstate" 2>/dev/null || true)"
+            case "$operstate" in up|down|unknown|dormant|lowerlayerdown|notpresent|testing) :;; *) operstate='unknown';; esac
+        else
+            operstate='unknown'
+        fi
+    fi
+    printf '"%s":{"present":%s,"carrier":"%s","operstate":"%s"}' "$dev" "$present" "$carrier" "$operstate"
+}
+
+scan_cli=false
+[ -x /usr/bin/iwinfo-ucode ] && scan_cli=true
+printf '{"ok":true,"read_only":true,"wan_device":"%s","wan_protocol":"%s","scan_cli_installed":%s,"ports":{' \
+    "$wan_dev" "$wan_proto" "$scan_cli"
+port_json wan
+for dev in lan1 lan2 lan3; do
+    printf ','
+    port_json "$dev"
+done
+if [ -n "$wan_dev" ]; then
+    case "$wan_dev" in wan|lan1|lan2|lan3) :;; *)
+        printf ','
+        port_json "$wan_dev";;
+    esac
+fi
+printf '}}\n'
