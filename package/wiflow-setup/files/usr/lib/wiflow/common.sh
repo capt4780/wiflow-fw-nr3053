@@ -156,22 +156,64 @@ internet_probe_fast(){
     rm -f "$out"; return 1
 }
 
+# MTWiFi (mt_wifi.ko) is not a cfg80211/nl80211 driver, so `iw dev` never lists
+# its interfaces. The Wi-Fi uplink is an ApCli vif named by the L1 profile
+# (apcli0 on 2.4 GHz, apclix0 on 5 GHz).
+WIFLOW_SYSFS_NET="${WIFLOW_SYSFS_NET:-/sys/class/net}"
+WIFLOW_L1_PROFILE="${WIFLOW_L1_PROFILE:-/etc/wireless/l1profile.dat}"
+apcli_ifnames(){
+    pfxs="$(sed -n 's/^INDEX[0-9]*_apcli_ifname=//p' "$WIFLOW_L1_PROFILE" 2>/dev/null | tr ';' ' ')"
+    [ -n "$pfxs" ] || pfxs='apcli apclix'
+    for pfx in $pfxs; do
+        for d in "$WIFLOW_SYSFS_NET/$pfx"[0-9]*; do
+            [ -e "$d" ] && printf '%s\n' "${d##*/}"
+        done
+    done
+}
+# The MTWiFi-aware iwinfo CLI ships as /usr/bin/iwinfo-ucode and
+# uci-defaults/99-replace-iwinfo moves it over /usr/bin/iwinfo on first boot, so
+# the old name is gone by the time Wiflow runs. Use whichever exists.
+WIFLOW_BIN_DIR="${WIFLOW_BIN_DIR:-/usr/bin}"
+wiflow_iwinfo(){
+    if [ -x "$WIFLOW_BIN_DIR/iwinfo-ucode" ]; then "$WIFLOW_BIN_DIR/iwinfo-ucode" "$@"
+    elif [ -x "$WIFLOW_BIN_DIR/iwinfo" ]; then "$WIFLOW_BIN_DIR/iwinfo" "$@"
+    else return 127; fi
+}
+# iwinfo takes a network interface (ra0/rax0), never a UCI radio section name
+# such as MT7981_1_1. Map a radio to its main interface by band using the L1
+# profile (first entry = 2.4 GHz, second = 5 GHz).
+radio_scan_ifname(){
+    rs_band="$(radio_band "$1")"
+    rs_mains="$(sed -n 's/^INDEX0_main_ifname=//p' "$WIFLOW_L1_PROFILE" 2>/dev/null | head -n1 | tr ';' ' ')"
+    set -- $rs_mains
+    case "$rs_band" in 5g) printf '%s' "${2:-rax0}";; *) printf '%s' "${1:-ra0}";; esac
+}
+# Prints the SSID the vif reports, or nothing when the driver does not report it.
+uplink_ssid_of(){
+    ifn="$1"; s=''
+    s="$(wiflow_iwinfo "$ifn" info 2>/dev/null | sed -n '1s/^.*ESSID: "\(.*\)".*$/\1/p')"
+    if [ -z "$s" ] && command -v iwconfig >/dev/null 2>&1; then
+        s="$(iwconfig "$ifn" 2>/dev/null | sed -n '1s/^.*ESSID:"\(.*\)".*$/\1/p')"
+    fi
+    printf '%s' "$s"
+}
+# Associated = an ApCli vif has carrier and, when the driver reports an SSID,
+# it equals the wanted one. DHCP and the Internet probe remain the real proof.
 wifi_uplink_associated(){
     want="${1:-}"
-    command -v iw >/dev/null 2>&1 || return 1
-    for ifn in $(iw dev 2>/dev/null | awk '/Interface /{i=$2}/type managed/{print i}'); do
-        link="$(iw dev "$ifn" link 2>/dev/null || true)"
-        printf '%s\n' "$link" | grep -q '^Connected to ' || continue
-        [ -z "$want" ] && return 0
-        got="$(printf '%s\n' "$link" | sed -n 's/^[[:space:]]*SSID: //p' | head -n1)"
-        [ "$got" = "$want" ] && return 0
+    for ifn in $(apcli_ifnames); do
+        [ "$(cat "$WIFLOW_SYSFS_NET/$ifn/carrier" 2>/dev/null || echo 0)" = 1 ] || continue
+        [ -n "$want" ] || return 0
+        got="$(uplink_ssid_of "$ifn")"
+        if [ -z "$got" ] || [ "$got" = "$want" ]; then return 0; fi
     done
     return 1
 }
 
 wifi_ssid_visible(){
     radio="$1"; want="$2"; tmp="/tmp/wiflow-visible.$$"
-    ( /usr/bin/iwinfo-ucode "$radio" scan > "$tmp" 2>/dev/null ) & p=$!
+    ifn="$(radio_scan_ifname "$radio")"
+    ( wiflow_iwinfo "$ifn" scan > "$tmp" 2>/dev/null ) & p=$!
     ( sleep 6; kill "$p" 2>/dev/null ) & w=$!
     wait "$p" 2>/dev/null || true; kill "$w" 2>/dev/null || true
     awk -v want="$want" '/ESSID: /{s=$0;sub(/^.*ESSID: "/,"",s);sub(/".*$/,"",s);if(s==want){ok=1;exit}} END{exit(ok?0:1)}' "$tmp" 2>/dev/null

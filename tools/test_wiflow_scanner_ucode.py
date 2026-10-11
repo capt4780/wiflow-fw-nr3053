@@ -11,15 +11,18 @@ PKG=(ROOT/"package/wiflow-setup/Makefile").read_text()
 
 class WiFiScannerUcodeTests(unittest.TestCase):
     def test_scanner_invokes_pinned_upstream_ucode_cli(self):
-        self.assertIn('/usr/bin/iwinfo-ucode "$r" scan', SCAN)
-        self.assertNotIn('( iwinfo "$r" scan', SCAN)
+        self.assertIn('wiflow_iwinfo "$ifn" scan', SCAN)
+        self.assertIn('radio_scan_ifname "$r"', SCAN)
+        self.assertNotIn('iwinfo "$r" scan', SCAN)
+        self.assertNotIn('/usr/bin/iwinfo-ucode', SCAN)
         self.assertIn('ESSID: ', SCAN)
         self.assertIn('Encryption: ', SCAN)
 
     def test_ssid_visibility_probe_invokes_built_ucode_cli(self):
         """Uplink SSID visibility must not depend on legacy iwinfo binary."""
-        self.assertIn('/usr/bin/iwinfo-ucode "$radio" scan', COMMON)
-        self.assertNotIn('( iwinfo "$radio" scan', COMMON)
+        self.assertIn('wiflow_iwinfo "$ifn" scan', COMMON)
+        self.assertIn('radio_scan_ifname "$radio"', COMMON)
+        self.assertNotIn('iwinfo "$radio" scan', COMMON)
         self.assertIn('wifi_ssid_visible(){', COMMON)
         self.assertIn('ESSID: ', COMMON)
         self.assertIn('awk -v want="$want"', COMMON)
