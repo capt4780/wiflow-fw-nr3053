@@ -141,6 +141,10 @@ else
 fi
 
 if has iw; then radios="$(iw dev 2>/dev/null || true)"; else radios=''; fi
+# MTWiFi (mt_wifi.ko) is invisible to nl80211 `iw dev`: fall back to iwconfig on the main vifs.
+if [ -z "$radios" ] && has iwconfig; then
+ radios="$(for i in ra0 rax0; do iwconfig "$i" 2>/dev/null; done | sed -n 's/^.*Frequency[:=]\([0-9.]*\) GHz.*$/\1/p' | awk '{printf "channel 0 (%d MHz)\n", $1*1000+0.5}')"
+fi
 if printf '%s\n' "$radios" | grep -Eq 'channel[[:space:]]+[0-9]+[[:space:]]+\(2[0-9]{3}[[:space:]]+MHz\)'; then
  report radio_2g_channel PASS 2_4ghz_channel_observed_not_client_tested
 else

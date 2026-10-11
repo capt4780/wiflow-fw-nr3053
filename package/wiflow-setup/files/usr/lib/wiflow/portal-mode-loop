@@ -30,11 +30,13 @@ portal_reconcile_local(){
   fi
 }
 
+delay=2
 while true; do
  paired="$(uci -q get wiflow.core.paired 2>/dev/null || echo 0)"
  if [ "$paired" = 1 ] && [ -n "$(device_token)" ] && [ -n "$(device_id)" ]; then
   resp="/tmp/wiflow-mode-sync.$$"; rm -f "$resp"; umask 077
   if wiflow_get "$resp" "$WIFLOW_DEVICE_API/sync" >/dev/null 2>&1; then
+   delay=2
    ok="$(jsonfilter -i "$resp" -e '@.ok' 2>/dev/null || true)"
    gen="$(jsonfilter -i "$resp" -e '@.data_generation' 2>/dev/null || true)"
    code="$(jsonfilter -i "$resp" -e '@.code' 2>/dev/null || true)"
@@ -64,8 +66,13 @@ while true; do
     desired="$(jsonfilter -i "$resp" -e '@.device.desired_portal_revision' 2>/dev/null || echo 0)"
     portal_reconcile_local "$desired"
    fi
+  else
+   # WordPress/Internet unreachable: back off (2,4,8,16,30 s) instead of hammering it.
+   delay=$((delay * 2)); [ "$delay" -le 30 ] || delay=30
   fi
   rm -f "$resp" "${resp}.fetch-error"
+ else
+  delay=2
  fi
- sleep 2
+ sleep "$delay"
 done
