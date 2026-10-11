@@ -348,14 +348,21 @@ command_result_clear(){
 
 recover_uplink_transaction(){
     [ -f "$UPLINK_TXN/.pending" ] || return 1
+    # Every saved config is mandatory. Do not delete the rollback transaction
+    # until all three configs are positively restored and protected.
+    for f in wireless network wiflow; do
+        [ -f "$UPLINK_TXN/$f" ] && [ ! -L "$UPLINK_TXN/$f" ] || return 2
+    done
     cid="$(cat "$UPLINK_TXN/command_id" 2>/dev/null || true)"
-    action="$(cat "$UPLINK_TXN/command_action" 2>/dev/null || true)"; [ -n "$action" ] || action=change_wifi
-    [ -f "$UPLINK_TXN/wireless" ] && cp "$UPLINK_TXN/wireless" /etc/config/wireless 2>/dev/null || true
-    [ -f "$UPLINK_TXN/network" ] && cp "$UPLINK_TXN/network" /etc/config/network 2>/dev/null || true
-    [ -f "$UPLINK_TXN/wiflow" ] && cp "$UPLINK_TXN/wiflow" /etc/config/wiflow 2>/dev/null || true
-    rm -rf "$UPLINK_TXN"
-    secure_configs
-    [ -n "$cid" ] && command_result_set "$cid" "$action" failed 'Thay đổi kết nối bị gián đoạn; cấu hình trước đó đã được khôi phục' || true
+    action="$(cat "$UPLINK_TXN/command_action" 2>/dev/null || true)"
+    [ -n "$action" ] || action=change_wifi
+    for f in wireless network wiflow; do
+        cp "$UPLINK_TXN/$f" "/etc/config/$f" || return 2
+        chmod 600 "/etc/config/$f" || return 2
+    done
+    secure_configs || return 2
+    rm -rf "$UPLINK_TXN" || return 2
+    [ -z "$cid" ] || command_result_set "$cid" "$action" failed 'Thay đổi kết nối bị gián đoạn; cấu hình trước đó đã được khôi phục' || true
     return 0
 }
 
