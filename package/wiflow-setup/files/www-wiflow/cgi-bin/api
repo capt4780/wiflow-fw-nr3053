@@ -6,9 +6,22 @@ action="$(param action 2>/dev/null || true)"; [ -n "$action" ] || action=status
 case "$action" in
 scan)
     band="$(param band 2>/dev/null || echo 5g)"; case "$band" in 2g|5g) :;; *) header_json; echo '{"ok":false,"error":"Băng tần không hợp lệ"}'; exit 0;; esac
-    /usr/lib/wiflow/scan-wifi "$band"
+    scan_tmp="/tmp/wiflow-api-scan-$$"
+    if ! /usr/lib/wiflow/scan-wifi "$band" > "$scan_tmp"; then
+        rm -f "$scan_tmp"
+        header_json
+        printf '{"ok":false,"band":"%s","code":"WIFI_SCAN_FAILED","error":"Không quét được WiFi trên băng tần này.","networks":[]}\n' "$(json_escape "$band")"
+        exit 0
+    fi
     header_json; printf '{"ok":true,"band":"%s","networks":[' "$(json_escape "$band")"; first=1
-    if [ -f /tmp/wiflow-scan.out ]; then TAB="$(printf '\t')"; while IFS="$TAB" read -r radio nband ssid bssid enc; do [ -n "$ssid" ] || continue; [ "$first" -eq 1 ] || printf ','; first=0; printf '{"radio":"%s","band":"%s","ssid":"%s","bssid":"%s","enc":"%s"}' "$(json_escape "$radio")" "$(json_escape "$nband")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$enc")"; done < /tmp/wiflow-scan.out; fi
+    TAB="$(printf '\t')"
+    while IFS="$TAB" read -r radio nband ssid bssid enc; do
+        [ -n "$ssid" ] || continue
+        [ "$first" -eq 1 ] || printf ','
+        first=0
+        printf '{"radio":"%s","band":"%s","ssid":"%s","bssid":"%s","enc":"%s"}' "$(json_escape "$radio")" "$(json_escape "$nband")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$enc")"
+    done < "$scan_tmp"
+    rm -f "$scan_tmp"
     printf ']}\n';;
 connect)
     require_csrf
