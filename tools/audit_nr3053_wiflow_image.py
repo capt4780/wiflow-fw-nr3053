@@ -592,12 +592,14 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
     service = fs / "etc/init.d/wiflow-setup"
     profile = fs / "usr/lib/wiflow/minimal-profile"
     common = fs / "usr/lib/wiflow/common.sh"
-    if not bootstrap.is_file() or not service.is_file() or not profile.is_file() or not common.is_file():
+    radio = fs / "usr/lib/wiflow/radio-policy"
+    if not bootstrap.is_file() or not service.is_file() or not profile.is_file() or not common.is_file() or not radio.is_file():
         return ["management recovery boot scripts missing"]
     src = bootstrap.read_text(encoding="utf-8", errors="replace")
     init = service.read_text(encoding="utf-8", errors="replace")
     minimal = profile.read_text(encoding="utf-8", errors="replace")
     common_src = common.read_text(encoding="utf-8", errors="replace")
+    radio_src = radio.read_text(encoding="utf-8", errors="replace")
     if "OPTIONAL_SERVICES='nodogsplash opennds wifidog'" not in minimal:
         return ["unrelated management/recovery services may be disabled on firstboot"]
     required = (
@@ -620,6 +622,10 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
         "uci -q get uhttpd.main.listen_https >/dev/null 2>&1 && return 1",
         "bootstrap_fail 'captive firewall activation failed'",
         "bootstrap_fail 'captive firewall disable failed'",
+        "recover_uplink_transaction || bootstrap_fail 'uplink rollback transaction incomplete'",
+        "bootstrap_fail 'initial WiFi radio policy failed'",
+        "bootstrap_fail 'saved WiFi radio policy failed'",
+        "bootstrap_fail 'WiFi radio reload failed'",
         '/etc/init.d/uhttpd restart >/dev/null 2>&1 || return 1',
     )
     if any(token not in src for token in required):
@@ -633,6 +639,21 @@ def audit_management_recovery_rootfs(fs: Path) -> list[str]:
     )
     if any(token not in common_src for token in common_required):
         return ["built common UCI owner lacks guest/uplink fail-closed checks"]
+    transaction_required = (
+        'cp "$UPLINK_TXN/$f" "/etc/config/$f" || return 2',
+        'chmod 600 "/etc/config/$f" || return 2',
+        'rm -rf "$UPLINK_TXN" || return 2',
+    )
+    radio_required = (
+        '[ -n "$r2" ] && [ -n "$r5" ] && [ "$r2" != "$r5" ] || exit 3',
+        'uci commit wireless || exit 1',
+        'ensure_guest wiflow_guest_2g "$r2" "$d2" || exit 1',
+        'ensure_guest wiflow_guest_5g "$r5" "$d5" || exit 1',
+    )
+    if any(token not in common_src for token in transaction_required):
+        return ["compiled uplink rollback can silently lose backup transaction"]
+    if any(token not in radio_src for token in radio_required):
+        return ["compiled radio setup can silently ignore WiFi configuration failure"]
     if not (
         src.index("backup_stock_configs ||") <
         src.index("ensure_management_network || bootstrap_fail") <
