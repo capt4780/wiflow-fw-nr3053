@@ -3,8 +3,8 @@ set -u
 . /usr/lib/wiflow/common.sh
 ROOT=/etc/wiflow
 LOG=/tmp/wiflow-bootstrap.log
-mkdir -p "$ROOT" /www-wiflow /www-wiflow-portal /www-wiflow-portal/runtime/revisions /www-wiflow-luci-gate 2>/dev/null || true
-chmod 700 "$ROOT" 2>/dev/null || true
+mkdir -p "$ROOT" /www-wiflow /www-wiflow-portal /www-wiflow-portal/runtime/revisions /www-wiflow-luci-gate 2>/dev/null || exit 1
+chmod 700 "$ROOT" 2>/dev/null || exit 1
 log(){ printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "$*" >> "$LOG"; }
 wait_for_br_lan(){ i=0; while [ "$i" -lt 30 ]; do ip link show br-lan >/dev/null 2>&1 && return 0; sleep 1; i=$((i+1)); done; return 1; }
 ensure_device_id(){
@@ -151,9 +151,12 @@ configure_web(){
 }
 
 wait_for_br_lan || { log 'BOOTSTRAP_BLOCK: br-lan unavailable'; exit 1; }
-ensure_device_id
+ensure_device_id || { log 'BOOTSTRAP_BLOCK: device identity could not be provisioned'; exit 1; }
 backup_stock_configs || { log 'BOOTSTRAP_BLOCK: incomplete stock configuration backup'; exit 1; }
-recover_uplink_transaction && log 'Recovered interrupted uplink transaction' || true
+if [ -f "$UPLINK_TXN/.pending" ]; then
+    recover_uplink_transaction || bootstrap_fail 'uplink rollback transaction incomplete'
+    log 'Recovered interrupted uplink transaction'
+fi
 ensure_management_network || bootstrap_fail 'management LAN configuration failed'
 ensure_guest_network || bootstrap_fail 'guest UCI configuration failed'
 ensure_uplink_network || bootstrap_fail 'uplink UCI configuration failed'
@@ -186,11 +189,11 @@ uplink_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
 uplink_ssid="$(uci -q get wireless.wiflow_uplink.ssid 2>/dev/null || true)"
 if [ -n "$uplink_radio" ] && [ -n "$uplink_ssid" ]; then
     uplink_band="$(radio_band "$uplink_radio")"
-    /usr/lib/wiflow/radio-policy wifi "$uplink_band" >/dev/null 2>&1 || log 'Saved WiFi radio policy could not be restored'
+    /usr/lib/wiflow/radio-policy wifi "$uplink_band" >/dev/null 2>&1 || bootstrap_fail 'saved WiFi radio policy failed'
 else
-    /usr/lib/wiflow/radio-policy setup >/dev/null 2>&1 || log 'Initial radio policy could not be applied'
+    /usr/lib/wiflow/radio-policy setup >/dev/null 2>&1 || bootstrap_fail 'initial WiFi radio policy failed'
 fi
-wifi reload >/dev/null 2>&1 || true
+wifi reload >/dev/null 2>&1 || wifi up >/dev/null 2>&1 || bootstrap_fail 'WiFi radio reload failed'
 configure_web || bootstrap_fail 'management web listeners not confirmed'
 /usr/lib/wiflow/minimal-profile >/dev/null 2>&1 || log 'Minimal runtime profile could not be fully applied'
 cleanup_legacy_management_ips

@@ -15,6 +15,7 @@ BOOT = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/bootstrap").read_text(
 COMMON = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/common.sh").read_text()
 INIT = (ROOT / "package/wiflow-setup/files/etc/init.d/wiflow-setup").read_text()
 MINIMAL = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/minimal-profile").read_text()
+RADIO = (ROOT / "package/wiflow-setup/files/usr/lib/wiflow/radio-policy").read_text()
 CONFIGS = ("network", "wireless", "firewall", "dhcp", "uhttpd")
 
 
@@ -107,6 +108,7 @@ rollback_stock_configs
             for rel, body in (("usr/lib/wiflow/bootstrap", BOOT),
                               ("usr/lib/wiflow/minimal-profile", MINIMAL),
                               ("usr/lib/wiflow/common.sh", COMMON),
+                              ("usr/lib/wiflow/radio-policy", RADIO),
                               ("etc/init.d/wiflow-setup", INIT)):
                 dest = fs / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +126,11 @@ rollback_stock_configs
             (fs / "usr/lib/wiflow/common.sh").write_text(
                 COMMON.replace("uci commit dhcp >/dev/null 2>&1 || return 1",
                                "uci commit dhcp >/dev/null 2>&1 || true"),
+                encoding="utf-8")
+            self.assertTrue(audit_management_recovery_rootfs(fs))
+            (fs / "usr/lib/wiflow/common.sh").write_text(COMMON, encoding="utf-8")
+            (fs / "usr/lib/wiflow/radio-policy").write_text(
+                RADIO.replace("uci commit wireless || exit 1", "uci commit wireless\nexit 0"),
                 encoding="utf-8")
             self.assertTrue(audit_management_recovery_rootfs(fs))
 
