@@ -44,6 +44,7 @@ uci(){
 firewall_test(){ printf "firewall:%s\n" "$1" >> "$TEST_ROOT/log"
                  [ "$FIREWALL_OK" = 1 ]; }
 log(){ printf "log:%s\n" "$1" >> "$TEST_ROOT/log"; }
+bootstrap_fail(){ log "BOOTSTRAP_BLOCK: $1"; exit 1; }
 ''' + production_boot_portal()
             result = subprocess.run(
                 ["sh", "-c", script], capture_output=True, text=True, timeout=6,
@@ -87,11 +88,17 @@ log(){ printf "log:%s\n" "$1" >> "$TEST_ROOT/log"; }
         self.assertEqual(calls, ["set:wiflow.core.portal_enabled=0",
                                  "commit:wiflow", "firewall:disable"])
 
-    def test_disabled_firewall_failure_is_visible_to_bootstrap_log(self):
+    def test_disabled_firewall_failure_blocks_bootstrap(self):
         code, flag, calls = self.run_case(flag=0, snapshot=True, firewall_ok=False)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertEqual(flag, "0")
-        self.assertIn("log:Captive portal firewall could not be disabled", calls)
+        self.assertIn("log:BOOTSTRAP_BLOCK: captive firewall disable failed", calls)
+
+    def test_enabled_firewall_failure_blocks_bootstrap(self):
+        code, flag, calls = self.run_case(flag=1, snapshot=True, firewall_ok=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(flag, "1")
+        self.assertIn("log:BOOTSTRAP_BLOCK: captive firewall activation failed", calls)
 
     def test_exact_image_auditor_accepts_current_bootstrap(self):
         with tempfile.TemporaryDirectory(prefix="wiflow-image-bootstrap-") as tmp:

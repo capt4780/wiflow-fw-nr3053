@@ -10,14 +10,23 @@ on:
       - "package/wiflow-setup/**"
       - "scripts/build-nr3053-base.sh"
       - "tools/audit_nr3053_wiflow_image.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-nr3053-wiflow.yml"
+      - "package/wiflow-setup/**"
+      - "scripts/build-nr3053-base.sh"
+      - "tools/audit_nr3053_wiflow_image.py"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: nr3053-wiflow-public-experimental
-  cancel-in-progress: false
+  # One lane per PR/main ref. Superseded PR commits cannot monopolize CI.
+  # Release/main builds are never cancelled automatically.
+  group: nr3053-wiflow-public-experimental-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:

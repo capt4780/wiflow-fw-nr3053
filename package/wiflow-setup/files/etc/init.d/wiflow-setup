@@ -3,7 +3,12 @@ START=96
 STOP=10
 USE_PROCD=1
 start_service() {
-    /usr/lib/wiflow/bootstrap >/tmp/wiflow-bootstrap.log 2>&1 || true
+    # A failed management bootstrap must never start heartbeat or Portal daemons.
+    # An on-device config rollback is not physical firmware recovery.
+    if ! /usr/lib/wiflow/bootstrap >>/tmp/wiflow-bootstrap.log 2>&1; then
+        logger -t wiflow-setup -p daemon.err 'BOOTSTRAP_BLOCK: management not verified; Wiflow loops not started'
+        return 1
+    fi
     procd_open_instance heartbeat
     procd_set_param command /usr/lib/wiflow/heartbeat-loop
     procd_set_param respawn 3600 5 5
