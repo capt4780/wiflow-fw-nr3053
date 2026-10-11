@@ -25,7 +25,9 @@ state_set job_started "$(date +%s)"
 old_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
 
 backup_configs(){
-    rm -rf "$UPLINK_TXN"
+    # A previous interrupted or failed rollback must never be overwritten.
+    [ ! -e "$UPLINK_TXN/.pending" ] && [ ! -L "$UPLINK_TXN/.pending" ] || return 1
+    rm -rf "$UPLINK_TXN" || return 1
     mkdir -p "$UPLINK_TXN" || return 1
     chmod 700 "$UPLINK_TXN" 2>/dev/null || true
     cp /etc/config/wireless "$UPLINK_TXN/wireless" 2>/dev/null || return 1
@@ -40,19 +42,32 @@ cleanup_backups(){ rm -rf "$UPLINK_TXN"; }
 cleanup_request(){ rm -f "$req"; }
 reload_radio(){ r="$1"; [ -n "$r" ] || return 0; wifi reload "$r" >/dev/null 2>&1 || wifi up "$r" >/dev/null 2>&1 || return 1; }
 restore_configs(){
-    [ -f "$UPLINK_TXN/wireless" ] && cp "$UPLINK_TXN/wireless" /etc/config/wireless
-    [ -f "$UPLINK_TXN/wiflow" ] && cp "$UPLINK_TXN/wiflow" /etc/config/wiflow
-    [ -f "$UPLINK_TXN/network" ] && cp "$UPLINK_TXN/network" /etc/config/network
+    # Fail closed if ANY saved file is absent; do not report restored if even
+    # one write, network reload, or radio reload failed.
+    for f in wireless wiflow network; do
+        [ -f "$UPLINK_TXN/$f" ] && [ ! -L "$UPLINK_TXN/$f" ] || return 1
+    done
+    for f in wireless wiflow network; do
+        cp "$UPLINK_TXN/$f" "/etc/config/$f" || return 1
+        chmod 600 "/etc/config/$f" || return 1
+    done
     secure_configs
-    ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || true
-    [ -n "$old_radio" ] && reload_radio "$old_radio" || true
-    [ -n "$radio" ] && [ "$radio" != "$old_radio" ] && reload_radio "$radio" || true
+    ubus call network reload >/dev/null 2>&1 || /etc/init.d/network reload >/dev/null 2>&1 || return 1
+    if [ -n "$old_radio" ]; then reload_radio "$old_radio" || return 1; fi
+    if [ -n "$radio" ] && [ "$radio" != "$old_radio" ]; then reload_radio "$radio" || return 1; fi
+    return 0
 }
 finish_command(){ status="$1"; message="$2"; [ -n "$command_id" ] && command_result_set "$command_id" "$command_action" "$status" "$message" || true; }
 fail(){
     code="$1"; message="$2"
-    restore_configs
-    cleanup_backups
+    if restore_configs; then
+        cleanup_backups
+    else
+        # Keep the original copies and .pending for next-boot recovery.
+        # Never tell the owner a configuration was restored if it was not.
+        code=rollback_failed
+        message='Không khôi phục được cấu hình mạng. Đã giữ bản sao để phục hồi; không reset hoặc flash lại.'
+    fi
     cleanup_request
     state_set job failed
     state_set phase failed
@@ -94,7 +109,7 @@ wait_internet(){
 backup_configs || { cleanup_request; state_set job failed; state_set phase failed; state_set job_error backup_failed; state_set message 'Không thể tạo điểm khôi phục cấu hình'; finish_command failed 'Không thể tạo điểm khôi phục cấu hình'; exit 1; }
 trap 'fail interrupted "Kết nối bị gián đoạn. Wiflow đã khôi phục cấu hình trước đó."' HUP INT TERM
 if ! uci -q get network.wiflow_wwan >/dev/null 2>&1; then
-    ensure_uplink_network
+    ensure_uplink_network || fail network_config_failed 'Không thể chuẩn bị giao diện WiFi nguồn'
 fi
 
 if [ "$mode" = lan ]; then
