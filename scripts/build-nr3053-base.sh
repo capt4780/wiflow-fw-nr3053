@@ -32,7 +32,7 @@ old = 'sscanf(data, "\\nTotal=%d", &total);'
 # Guard empty site surveys and damaged response headers.
 assert s.count(old) == 1, "MTK survey parse changed"
 s = s.replace(old, old + '\n\t\tif (total == 0) break;')
-old = '\t\tpos = strtok(NULL, "\\n");'
+old = '\n\t\tpos = strtok(NULL, "\\n");'
 assert s.count(old) == 1, "MTK survey header parse changed"
 s = s.replace(old, old + '\n\t\tif (!pos) { free(data); return -1; }')
 p.write_text(s)
