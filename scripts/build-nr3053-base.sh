@@ -35,6 +35,23 @@ s = s.replace(old, old + '\n\t\tif (total == 0) break;')
 old = '\n\t\tpos = strtok(NULL, "\\n");'
 assert s.count(old) == 1, "MTK survey header parse changed"
 s = s.replace(old, old + '\n\t\tif (!pos) { free(data); return -1; }')
+# The pinned upstream assumes all SiteSurvey columns exist and blindly
+# subtracts a NULL strstr() pointer on malformed/partial driver responses.
+header_anchor = 'offsets[SCAN_DATA_CH] = strstr(pos, "Ch ") - pos;'
+assert s.count(header_anchor) == 1, "MTK SiteSurvey column mapping changed"
+column_guard = (
+    '\t\tif (!strstr(pos, "Ch ") || !strstr(pos, "SSID ") || '
+    '!strstr(pos, "BSSID ") || !strstr(pos, "Security ") || '
+    '!strstr(pos, "Rssi") || !strstr(pos, "Siganl") || '
+    '!strstr(pos, "NT") || !strstr(pos, "SSID_Len")) { '
+    'free(data); return -1; }\n'
+)
+s = s.replace('\t\t' + header_anchor, column_guard + '\t\t' + header_anchor)
+# Never copy an untrusted driver-reported SSID length outside iwinfo's buffer.
+old = 'sscanf(pos + offsets[SCAN_DATA_SSID_LEN], "%d", &ssid_len);'
+assert s.count(old) == 1, "MTK SiteSurvey SSID length parse changed"
+s = s.replace(old, 'if (' + old[:-1] + ' != 1 || ssid_len < 0 || '
+              '(size_t)ssid_len > sizeof(e->ssid)) continue;')
 p.write_text(s)
 print("P51_MTK_SURVEY_BUFFER_FIX_STAGED")
 PY
