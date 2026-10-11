@@ -4,6 +4,16 @@
 require_session
 action="$(param action 2>/dev/null || true)"; [ -n "$action" ] || action=status
 case "$action" in
+diagnostics)
+    # Authenticated, read-only evidence. The helper never alters network state.
+    umask 077
+    diag="/tmp/wiflow-network-diagnostics-$"
+    if sh /usr/lib/wiflow/network-diagnostics > "$diag" && [ -s "$diag" ]; then
+        header_json; cat "$diag"
+    else
+        header_json; echo '{"ok":false,"error":"Không đọc được trạng thái mạng."}'
+    fi
+    rm -f "$diag";;
 scan)
     band="$(param band 2>/dev/null || echo 5g)"; case "$band" in 2g|5g) :;; *) header_json; echo '{"ok":false,"error":"Băng tần không hợp lệ"}'; exit 0;; esac
     scan_tmp="/tmp/wiflow-api-scan-$$"
