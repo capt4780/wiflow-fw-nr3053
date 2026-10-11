@@ -19,6 +19,44 @@ echo "PINNED_PUBLIC_SOURCE_PASS=$PIN"
 echo "::endgroup::"
 cd "$ROOT"
 
+echo "::group::Repair pinned MTK survey buffer bug"
+python3 - <<'PY'
+from pathlib import Path
+p = Path("package/network/utils/iwinfo/src/iwinfo_mtk.c")
+s = p.read_text()
+bad = "mtk_get_scanlist_dump(ifname, index, data, sizeof(data))"
+assert s.count(bad) == 1, "Pinned MTK survey backend changed: stop build"
+assert s.count("unsigned int data_len = 5000;") == 1, "MTK survey allocation changed"
+s = s.replace(bad, "mtk_get_scanlist_dump(ifname, index, data, data_len)")
+old = 'sscanf(data, "\\nTotal=%d", &total);'
+# Guard empty site surveys and damaged response headers.
+assert s.count(old) == 1, "MTK survey parse changed"
+s = s.replace(old, old + '\n\t\tif (total == 0) break;')
+old = '\n\t\tpos = strtok(NULL, "\\n");'
+assert s.count(old) == 1, "MTK survey header parse changed"
+s = s.replace(old, old + '\n\t\tif (!pos) { free(data); return -1; }')
+# The pinned upstream assumes all SiteSurvey columns exist and blindly
+# subtracts a NULL strstr() pointer on malformed/partial driver responses.
+header_anchor = 'offsets[SCAN_DATA_CH] = strstr(pos, "Ch ") - pos;'
+assert s.count(header_anchor) == 1, "MTK SiteSurvey column mapping changed"
+column_guard = (
+    '\t\tif (!strstr(pos, "Ch ") || !strstr(pos, "SSID ") || '
+    '!strstr(pos, "BSSID ") || !strstr(pos, "Security ") || '
+    '!strstr(pos, "Rssi") || !strstr(pos, "Siganl") || '
+    '!strstr(pos, "NT") || !strstr(pos, "SSID_Len")) { '
+    'free(data); return -1; }\n'
+)
+s = s.replace('\t\t' + header_anchor, column_guard + '\t\t' + header_anchor)
+# Never copy an untrusted driver-reported SSID length outside iwinfo's buffer.
+old = 'sscanf(pos + offsets[SCAN_DATA_SSID_LEN], "%d", &ssid_len);'
+assert s.count(old) == 1, "MTK SiteSurvey SSID length parse changed"
+s = s.replace(old, 'if (' + old[:-1] + ' != 1 || ssid_len < 0 || '
+              '(size_t)ssid_len > sizeof(e->ssid)) continue;')
+p.write_text(s)
+print("P51_MTK_SURVEY_BUFFER_FIX_STAGED")
+PY
+echo "::endgroup::"
+
 echo "::group::Derive NR3053-only configuration and disable unsafe radio writers"
 python3 - <<'PY'
 from pathlib import Path
