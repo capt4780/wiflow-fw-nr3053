@@ -26,10 +26,6 @@ class MtWifiAssociationTests(unittest.TestCase):
             root=Path(tmp)
             (root/"apcli0").touch()
             cli=root/"iwinfo-ucode"
-            cli.write_text(
-                "#!/bin/sh\n"
-                "printf 'apcli0 ESSID: \\"%s\\"\\n' \\"%s\\"\n".replace('\\"%s\\"\\n','\"%s\"\\n').replace('\\\\"%s\\\\"','\"%s\"')
-            )
             # Use a fixed fixture; all controlled input is in the fixture script.
             cli.write_text(
                 '#!/bin/sh\n'
