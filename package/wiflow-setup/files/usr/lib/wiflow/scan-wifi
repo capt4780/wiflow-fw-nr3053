@@ -4,16 +4,14 @@ set -u
 band="${1:-5g}"
 case "$band" in 2g|5g) :;; *) exit 2;; esac
 OUT=/tmp/wiflow-scan.out
+DBG=/tmp/wiflow-scan-debug.log
 : > "$OUT"
-for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do
-    [ "$(radio_band "$r")" = "$band" ] || continue
-    tmp="/tmp/wiflow-scan-$r.$$"
-    ifn="$(radio_scan_ifname "$r")"
-    ( wiflow_iwinfo "$ifn" scan > "$tmp" 2>/dev/null ) & p=$!
-    ( sleep 7; kill "$p" 2>/dev/null ) & w=$!
-    wait "$p" 2>/dev/null || true
-    kill "$w" 2>/dev/null || true
-    awk -v radio="$r" -v band="$band" '
+: > "$DBG"
+chmod 600 "$DBG" 2>/dev/null || true
+
+# iwinfo "Cell NN - Address:" format.
+parse_iwinfo(){
+    awk -v radio="$1" -v band="$2" '
       /Cell [0-9]+ - Address:/ {b=$0; sub(/^.*Address: /,"",b); gsub(/[[:space:]]+$/,"",b)}
       /ESSID: / {s=$0; sub(/^.*ESSID: \"/,"",s); sub(/\".*$/,"",s)}
       /Encryption: / {
@@ -23,7 +21,59 @@ for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1
         else if(e ~ /WPA[^2]/) enc="psk";
         if(s!="") {print radio "\t" band "\t" s "\t" b "\t" enc; s=""; b=""}
       }
-    ' "$tmp" >> "$OUT" 2>/dev/null || true
+    ' "$3" 2>/dev/null
+}
+# MTK `iwpriv <ifn> get_site_survey` table: [No] Ch SSID BSSID Security Signal ...
+parse_mtk_survey(){
+    awk -v radio="$1" -v band="$2" '
+      match($0, /[0-9A-Fa-f][0-9A-Fa-f](:[0-9A-Fa-f][0-9A-Fa-f])+/) && RLENGTH==17 {
+        b=substr($0,RSTART,RLENGTH); pre=substr($0,1,RSTART-1); post=substr($0,RSTART+RLENGTH)
+        sub(/^[[:space:]]+/,"",pre); sub(/^[0-9]+[[:space:]]+/,"",pre)
+        if (pre ~ /^[0-9]+[[:space:]]+[^[:space:]]/) sub(/^[0-9]+[[:space:]]+/,"",pre)
+        sub(/[[:space:]]+$/,"",pre); sub(/^[[:space:]]+/,"",post); split(post,t,/[[:space:]]+/); sec=toupper(t[1])
+        enc="psk2"
+        if (sec ~ /NONE|OPEN/) enc="none"
+        else if (sec ~ /WPA3|SAE/) enc="sae-mixed"
+        else if (sec ~ /WPA2/) enc="psk2"
+        else if (sec ~ /WPA/) enc="psk"
+        if (pre!="") print radio "\t" band "\t" pre "\t" b "\t" enc
+      }
+    ' "$3" 2>/dev/null
+}
+dbg(){ printf '%s\n' "$*" >> "$DBG"; }
+
+for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do
+    [ "$(radio_band "$r")" = "$band" ] || continue
+    tmp="/tmp/wiflow-scan-$r.$$"
+    ifn="$(radio_scan_ifname "$r")"
+    dbg "radio=$r band=$band ifname=$ifn"
+    got=0
+    if [ -n "$(command -v iwinfo-ucode 2>/dev/null)$(command -v iwinfo 2>/dev/null)" ] || [ -x "$WIFLOW_BIN_DIR/iwinfo" ] || [ -x "$WIFLOW_BIN_DIR/iwinfo-ucode" ]; then
+        ( wiflow_iwinfo "$ifn" scan > "$tmp" 2>&1 ) & p=$!
+        ( sleep 7; kill "$p" 2>/dev/null ) & w=$!
+        wait "$p" 2>/dev/null || true
+        kill "$w" 2>/dev/null || true
+        rows="$(parse_iwinfo "$r" "$band" "$tmp")"
+        dbg "iwinfo scan: $(wc -c < "$tmp" 2>/dev/null || echo 0) bytes, parsed=$(printf '%s' "$rows" | grep -c . )"
+        head -n 12 "$tmp" 2>/dev/null | sed 's/^/  | /' >> "$DBG"
+        if [ -n "$rows" ]; then printf '%s\n' "$rows" >> "$OUT"; got=1; fi
+    else
+        dbg "iwinfo: not installed"
+    fi
+    if [ "$got" -eq 0 ] && command -v iwpriv >/dev/null 2>&1; then
+        iwpriv "$ifn" set SiteSurvey=1 >/dev/null 2>&1 || true
+        sleep "${WIFLOW_SURVEY_WAIT:-4}"
+        ( iwpriv "$ifn" get_site_survey > "$tmp" 2>&1 ) & p=$!
+        ( sleep 5; kill "$p" 2>/dev/null ) & w=$!
+        wait "$p" 2>/dev/null || true
+        kill "$w" 2>/dev/null || true
+        rows="$(parse_mtk_survey "$r" "$band" "$tmp")"
+        dbg "iwpriv get_site_survey: $(wc -c < "$tmp" 2>/dev/null || echo 0) bytes, parsed=$(printf '%s' "$rows" | grep -c . )"
+        head -n 12 "$tmp" 2>/dev/null | sed 's/^/  | /' >> "$DBG"
+        [ -n "$rows" ] && printf '%s\n' "$rows" >> "$OUT"
+    elif [ "$got" -eq 0 ]; then
+        dbg "iwpriv: not installed"
+    fi
     rm -f "$tmp"
 done
 # Keep same SSID on different BSSID entries; only remove exact duplicate radio+SSID+BSSID.

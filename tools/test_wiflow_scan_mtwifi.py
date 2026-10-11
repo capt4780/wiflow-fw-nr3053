@@ -38,6 +38,20 @@ case "$1" in
 esac
 '''
 
+SURVEY = """ra0       get_site_survey:
+No  Ch  SSID                             BSSID               Security               Signal(%)W-Mode  ExtCH  NT WPS DPID
+1   6   Quan Cafe 2G                     aa:bb:cc:dd:ee:10   WPA2PSK/AES            70       11b/g/n NONE   In YES
+2   11  OpenNet                          aa:bb:cc:dd:ee:11   NONE                   40       11b/g/n NONE   In NO
+3   1   Old                              aa:bb:cc:dd:ee:12   WPAPSK/TKIP            30       11b/g   NONE   In NO
+4   3   Nha WPA3                         aa:bb:cc:dd:ee:13   WPA3PSK/AES            50       11b/g/n NONE   In NO
+"""
+FAKE_IWPRIV = '''#!/bin/sh
+echo "iwpriv $*" >> "$WIFLOW_TEST_LOG"
+[ "$2" = set ] && exit 0
+[ "$2" = get_site_survey ] && { printf '%s' "$WIFLOW_TEST_SURVEY"; exit 0; }
+exit 1
+'''
+
 
 class ScanMtwifiTests(unittest.TestCase):
     def setUp(self):
@@ -115,6 +129,34 @@ class ScanMtwifiTests(unittest.TestCase):
 
     def test_no_cli_yields_empty_result_not_crash(self):
         self.assertEqual(self.run_scan("2g"), [])
+
+    def test_iwpriv_site_survey_fallback_when_iwinfo_is_empty(self):
+        self.install_cli("iwinfo")  # fake prints nothing for ra0 in this test
+        p = self.bin / "iwpriv"
+        p.write_text(FAKE_IWPRIV)
+        p.chmod(0o755)
+        out = Path("/tmp/wiflow-scan.out")
+        out.unlink(missing_ok=True)
+        env = {"PATH": f"{self.bin}:/usr/bin:/bin", "WIFLOW_BIN_DIR": str(self.bin),
+               "WIFLOW_L1_PROFILE": str(self.l1), "WIFLOW_TEST_LOG": str(self.log),
+               "WIFLOW_TEST_2G": "", "WIFLOW_TEST_5G": "", "WIFLOW_TEST_SURVEY": SURVEY,
+               "WIFLOW_SURVEY_WAIT": "0"}
+        subprocess.run(["sh", str(self.scan), "2g"], env=env, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        rows = out.read_text().splitlines()
+        self.assertEqual(rows, [
+            "MT7981_1_1\t2g\tQuan Cafe 2G\taa:bb:cc:dd:ee:10\tpsk2",
+            "MT7981_1_1\t2g\tOpenNet\taa:bb:cc:dd:ee:11\tnone",
+            "MT7981_1_1\t2g\tOld\taa:bb:cc:dd:ee:12\tpsk",
+            "MT7981_1_1\t2g\tNha WPA3\taa:bb:cc:dd:ee:13\tsae-mixed"])
+        self.assertIn("iwpriv ra0 set SiteSurvey=1", self.calls())
+        dbg = Path("/tmp/wiflow-scan-debug.log").read_text()
+        self.assertIn("ifname=ra0", dbg)
+        self.assertIn("iwpriv get_site_survey", dbg)
+
+    def test_debug_log_records_reason_when_nothing_works(self):
+        self.run_scan("2g")
+        self.assertIn("iwinfo: not installed", Path("/tmp/wiflow-scan-debug.log").read_text())
 
 
 if __name__ == "__main__":

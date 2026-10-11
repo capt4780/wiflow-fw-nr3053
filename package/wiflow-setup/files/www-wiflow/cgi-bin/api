@@ -10,6 +10,8 @@ scan)
     header_json; printf '{"ok":true,"band":"%s","networks":[' "$(json_escape "$band")"; first=1
     if [ -f /tmp/wiflow-scan.out ]; then TAB="$(printf '\t')"; while IFS="$TAB" read -r radio nband ssid bssid enc; do [ -n "$ssid" ] || continue; [ "$first" -eq 1 ] || printf ','; first=0; printf '{"radio":"%s","band":"%s","ssid":"%s","bssid":"%s","enc":"%s"}' "$(json_escape "$radio")" "$(json_escape "$nband")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$enc")"; done < /tmp/wiflow-scan.out; fi
     printf ']}\n';;
+scan_debug)
+    printf 'Content-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\n\r\n'; cat /tmp/wiflow-scan-debug.log 2>/dev/null;;
 connect)
     require_csrf
     arm_management_resume >/dev/null 2>&1 || true
