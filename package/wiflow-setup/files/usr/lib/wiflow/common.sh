@@ -158,20 +158,35 @@ internet_probe_fast(){
 
 wifi_uplink_associated(){
     want="${1:-}"
-    # NR3053 uses MediaTek's proprietary MTWiFi (apcli*/apclix*), not only
-    # nl80211. 'iw dev' often reports no managed interface for this backend.
-    # A configured SSID is NOT proof of association: verify live BSSID too.
+    # NR3053 uses proprietary MTWiFi APCLI devices, usually absent from iw dev.
+    # Verify live ESSID AND a non-zero associated BSSID, never UCI alone.
     if [ -x /usr/bin/iwinfo-ucode ]; then
         for sysif in /sys/class/net/apcli*; do
             [ -e "$sysif" ] || continue
             ifn="${sysif##*/}"
             info="$(/usr/bin/iwinfo-ucode "$ifn" info 2>/dev/null)" || continue
-            ssid="$(printf '%s\n' "$info" | sed -n 's/.*ESSID: "\(.*\)".*/\1/p' | head -n1)"
-            ap="$(printf '%s\n' "$info" | sed -n 's/.*Access Point: \([^[:space:]]*\).*/\1/p' | head -n1)"
-            case "$ap" in
-                ''|00:00:00:00:00:00|ff:ff:ff:ff:ff:ff|FF:FF:FF:FF:FF:FF|Not-Associated) continue;;
+            ssid="$(printf '%s\n' "$info" | awk -F'ESSID: "' 'NF>1 {sub(/".*$/, "", $2); print $2; exit}')"
+            ap="$(printf '%s\n' "$info" | awk -F'Access Point: ' 'NF>1 {split($2,a," "); print a[1]; exit}')"
+            case "$(printf '%s' "$ap" | tr A-F a-f)" in
+                ""|00:00:00:00:00:00|ff:ff:ff:ff:ff:ff|not-associated) continue;;
             esac
-            printf '%s' "$ap" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}
+            printf '%s' "$ap" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' || continue
+            [ -n "$ssid" ] || continue
+            [ -z "$want" ] || [ "$ssid" = "$want" ] || continue
+            return 0
+        done
+    fi
+    # Preserve nl80211 support if an ordinary managed STA is present.
+    command -v iw >/dev/null 2>&1 || return 1
+    for ifn in $(iw dev 2>/dev/null | awk '/Interface /{i=$2}/type managed/{print i}'); do
+        link="$(iw dev "$ifn" link 2>/dev/null || true)"
+        printf '%s\n' "$link" | grep -q '^Connected to ' || continue
+        [ -z "$want" ] && return 0
+        got="$(printf '%s\n' "$link" | sed -n 's/^[[:space:]]*SSID: //p' | head -n1)"
+        [ "$got" = "$want" ] && return 0
+    done
+    return 1
+}
 
 wifi_ssid_visible(){
     radio="$1"; want="$2"; tmp="/tmp/wiflow-visible.$$"
