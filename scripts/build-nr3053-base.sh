@@ -19,6 +19,27 @@ echo "PINNED_PUBLIC_SOURCE_PASS=$PIN"
 echo "::endgroup::"
 cd "$ROOT"
 
+echo "::group::Repair pinned MTK survey buffer bug"
+python3 - <<'PY'
+from pathlib import Path
+p = Path("package/network/utils/iwinfo/src/iwinfo_mtk.c")
+s = p.read_text()
+bad = "mtk_get_scanlist_dump(ifname, index, data, sizeof(data))"
+assert s.count(bad) == 1, "Pinned MTK survey backend changed: stop build"
+assert s.count("unsigned int data_len = 5000;") == 1, "MTK survey allocation changed"
+s = s.replace(bad, "mtk_get_scanlist_dump(ifname, index, data, data_len)")
+old = 'sscanf(data, "\\nTotal=%d", &total);'
+# Guard empty site surveys and damaged response headers.
+assert s.count(old) == 1, "MTK survey parse changed"
+s = s.replace(old, old + '\n\t\tif (total == 0) break;')
+old = 'pos = strtok(NULL, "\\n");'
+assert s.count(old) == 1, "MTK survey header parse changed"
+s = s.replace(old, old + '\n\t\tif (!pos) { free(data); return -1; }')
+p.write_text(s)
+print("P51_MTK_SURVEY_BUFFER_FIX_STAGED")
+PY
+echo "::endgroup::"
+
 echo "::group::Derive NR3053-only configuration and disable unsafe radio writers"
 python3 - <<'PY'
 from pathlib import Path
