@@ -158,6 +158,365 @@ internet_probe_fast(){
 
 wifi_uplink_associated(){
     want="${1:-}"
+    # NR3053 uses MediaTek's proprietary MTWiFi (apcli*/apclix*), not only
+    # nl80211. 'iw dev' often reports no managed interface for this backend.
+    # A configured SSID is NOT proof of association: verify live BSSID too.
+    if [ -x /usr/bin/iwinfo-ucode ]; then
+        for sysif in /sys/class/net/apcli*; do
+            [ -e "$sysif" ] || continue
+            ifn="${sysif##*/}"
+            info="$(/usr/bin/iwinfo-ucode "$ifn" info 2>/dev/null)" || continue
+            ssid="$(printf '%s\n' "$info" | sed -n 's/.*ESSID: "\(.*\)".*/\1/p' | head -n1)"
+            ap="$(printf '%s\n' "$info" | sed -n 's/.*Access Point: \([^[:space:]]*\).*/\1/p' | head -n1)"
+            case "$ap" in
+                ''|00:00:00:00:00:00|ff:ff:ff:ff:ff:ff|FF:FF:FF:FF:FF:FF|Not-Associated) continue;;
+            esac
+            printf '%s' "$ap" | grep -Eiq '^([0-9a-f]{2}:){5}[0-9a-f]{2}
+
+wifi_ssid_visible(){
+    radio="$1"; want="$2"; tmp="/tmp/wiflow-visible.$$"
+    ( /usr/bin/iwinfo-ucode "$radio" scan > "$tmp" 2>/dev/null ) & p=$!
+    ( sleep 6; kill "$p" 2>/dev/null ) & w=$!
+    wait "$p" 2>/dev/null || true; kill "$w" 2>/dev/null || true
+    awk -v want="$want" '/ESSID: /{s=$0;sub(/^.*ESSID: "/,"",s);sub(/".*$/,"",s);if(s==want){ok=1;exit}} END{exit(ok?0:1)}' "$tmp" 2>/dev/null
+    rc=$?; rm -f "$tmp"; return "$rc"
+}
+
+setup_username(){ u="$(uci -q get wiflow.core.setup_username 2>/dev/null || true)"; [ -n "$u" ] && printf '%s' "$u" || printf 'wiflow'; }
+setup_check_login(){
+    u="$1"; p="$2"; stored_hash="$(uci -q get wiflow.core.setup_password_hash 2>/dev/null || true)"; stored_salt="$(uci -q get wiflow.core.setup_password_salt 2>/dev/null || true)"
+    [ -n "$stored_hash" ] && [ -n "$stored_salt" ] || return 1
+    [ "$u" = "$(setup_username)" ] || return 1
+    got="$(printf '%s:%s' "$stored_salt" "$p" | sha256sum | awk '{print $1}')"
+    [ "$got" = "$stored_hash" ]
+}
+setup_set_login(){
+    u="$1"; p="$2"
+    printf '%s' "$u" | grep -Eq '^[A-Za-z0-9._-]{3,32}$' || return 2
+    plen="$(printf '%s' "$p" | wc -c | tr -d ' ')"; case "$plen" in ''|*[!0-9]*) return 2;; esac
+    [ "$plen" -ge 12 ] && [ "$plen" -le 128 ] || return 2
+    salt="$(new_token | cut -c1-32)"; hash="$(printf '%s:%s' "$salt" "$p" | sha256sum | awk '{print $1}')"
+    uci set "wiflow.core.setup_username=$u"
+    uci set "wiflow.core.setup_password_salt=$salt"
+    uci set "wiflow.core.setup_password_hash=$hash"
+    uci commit wiflow || return 1
+    secure_configs
+    rm -rf "$SESS"/* 2>/dev/null || true
+    clear_all_management_resume
+    return 0
+}
+setup_reset_login(){
+    uci -q delete wiflow.core.setup_username >/dev/null 2>&1 || true
+    uci -q delete wiflow.core.setup_password_salt >/dev/null 2>&1 || true
+    uci -q delete wiflow.core.setup_password_hash >/dev/null 2>&1 || true
+    uci commit wiflow >/dev/null 2>&1 || true
+    secure_configs
+    rm -rf "$SESS"/* 2>/dev/null || true
+    clear_all_management_resume
+}
+
+
+device_id(){ cat /etc/wiflow/device-id 2>/dev/null | tr -d "\r\n"; }
+device_token(){ uci -q get wiflow.core.device_token 2>/dev/null || true; }
+wiflow_get(){
+ out="$1"; url="$2"; did="$(device_id)"; tok="$(device_token)"; [ -n "$did" ] && [ -n "$tok" ] || return 2
+ err="${out}.fetch-error"; rm -f "$err"; uclient-fetch -T 15 --header="X-Wiflow-Device-ID: $did" --header="X-Wiflow-Device-Token: $tok" -O "$out" "$url" 2>"$err"; rc=$?
+ [ "$rc" -eq 0 ] && rm -f "$err"; return "$rc"
+}
+wiflow_post(){
+ out="$1"; url="$2"; body="$3"; did="$(device_id)"; tok="$(device_token)"; [ -n "$did" ] && [ -n "$tok" ] || return 2
+ err="${out}.fetch-error"; rm -f "$err"; uclient-fetch -T 15 --post-data="$body" --header='Content-Type: application/json' --header="X-Wiflow-Device-ID: $did" --header="X-Wiflow-Device-Token: $tok" -O "$out" "$url" 2>"$err"; rc=$?
+ [ "$rc" -eq 0 ] && rm -f "$err"; return "$rc"
+}
+
+portal_storage_reset(){
+    rm -rf "$PORTAL_REVISIONS" "$PORTAL_ACTIVE" "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* 2>/dev/null || true
+    mkdir -p "$PORTAL_REVISIONS" 2>/dev/null || true
+    uci set wiflow.core.portal_revision='0'
+    uci set wiflow.core.portal_sync_status='idle'
+    uci set wiflow.core.portal_sync_error=''
+}
+
+pairing_clear_local(){
+    /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
+    uci set wiflow.core.paired='0'
+    uci set wiflow.core.portal_enabled='0'
+    uci set wiflow.core.pair_required='1'
+    for k in device_token account_public_id client_hash_salt last_command_id last_command_action last_command_status last_command_message; do
+        uci -q delete "wiflow.core.$k" >/dev/null 2>&1 || true
+    done
+    portal_storage_reset
+    uci commit wiflow >/dev/null 2>&1 || true
+    secure_configs
+    rm -f "$EVENT_QUEUE" "$HEARTBEAT_KICK" 2>/dev/null || true
+    rm -rf "$CLIENT_SESSIONS"/* 2>/dev/null || true
+    ensure_guest_network >/dev/null 2>&1 || true
+    /etc/init.d/firewall reload >/dev/null 2>&1 || true
+}
+
+client_id_for_mac(){
+    mac="$1"; salt="$(uci -q get wiflow.core.client_hash_salt 2>/dev/null || true)"
+    [ -n "$salt" ] || salt="$(cat /etc/wiflow/device-id 2>/dev/null | tr -d '\r\n')"
+    printf '%s|%s' "$salt" "$mac" | sha256sum | awk '{print substr($1,1,32)}'
+}
+client_file_for_mac(){ safe="$(printf '%s' "$1" | tr -cd '0-9A-Fa-f')"; [ -n "$safe" ] || return 1; printf '%s/%s' "$CLIENT_SESSIONS" "$safe"; }
+client_find_file_by_session(){
+    sid="$1"; for f in "$CLIENT_SESSIONS"/*; do [ -f "$f" ] || continue; IFS='|' read -r _mac _cid _sid _ip _connected _authorized _last _absent < "$f" 2>/dev/null || true; [ "$_sid" = "$sid" ] && { printf '%s' "$f"; return 0; }; done; return 1
+}
+valid_guest_ip(){ case "${1:-}" in 10.10.10.*) last="${1##*.}";; *) return 1;; esac; case "$last" in ''|*[!0-9]*) return 1;; esac; [ "$last" -ge 2 ] 2>/dev/null && [ "$last" -le 254 ] 2>/dev/null; }
+guest_mac_for_ip(){
+    ipx="$1"; valid_guest_ip "$ipx" || return 1
+    mac="$(awk -v ip="$ipx" '$3==ip{print toupper($2);exit}' /tmp/dhcp.leases 2>/dev/null || true)"
+    [ -n "$mac" ] || mac="$(ip neigh show "$ipx" dev br-wiflow 2>/dev/null | awk '/lladdr/{print toupper($5);exit}')"
+    printf '%s' "$mac" | grep -Eq '^([0-9A-F]{2}:){5}[0-9A-F]{2}$' || return 1
+    printf '%s' "$mac"
+}
+client_session_write(){
+    f="$1"; mac="$2"; cid="$3"; sid="$4"; ipx="$5"; connected="$6"; authorized="$7"; last="$8"; absent="$9"
+    tmp="$f.$$"; printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "$mac" "$cid" "$sid" "$ipx" "$connected" "$authorized" "$last" "$absent" > "$tmp" || return 1
+    chmod 600 "$tmp" 2>/dev/null || true; mv "$tmp" "$f"
+}
+portal_nft_ready(){
+    /usr/sbin/nft list set inet fw4 wiflow_portal_authed >/dev/null 2>&1 &&
+    /usr/sbin/nft list set inet fw4 wiflow_portal_granted >/dev/null 2>&1
+}
+portal_nft_grant_del(){
+    ipx="$1"; mac="$2"
+    printf 'delete element inet fw4 wiflow_portal_granted { %s . %s }\n' "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || true
+}
+portal_nft_grant_add(){
+    ipx="$1"; mac="$2"; valid_guest_ip "$ipx" || return 1; portal_nft_ready || return 1
+    portal_nft_grant_del "$ipx" "$mac"
+    printf 'add element inet fw4 wiflow_portal_granted { %s . %s timeout 30m }\n' "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
+    portal_nft_pair_granted "$ipx" "$mac"
+}
+portal_nft_pair_granted(){
+    ipx="$1"; mac="$2"
+    /usr/sbin/nft list set inet fw4 wiflow_portal_granted 2>/dev/null | grep -Fiq "$ipx . $mac"
+}
+portal_nft_del(){ ipx="$1"; mac="$2"; printf 'delete element inet fw4 wiflow_portal_authed { %s . %s }\n' "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || true; }
+# Unlike portal_nft_pair_authorized, this helper MUST prove a successful nft
+# readback. A failed list/read command is never proof of revocation.
+portal_nft_pair_revoked(){
+    ipx="$1"; mac="$2"
+    dump="$(/usr/sbin/nft list set inet fw4 wiflow_portal_authed 2>/dev/null)" || return 1
+    ! printf '%s\n' "$dump" | grep -Fiq "$ipx . $mac"
+}
+
+portal_nft_add(){
+    ipx="$1"; mac="$2"; valid_guest_ip "$ipx" || return 1; portal_nft_ready || return 1
+    portal_nft_del "$ipx" "$mac"
+    printf 'add element inet fw4 wiflow_portal_authed { %s . %s timeout 30d }\n' "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
+    portal_nft_pair_authorized "$ipx" "$mac"
+}
+portal_nft_pair_authorized(){ ipx="$1"; mac="$2"; /usr/sbin/nft list set inet fw4 wiflow_portal_authed 2>/dev/null | grep -Fiq "$ipx . $mac"; }
+_event_lock(){ i=0; while ! mkdir "$EVENT_LOCK" 2>/dev/null; do i=$((i+1)); if [ "$i" -ge 3 ]; then rmdir "$EVENT_LOCK" 2>/dev/null || true; i=0; fi; sleep 1; done; }
+_event_unlock(){ rmdir "$EVENT_LOCK" 2>/dev/null || true; }
+event_enqueue(){
+    event="$1"; cid="$2"; sid="$3"; when="${4:-$(date +%s)}"; eid="$(new_token | cut -c1-24)"
+    _event_lock || return 1
+    printf '%s|%s|%s|%s|%s\n' "$eid" "$cid" "$sid" "$event" "$when" >> "$EVENT_QUEUE"
+    lines="$(wc -l < "$EVENT_QUEUE" 2>/dev/null | tr -d ' ')"; case "$lines" in ''|*[!0-9]*) lines=0;; esac
+    if [ "$lines" -gt 5000 ]; then tmp="$EVENT_QUEUE.trim"; tail -n 4000 "$EVENT_QUEUE" > "$tmp" 2>/dev/null || true; mv "$tmp" "$EVENT_QUEUE"; fi
+    chmod 600 "$EVENT_QUEUE" 2>/dev/null || true
+    _event_unlock
+    : > "$HEARTBEAT_KICK" 2>/dev/null || true
+}
+event_prepare_batch(){
+    out="$1"; limit="${2:-20}"; : > "$out"
+    _event_lock || { echo 0; return 1; }
+    [ -f "$EVENT_QUEUE" ] && head -n "$limit" "$EVENT_QUEUE" > "$out" 2>/dev/null || true
+    _event_unlock
+    wc -l < "$out" | tr -d ' '
+}
+event_ack_batch(){
+    count="$1"; case "$count" in ''|*[!0-9]*) return 1;; esac; [ "$count" -gt 0 ] || return 0
+    _event_lock || return 1
+    if [ -f "$EVENT_QUEUE" ]; then tmp="$EVENT_QUEUE.$$"; awk -v n="$count" 'NR>n' "$EVENT_QUEUE" > "$tmp" 2>/dev/null || : > "$tmp"; mv "$tmp" "$EVENT_QUEUE"; chmod 600 "$EVENT_QUEUE" 2>/dev/null || true; fi
+    _event_unlock
+}
+
+command_result_set(){
+    id="$1"; action="$2"; status="$3"; message="${4:-}"
+    uci set "wiflow.core.last_command_id=$id"
+    uci set "wiflow.core.last_command_action=$action"
+    uci set "wiflow.core.last_command_status=$status"
+    uci set "wiflow.core.last_command_message=$message"
+    uci commit wiflow >/dev/null 2>&1 || true
+    secure_configs
+}
+command_result_clear(){
+    for k in last_command_id last_command_action last_command_status last_command_message; do uci -q delete "wiflow.core.$k" >/dev/null 2>&1 || true; done
+    uci commit wiflow >/dev/null 2>&1 || true
+}
+
+recover_uplink_transaction(){
+    [ -f "$UPLINK_TXN/.pending" ] || return 1
+    # Every saved config is mandatory. Do not delete the rollback transaction
+    # until all three configs are positively restored and protected.
+    for f in wireless network wiflow; do
+        [ -f "$UPLINK_TXN/$f" ] && [ ! -L "$UPLINK_TXN/$f" ] || return 2
+    done
+    cid="$(cat "$UPLINK_TXN/command_id" 2>/dev/null || true)"
+    action="$(cat "$UPLINK_TXN/command_action" 2>/dev/null || true)"
+    [ -n "$action" ] || action=change_wifi
+    for f in wireless network wiflow; do
+        cp "$UPLINK_TXN/$f" "/etc/config/$f" || return 2
+        chmod 600 "/etc/config/$f" || return 2
+    done
+    secure_configs || return 2
+    rm -rf "$UPLINK_TXN" || return 2
+    [ -z "$cid" ] || command_result_set "$cid" "$action" failed 'Thay đổi kết nối bị gián đoạn; cấu hình trước đó đã được khôi phục' || true
+    return 0
+}
+
+website_url_valid(){ case "$1" in http://*|https://*) return 0;; *) return 1;; esac; }
+website_host_from_url(){ printf '%s' "$1" | sed -n 's#^https\{0,1\}://\([^/:?]*\).*#\1#p'; }
+portal_active_config(){ [ -f "$PORTAL_ACTIVE/portal.json" ] && printf '%s' "$PORTAL_ACTIVE/portal.json"; }
+
+tune_wiflow_runtime(){
+    if uci -q get network.lan >/dev/null 2>&1; then
+        uci set network.lan.delegate='0' || return 1
+        uci -q delete network.lan.ip6assign >/dev/null 2>&1 || true
+        uci -q delete network.lan.ip6hint >/dev/null 2>&1 || true
+        uci -q delete network.lan.ip6ifaceid >/dev/null 2>&1 || true
+    fi
+    if uci -q get dhcp.lan >/dev/null 2>&1; then
+        uci set dhcp.lan.dhcpv6='disabled' || return 1
+        uci set dhcp.lan.ra='disabled' || return 1
+        uci set dhcp.lan.ndp='disabled' || return 1
+    fi
+    if uci -q get 'dhcp.@dnsmasq[0]' >/dev/null 2>&1; then
+        uci set 'dhcp.@dnsmasq[0].cachesize=1000' || return 1
+        uci set 'dhcp.@dnsmasq[0].logqueries=0' || return 1
+        uci set 'dhcp.@dnsmasq[0].logdhcp=0' || return 1
+        uci set 'dhcp.@dnsmasq[0].localservice=1' || return 1
+    fi
+    uci commit network >/dev/null 2>&1 || return 1
+    uci commit dhcp >/dev/null 2>&1 || return 1
+}
+
+ensure_guest_network(){
+    uci -q delete network.wiflow_guest >/dev/null 2>&1 || true
+    uci set network.wiflow_guest='interface' || return 1
+    uci set network.wiflow_guest.proto='static' || return 1
+    uci set network.wiflow_guest.device='br-wiflow' || return 1
+    uci set network.wiflow_guest.ipaddr='10.10.10.1' || return 1
+    uci set network.wiflow_guest.netmask='255.255.255.0' || return 1
+    uci set network.wiflow_guest.delegate='0' || return 1
+    uci -q delete network.wiflow_guest.ip6assign >/dev/null 2>&1 || true
+    uci -q delete network.wiflow_guest.ip6hint >/dev/null 2>&1 || true
+    uci -q delete network.wiflow_guest_dev >/dev/null 2>&1 || true
+    uci set network.wiflow_guest_dev='device' || return 1
+    uci set network.wiflow_guest_dev.name='br-wiflow' || return 1
+    uci set network.wiflow_guest_dev.type='bridge' || return 1
+    uci set network.wiflow_guest_dev.bridge_empty='1' || return 1
+    uci commit network || return 1
+
+    uci -q delete dhcp.wiflow_guest >/dev/null 2>&1 || true
+    uci set dhcp.wiflow_guest='dhcp' || return 1
+    uci set dhcp.wiflow_guest.interface='wiflow_guest' || return 1
+    uci set dhcp.wiflow_guest.start='100' || return 1
+    uci set dhcp.wiflow_guest.limit='150' || return 1
+    uci set dhcp.wiflow_guest.leasetime='4h' || return 1
+    uci set dhcp.wiflow_guest.force='1' || return 1
+    # Router DNS is the DHCP default only. After authorization the firewall
+    # does not intercept or force DNS, DoT or DoH, so clients may use their own
+    # resolvers/tunnels as supported by the operating system and upstream WAN.
+    uci -q delete dhcp.wiflow_guest.dhcp_option >/dev/null 2>&1 || true
+    uci add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1' || return 1
+    # Do not advertise CAPPORT (DHCPv4 Option 114) yet. RFC 8908 requires
+    # an HTTPS API and TLS user-portal URL with a verifiable certificate.
+    # Advertising the legacy HTTP endpoint would break standards-aware clients.
+    # Keep HTTP captive fallback until a separately audited TLS deployment.
+    uci set dhcp.wiflow_guest.dhcpv6='disabled' || return 1
+    uci set dhcp.wiflow_guest.ra='disabled' || return 1
+    uci set dhcp.wiflow_guest.ndp='disabled' || return 1
+    uci commit dhcp || return 1
+
+    uci -q delete firewall.wiflow_guest >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest='zone' || return 1
+    uci set firewall.wiflow_guest.name='wiflow_guest' || return 1
+    uci add_list firewall.wiflow_guest.network='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest.input='REJECT' || return 1
+    uci set firewall.wiflow_guest.output='ACCEPT' || return 1
+    uci set firewall.wiflow_guest.forward='REJECT' || return 1
+
+    uci -q delete firewall.wiflow_guest_dns >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest_dns='rule' || return 1
+    uci set firewall.wiflow_guest_dns.name='Wiflow-Guest-DNS' || return 1
+    uci set firewall.wiflow_guest_dns.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_dns.dest_port='53' || return 1
+    uci add_list firewall.wiflow_guest_dns.proto='tcp' || return 1
+    uci add_list firewall.wiflow_guest_dns.proto='udp' || return 1
+    uci set firewall.wiflow_guest_dns.target='ACCEPT' || return 1
+
+    # Private DNS (Android/Samsung "Private DNS") must remain reachable even
+    # before Portal authorization. Keep this as a normal fw4 rule so it does
+    # not disappear when captive NAT rules are rebuilt.
+    uci -q delete firewall.wiflow_guest_private_dns >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest_private_dns='rule' || return 1
+    uci set firewall.wiflow_guest_private_dns.name='Wiflow-Guest-Private-DNS' || return 1
+    uci set firewall.wiflow_guest_private_dns.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_private_dns.dest='wan' || return 1
+    uci set firewall.wiflow_guest_private_dns.dest_port='853' || return 1
+    # Android Private DNS uses DoT over TCP/853; UDP/853 is not part of the
+    # pre-authorized contract and would open an additional WAN tunnel path.
+    uci add_list firewall.wiflow_guest_private_dns.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_private_dns.target='ACCEPT' || return 1
+
+    uci -q delete firewall.wiflow_guest_dhcp >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest_dhcp='rule' || return 1
+    uci set firewall.wiflow_guest_dhcp.name='Wiflow-Guest-DHCP' || return 1
+    uci set firewall.wiflow_guest_dhcp.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_dhcp.proto='udp' || return 1
+    uci set firewall.wiflow_guest_dhcp.dest_port='67-68' || return 1
+    uci set firewall.wiflow_guest_dhcp.target='ACCEPT' || return 1
+
+    uci -q delete firewall.wiflow_guest_setup >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest_setup='rule' || return 1
+    uci set firewall.wiflow_guest_setup.name='Wiflow-Guest-Setup-Access' || return 1
+    uci set firewall.wiflow_guest_setup.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_setup.dest_ip='10.0.0.1' || return 1
+    uci set firewall.wiflow_guest_setup.dest_port='80' || return 1
+    uci set firewall.wiflow_guest_setup.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_setup.target='ACCEPT' || return 1
+    uci -q delete firewall.wiflow_guest_gate >/dev/null 2>&1 || true
+    uci set firewall.wiflow_guest_gate='rule' || return 1
+    uci set firewall.wiflow_guest_gate.name='Wiflow-LuCI-Security-Gate' || return 1
+    uci set firewall.wiflow_guest_gate.src='wiflow_guest' || return 1
+    uci set firewall.wiflow_guest_gate.dest_ip='10.0.0.2' || return 1
+    uci set firewall.wiflow_guest_gate.dest_port='80' || return 1
+    uci set firewall.wiflow_guest_gate.proto='tcp' || return 1
+    uci set firewall.wiflow_guest_gate.target='ACCEPT' || return 1
+
+    # Fail closed while Portal has no active validated snapshot.
+    # The captive firewall is the SOLE owner of the guest->WAN forwarding.
+    uci -q delete firewall.wiflow_guest_wan >/dev/null 2>&1 || true
+    # Never tolerate stale guest->WAN forwarding if the delete failed.
+    uci -q get firewall.wiflow_guest_wan >/dev/null 2>&1 && return 1
+    uci commit firewall || return 1
+}
+
+ensure_uplink_network(){
+    uci -q get network.wiflow_wwan >/dev/null 2>&1 || uci set network.wiflow_wwan='interface' || return 1
+    uci set network.wiflow_wwan.proto='dhcp' || return 1
+    uci set network.wiflow_wwan.metric='10' || return 1
+    uci commit network || return 1
+    z="$(wan_zone || true)"
+    if [ -n "$z" ]; then
+        uci -q del_list "firewall.$z.network=wiflow_wwan" >/dev/null 2>&1 || true
+        uci add_list "firewall.$z.network=wiflow_wwan" || return 1
+        uci commit firewall || return 1
+    fi
+}
+ || continue
+            [ -n "$ssid" ] || continue
+            [ -z "$want" ] || [ "$ssid" = "$want" ] || continue
+            return 0
+        done
+    fi
+    # Preserve the standard nl80211 route for non-MTWiFi station adapters.
     command -v iw >/dev/null 2>&1 || return 1
     for ifn in $(iw dev 2>/dev/null | awk '/Interface /{i=$2}/type managed/{print i}'); do
         link="$(iw dev "$ifn" link 2>/dev/null || true)"
