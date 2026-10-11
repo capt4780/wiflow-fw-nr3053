@@ -1,20 +1,31 @@
 #!/bin/sh
+# P51: bounded MTWiFi scan with explicit failure and request-local output.
 set -u
 . /usr/lib/wiflow/common.sh
 band="${1:-5g}"
 case "$band" in 2g|5g) :;; *) exit 2;; esac
-OUT=/tmp/wiflow-scan.out
-: > "$OUT"
+out="/tmp/wiflow-scan-$$.out"
+: > "$out" || exit 4
+trap 'rm -f "$out" "$out.uniq" /tmp/wiflow-scan-$$.*' EXIT
+found_radio=0
 for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do
     [ "$(radio_band "$r")" = "$band" ] || continue
-    tmp="/tmp/wiflow-scan-$r.$$"
+    found_radio=1
+    tmp="/tmp/wiflow-scan-$$.$r"
+    # MTK SiteSurvey needs ~5 seconds; kill a stalled scan after 15 seconds.
     ( /usr/bin/iwinfo-ucode "$r" scan > "$tmp" 2>/dev/null ) & p=$!
-    ( sleep 7; kill "$p" 2>/dev/null ) & w=$!
-    wait "$p" 2>/dev/null || true
+    ( sleep 15; kill "$p" 2>/dev/null ) & w=$!
+    if ! wait "$p"; then
+        kill "$w" 2>/dev/null || true
+        wait "$w" 2>/dev/null || true
+        rm -f "$tmp"
+        exit 4
+    fi
     kill "$w" 2>/dev/null || true
+    wait "$w" 2>/dev/null || true
     awk -v radio="$r" -v band="$band" '
       /Cell [0-9]+ - Address:/ {b=$0; sub(/^.*Address: /,"",b); gsub(/[[:space:]]+$/,"",b)}
-      /ESSID: / {s=$0; sub(/^.*ESSID: \"/,"",s); sub(/\".*$/,"",s)}
+      /ESSID: / {s=$0; sub(/^.*ESSID: "/,"",s); sub(/".*$/,"",s)}
       /Encryption: / {
         e=$0; sub(/^.*Encryption: /,"",e); enc="psk2";
         if(e ~ /none|None/) enc="none";
@@ -22,9 +33,9 @@ for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1
         else if(e ~ /WPA[^2]/) enc="psk";
         if(s!="") {print radio "\t" band "\t" s "\t" b "\t" enc; s=""; b=""}
       }
-    ' "$tmp" >> "$OUT" 2>/dev/null || true
+    ' "$tmp" >> "$out" || exit 4
     rm -f "$tmp"
 done
-# Keep same SSID on different BSSID entries; only remove exact duplicate radio+SSID+BSSID.
-awk -F '\t' '!seen[$1 FS $3 FS $4]++ && $3!="" {print}' "$OUT" > "$OUT.uniq" 2>/dev/null || true
-mv "$OUT.uniq" "$OUT" 2>/dev/null || true
+[ "$found_radio" -eq 1 ] || exit 3
+awk -F '\t' '!seen[$1 FS $3 FS $4]++ && $3!="" {print}' "$out" > "$out.uniq" || exit 4
+cat "$out.uniq"

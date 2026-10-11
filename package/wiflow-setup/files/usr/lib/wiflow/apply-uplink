@@ -131,7 +131,14 @@ if [ "$mode" = lan ]; then
         fi
         sleep 1; n=$((n+1))
     done
-    fail dhcp_failed 'Cáp mạng chưa nhận được địa chỉ mạng'
+    # Distinguish missing Ethernet carrier from a DHCP failure without
+    # touching the management LAN or wireless interface.
+    wan_dev="$(uci -q get network.wan.device 2>/dev/null || true)"
+    if [ -n "$wan_dev" ] && [ -r "/sys/class/net/$wan_dev/carrier" ]; then
+        carrier="$(cat "/sys/class/net/$wan_dev/carrier" 2>/dev/null || true)"
+        [ "$carrier" = 0 ] && fail wan_no_carrier 'Cổng WAN chưa có tín hiệu cáp. Cắm LAN của modem nguồn vào WAN của NR3053.'
+    fi
+    fail dhcp_failed 'Cổng WAN có thể đã kết nối nhưng chưa nhận IP qua DHCP từ modem nguồn'
 fi
 
 [ "$mode" = wifi ] || fail invalid_mode 'Kiểu kết nối không hợp lệ'
