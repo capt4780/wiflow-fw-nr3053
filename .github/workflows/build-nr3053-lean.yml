@@ -3,6 +3,12 @@ name: NR3053 Lean Base + Separate Wiflow APK Build (NO FLASH)
 # Engineering-only: compiles the public device runtime into an NR3053 image.
 # Neither CI success nor an emitted .itb authorizes flashing.
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-nr3053-lean.yml"
+      - "scripts/build-nr3053-base.sh"
+      - "tools/check_nr3053_lean_manifest.py"
   workflow_dispatch:
 
 permissions:
@@ -12,7 +18,7 @@ concurrency:
   # One lane per PR/main ref. Superseded PR commits cannot monopolize CI.
   # Release/main builds are never cancelled automatically.
   group: nr3053-lean-base-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
