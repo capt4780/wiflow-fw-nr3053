@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -29,18 +30,38 @@ FORBIDDEN = (
 )
 
 
+_VER = re.compile(r"^(.*?)-(\d[^\s]*)$")
+
+
+def _name(line: str) -> str:
+    """Package name from either manifest style.
+
+    opkg style: "name - 1.0-r1"; apk style: "name-1.0-r1 arch {origin} ...".
+    """
+    parts = line.split()
+    if len(parts) >= 2 and parts[1] == "-":
+        return parts[0]
+    m = _VER.match(parts[0])
+    return m.group(1) if m else parts[0]
+
+
 def parse(text: str) -> set[str]:
     names = set()
     for line in text.splitlines():
         line = line.strip()
         if line and not line.startswith("#"):
-            names.add(line.split()[0].rstrip(":"))
+            names.add(_name(line))
     return names
+
+
+def has(pkgs: set[str], want: str) -> bool:
+    """Exact name, or name plus a library ABI suffix (libustream-openssl20201210)."""
+    return want in pkgs or any(re.fullmatch(re.escape(want) + r"\d+", p) for p in pkgs)
 
 
 def check(text: str) -> dict:
     pkgs = parse(text)
-    missing = [p for p in REQUIRED if p not in pkgs]
+    missing = [p for p in REQUIRED if not has(pkgs, p)]
     present = [p for p in FORBIDDEN if p in pkgs]
     return {
         "package_count": len(pkgs),

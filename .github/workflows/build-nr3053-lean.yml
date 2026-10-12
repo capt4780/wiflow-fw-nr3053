@@ -62,22 +62,27 @@ jobs:
       - name: Compile lean NR3053 image and separate wiflow-setup .apk
         shell: bash
         run: bash scripts/build-nr3053-base.sh
-      - name: Inspect the exact compiled FIT and Wiflow rootfs
+      - name: Inspect the exact compiled FIT and lean package list
+        id: inspect
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           shopt -s nullglob
+          fail(){ echo "::error::INSPECT_STEP_FAILED $1"; exit 1; }
           images=(output/*viettel_nr3053*sysupgrade.itb)
-          test "${#images[@]}" -eq 1
+          test "${#images[@]}" -eq 1 || fail "expected_one_itb_found_${#images[@]}"
           python3 tools/check_nr3053_fit_reference.py "${images[0]}" \
             --reference reference/nr3053-golden.json \
-            | tee output/golden-compare.json
+            | tee output/golden-compare.json || fail golden_compare
           python3 tools/audit_nr3053_rootfs.py "${images[0]}" \
-            --output output/base-rootfs-audit.json
+            --output output/base-rootfs-audit.json || fail base_rootfs_audit
+          head -n 12 output/nr3053-lean.manifest | sed 's/^/::notice::MANIFEST_SAMPLE /'
           python3 tools/check_nr3053_lean_manifest.py output/nr3053-lean.manifest \
-            --report output/lean-manifest-report.json
-          ls output/wiflow-setup-*.apk
-          python3 - <<'PY'
+            --report output/lean-manifest-report.json \
+            || fail "lean_manifest $(tr -d '\n ' < output/lean-manifest-report.json)"
+          ls output/wiflow-setup-*.apk || fail missing_wiflow_apk
+          python3 - <<'PY' || fail result_assertions
           import json
           from pathlib import Path
           out=Path("output")
@@ -89,8 +94,8 @@ jobs:
           assert base["firstboot_static"]["static_gate"]=="PASS",base
           assert lean["lean_gate"]=="PASS",lean
           assert lean["flash_authorization"]=="BLOCK",lean
-          print("LEAN_PACKAGE_COUNT",lean["package_count"])
           assert fit["flash_authorization"]=="BLOCK",fit
+          print("LEAN_PACKAGE_COUNT",lean["package_count"])
           print("NR3053_LEAN_IMAGE_STATIC_INSPECTION_PASS_NO_FLASH")
           PY
       - name: Capture reproducible failure context
@@ -121,7 +126,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Upload engineering-only image and diagnostic reports
-        if: success()
+        if: steps.inspect.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: nr3053-lean-base-and-wiflow-apk-NOT-FOR-FLASHING
@@ -129,3 +134,18 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
+      - name: Upload image even though inspection FAILED (engineering diagnosis only)
+        if: steps.inspect.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-lean-INSPECTION-FAILED-NOT-FOR-FLASHING
+          path: output/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Fail the job when inspection failed
+        if: steps.inspect.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::error::LEAN_INSPECTION_FAILED_SEE_ANNOTATIONS"
+          exit 1

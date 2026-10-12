@@ -26,6 +26,18 @@ class LeanManifestTests(unittest.TestCase):
         for bad in ("htop", "luci-app-upnp", "wiflow-setup"):
             self.assertEqual(check(manifest(extra=(bad,)))["lean_gate"], "FAIL", bad)
 
+    def test_apk_style_manifest_lines(self):
+        apk = "\n".join(
+            f"{n}-1.2.3-r1 aarch64_cortex-a53 {{{n}}} (GPL-2.0) [installed]" for n in REQUIRED)
+        r = check(apk)
+        self.assertEqual(r["lean_gate"], "PASS", r)
+        self.assertEqual(parse("kmod-mt_wifi-6.12.94.2-r1 aarch64 {x} (x)\n"), {"kmod-mt_wifi"})
+        self.assertEqual(parse("luci-i18n-base-vi-26.045.1-r1 all {l}\n"), {"luci-i18n-base-vi"})
+
+    def test_library_abi_suffix_counts(self):
+        txt = manifest(drop=("libustream-openssl",), extra=("libustream-openssl20201210",))
+        self.assertEqual(check(txt)["lean_gate"], "PASS")
+
     def test_empty_manifest_fails(self):
         self.assertEqual(check("")["lean_gate"], "FAIL")
 
