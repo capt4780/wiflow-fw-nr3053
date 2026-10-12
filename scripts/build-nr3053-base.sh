@@ -96,6 +96,52 @@ for name in sorted(optional):
         r"(?m)^CONFIG_PACKAGE_" + re.escape(name) + r"=[ym]$",
         "# CONFIG_PACKAGE_" + name + " is not set", config
     )
+import os
+if os.getenv("NR3053_LEAN") == "1":
+    # Lean base: only boot, MTWiFi, networking, firewall4/nft, LuCI core and
+    # TLS stay. Removing a leaf here is safe: `make defconfig` re-selects any
+    # package that a kept package still depends on.
+    lean_remove = {
+        # LuCI/vendor add-ons and acceleration UIs
+        "luci-app-eqos-mtk", "luci-i18n-eqos-mtk-vi",
+        "luci-app-turboacc-mtk", "luci-i18n-turboacc-mtk-vi",
+        # developer/diagnostic tools and storage stack (no USB/SATA use)
+        "htop", "nano", "tcpdump", "openssh-sftp-server", "openssh-keygen",
+        "openssl-util", "ca-certificates", "iw", "blockd",
+        "kmod-ata-core", "kmod-scsi-core", "kmod-fs-vfat", "kmod-fs-autofs4",
+        "kmod-nls-cp437", "kmod-nls-iso8859-1",
+        # unused kernel features
+        "kmod-tcp-bbr", "kmod-tun", "kmod-ifb", "kmod-zram", "zram-swap",
+        "kmod-inet-diag", "kmod-wireguard", "kmod-sched-core", "tc-tiny",
+        "tc-mod-iptables",
+        # legacy iptables/ebtables stack (fw4 uses nftables)
+        "ipset", "libipset", "ebtables", "kmod-ebtables", "kmod-ebtables-ipv4",
+        "kmod-ebtables-ipv6", "ip6tables-extra", "kmod-ip6tables-extra",
+        "iptables-mod-conntrack-extra", "iptables-mod-extra", "iptables-mod-filter",
+        "iptables-mod-hashlimit", "iptables-mod-iface", "iptables-mod-ipmark",
+        "iptables-mod-ipopt", "iptables-mod-iprange", "iptables-mod-ipv4options",
+        "iptables-mod-nat-extra", "iptables-mod-proto", "iptables-mod-tee",
+        "iptables-mod-tproxy", "iptables-mod-u32",
+        "kmod-ipt-compat-xtables", "kmod-ipt-conntrack-extra", "kmod-ipt-extra",
+        "kmod-ipt-filter", "kmod-ipt-hashlimit", "kmod-ipt-iface", "kmod-ipt-ipmark",
+        "kmod-ipt-ipopt", "kmod-ipt-iprange", "kmod-ipt-ipv4options",
+        "kmod-ipt-nat-extra", "kmod-ipt-offload", "kmod-ipt-proto", "kmod-ipt-raw6",
+        "kmod-ipt-tee", "kmod-ipt-tproxy", "kmod-ipt-u32", "kmod-nft-compat",
+        "kmod-nft-socket", "kmod-nft-tproxy",
+        # libraries only those tools needed
+        "libncurses", "terminfo", "libpcap", "libevdev", "libfido2", "libcbor",
+        "libudev-zero", "libblkid", "libuuid", "libopenssl-afalg_sync",
+        "libopenssl-devcrypto",
+    }
+    for name in sorted(lean_remove):
+        config = re.sub(r"(?m)^CONFIG_PACKAGE_" + re.escape(name) + r"=[ym]$",
+                        "# CONFIG_PACKAGE_" + name + " is not set", config)
+    for line in ("CONFIG_TURBOACC_INCLUDE_NO_FASTPATH=y",
+                 "CONFIG_luci-app-ssr-plus_INCLUDE_NONE_V2RAY=y",
+                 "CONFIG_luci-app-ssr-plus_INCLUDE_Shadowsocks_NONE_Client=y",
+                 "CONFIG_luci-app-ssr-plus_INCLUDE_Shadowsocks_NONE_Server=y"):
+        config = config.replace(line, "# " + line.split("=")[0] + " is not set")
+    print("NR3053_LEAN_REMOVALS_APPLIED", len(lean_remove))
 Path(".config").write_text(config, encoding="utf-8")
 print("NR3053_SOURCE_CONFIG_PREPARED")
 PY
@@ -117,7 +163,12 @@ if [[ "${WIFLOW_SOURCE_BUILD:-0}" == "1" ]]; then
     }
   done
   cp -a "$source_dir" package/wiflow-setup
-  echo "CONFIG_PACKAGE_wiflow-setup=y" >> .config
+  if [[ "${NR3053_LEAN:-0}" == "1" ]]; then
+    # =m builds the .apk but does NOT put Wiflow inside the firmware image.
+    echo "CONFIG_PACKAGE_wiflow-setup=m" >> .config
+  else
+    echo "CONFIG_PACKAGE_wiflow-setup=y" >> .config
+  fi
   # Keep the pinned upstream intact; stage an audited root shadow override
   # for Wiflow builds only. Never publish plaintext shadow or any private data.
   python3 "$GITHUB_WORKSPACE/tools/provision_nr3053_root_shadow.py" \
@@ -151,7 +202,17 @@ for pkg in ("luci-app-mtwifi-cfg", "luci-app-nr3053-throughwall", "luci-theme-au
     assert "CONFIG_PACKAGE_" + pkg + "=y" not in config, ("UNSAFE_OR_UNUSED_PACKAGE_SELECTED", pkg)
 import os
 if os.getenv("WIFLOW_SOURCE_BUILD") == "1":
-    assert "CONFIG_PACKAGE_wiflow-setup=y" in config, "Wiflow APK source not selected by Kconfig"
+    want = "CONFIG_PACKAGE_wiflow-setup=m" if os.getenv("NR3053_LEAN") == "1" else "CONFIG_PACKAGE_wiflow-setup=y"
+    assert want in config, ("Wiflow APK source not selected by Kconfig", want)
+    if os.getenv("NR3053_LEAN") == "1":
+        for needed in ("uhttpd", "firewall4", "dnsmasq-full", "nftables-json", "jsonfilter",
+                       "uclient-fetch", "ca-bundle", "libustream-openssl", "mtwifi-cfg-ucode",
+                       "wireless-tools", "kmod-mt_wifi", "luci-base"):
+            assert "CONFIG_PACKAGE_" + needed + "=y" in config, ("LEAN_BASE_MISSING_WIFLOW_RUNTIME_DEP", needed)
+        for gone in ("htop", "nano", "tcpdump", "luci-app-upnp", "luci-app-ddns", "luci-app-adblock",
+                     "luci-app-turboacc-mtk", "luci-app-eqos-mtk", "kmod-wireguard", "miniupnpd"):
+            assert "CONFIG_PACKAGE_" + gone + "=y" not in config, ("LEAN_EXTRA_STILL_SELECTED", gone)
+        print("NR3053_LEAN_KCONFIG_PASS")
     # Pinned mtwifi-cfg-ucode requires iwinfo-ucode, whose Kconfig forbids
     # the legacy iwinfo variant (@!PACKAGE_iwinfo). Never select both.
     assert "CONFIG_PACKAGE_iwinfo-ucode=y" in config, ("REQUIRED_UCODE_IWINFO_DROPPED", "CONFIG_PACKAGE_iwinfo-ucode=y")
@@ -198,6 +259,19 @@ if find target/linux/mediatek/filogic/base-files -type f -name '*nr3053-throughw
   exit 1
 fi
 cp "${files[0]}" "$OUTPUT/"
+if [[ "${NR3053_LEAN:-0}" == "1" ]]; then
+  apks=( $(find bin/packages -name 'wiflow-setup-*.apk' 2>/dev/null) )
+  if (( ${#apks[@]} != 1 )); then
+    echo "::error::Expected exactly 1 wiflow-setup .apk, found ${#apks[@]}"
+    exit 1
+  fi
+  cp "${apks[0]}" "$OUTPUT/"
+  manifests=(bin/targets/mediatek/filogic/*viettel_nr3053*.manifest)
+  if (( ${#manifests[@]} == 1 )); then
+    cp "${manifests[0]}" "$OUTPUT/nr3053-lean.manifest"
+    echo "NR3053_LEAN_PACKAGE_COUNT=$(wc -l < "${manifests[0]}")"
+  fi
+fi
 (
   cd "$OUTPUT"
   sha256sum ./*.itb > SHA256SUMS
