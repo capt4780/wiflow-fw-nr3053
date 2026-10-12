@@ -43,31 +43,29 @@ for sec in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-iface" {n=$
     uci set "wireless.$sec.disabled=1" || exit 1
 done
 
-d2=0; d5=0
 case "$mode" in
-  wan|setup) d2=0; d5=0;;
+  wan|setup) :;;
   wifi)
-    d2=0; d5=0
     case "$uplink_band" in
-      5g)
-        [ -n "$r5" ] || exit 3
-        uci set "wireless.$r5.disabled=0" || exit 1
-        uci set "wireless.$r5.channel=auto" || exit 1
-        [ "$stage" = anchor ] && d5=1
-        ;;
-      2g)
-        [ -n "$r2" ] || exit 3
-        uci set "wireless.$r2.disabled=0" || exit 1
-        uci set "wireless.$r2.channel=auto" || exit 1
-        [ "$stage" = anchor ] && d2=1
-        ;;
+      5g) [ -n "$r5" ] || exit 3; uci set "wireless.$r5.disabled=0" || exit 1; uci set "wireless.$r5.channel=auto" || exit 1;;
+      2g) [ -n "$r2" ] || exit 3; uci set "wireless.$r2.disabled=0" || exit 1; uci set "wireless.$r2.channel=auto" || exit 1;;
       *) exit 2;;
     esac;;
   *) exit 2;;
 esac
+# Guest AP only on the effective bands; never on the Wi-Fi source band.
+eff="$(guest_bands_effective "$mode" "$uplink_band")"
+[ -n "$eff" ] || exit 2
+d2=1; d5=1
+case " $eff " in *" 2g "*) d2=0;; esac
+case " $eff " in *" 5g "*) d5=0;; esac
 if [ "$uplink_band" != 2g ]; then configure_radio "$r2" 2g || exit 1; fi
 if [ "$uplink_band" != 5g ]; then configure_radio "$r5" 5g || exit 1; fi
 ensure_guest wiflow_guest_2g "$r2" "$d2" || exit 1
 ensure_guest wiflow_guest_5g "$r5" "$d5" || exit 1
+if [ "$mode" != wifi ]; then
+    [ "$d2" = 1 ] && { uci set "wireless.$r2.disabled=1" || exit 1; }
+    [ "$d5" = 1 ] && { uci set "wireless.$r5.disabled=1" || exit 1; }
+fi
 uci commit wireless || exit 1
 exit 0

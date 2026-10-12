@@ -1,0 +1,88 @@
+#!/bin/sh
+# Choose which bands broadcast the guest Wi-Fi (2g | 5g | both).
+# With a Wi-Fi source on band U the guest AP is never placed on U: a source
+# STA and a guest AP on one MTK radio must share a channel, so the guest AP
+# would follow every channel change of the source AP. LAN source: any choice.
+set -u
+. /usr/lib/wiflow/common.sh
+
+bands="${1:-}"
+case "$bands" in 2g|5g|both) :;; *) exit 2;; esac
+TXN=/tmp/wiflow-broadcast-txn
+
+src_band="$(source_band)"
+if [ -n "$src_band" ]; then mode=wifi; up="$src_band"; else mode=wan; up=''; fi
+
+state_set job running
+state_set phase broadcast
+state_set job_error ''
+state_set message 'Đang áp dụng băng tần phát WiFi'
+state_set job_started "$(date +%s)"
+
+reload_radio(){ r="$1"; [ -n "$r" ] || return 0; wifi reload "$r" >/dev/null 2>&1 || wifi up "$r" >/dev/null 2>&1 || return 1; }
+reload_for_mode(){
+    if [ "$mode" = wifi ]; then
+        # Opposite band only; the radio that carries the source STA is not touched.
+        if [ "$up" = 2g ]; then reload_radio "$(radio_for_band 5g 2>/dev/null || true)"; else reload_radio "$(radio_for_band 2g 2>/dev/null || true)"; fi
+    else
+        reload_radio "$(radio_for_band 2g 2>/dev/null || true)"
+        reload_radio "$(radio_for_band 5g 2>/dev/null || true)"
+    fi
+}
+restore(){
+    [ -f "$TXN/wireless" ] && cp "$TXN/wireless" /etc/config/wireless
+    [ -f "$TXN/wiflow" ] && cp "$TXN/wiflow" /etc/config/wiflow
+    secure_configs
+    reload_for_mode || true
+}
+fail(){
+    code="$1"; message="$2"
+    restore
+    rm -rf "$TXN"
+    state_set job failed
+    state_set phase failed
+    state_set job_error "$code"
+    state_set message "$message"
+    exit 1
+}
+
+# Conflict rule is enforced here as well as in the API.
+if [ "$mode" = wifi ]; then
+    case "$bands" in
+        both) fail band_conflict "Đang nhận WiFi nguồn ở ${up}. Chỉ có thể phát WiFi khách ở băng tần còn lại.";;
+        "$up") fail band_conflict "Không thể phát WiFi khách cùng băng tần ${up} với WiFi nguồn.";;
+    esac
+fi
+
+rm -rf "$TXN"; mkdir -p "$TXN" || fail backup_failed 'Không thể tạo điểm khôi phục cấu hình'
+chmod 700 "$TXN" 2>/dev/null || true
+cp /etc/config/wireless "$TXN/wireless" 2>/dev/null || fail backup_failed 'Không thể tạo điểm khôi phục cấu hình'
+cp /etc/config/wiflow "$TXN/wiflow" 2>/dev/null || fail backup_failed 'Không thể tạo điểm khôi phục cấu hình'
+
+uci set "wiflow.core.guest_bands=$bands" || fail config_failed 'Không lưu được băng tần phát'
+uci commit wiflow || fail config_failed 'Không lưu được băng tần phát'
+secure_configs
+
+/usr/lib/wiflow/radio-policy "$mode" "$up" full >/dev/null 2>&1 || fail radio_policy_failed 'Không áp dụng được băng tần phát WiFi khách'
+reload_for_mode || fail radio_reload_failed 'Không tải lại được WiFi khách'
+sleep 2
+
+# The source must still work after the change; otherwise roll back.
+state_set message 'Đang kiểm tra lại Internet'
+n=0; ok=0
+while [ "$n" -lt 4 ]; do
+    if [ "$mode" = wifi ]; then
+        wifi_uplink_associated "$(uci -q get wireless.wiflow_uplink.ssid 2>/dev/null || true)" && iface_route_active wiflow_wwan && internet_probe && { ok=1; break; }
+    else
+        iface_route_active wan && internet_probe && { ok=1; break; }
+    fi
+    n=$((n+1)); sleep 3
+done
+[ "$ok" = 1 ] || fail internet_lost 'Internet bị mất sau khi đổi băng tần phát. Đã khôi phục cấu hình trước đó.'
+
+rm -rf "$TXN"
+state_set job success
+state_set phase connected
+state_set job_error ''
+state_set message 'Đã áp dụng băng tần phát WiFi'
+exit 0

@@ -118,7 +118,9 @@ if [ "$mode" = lan ]; then
                 uci commit wireless
                 ifdown wiflow_wwan >/dev/null 2>&1 || true
                 /usr/lib/wiflow/radio-policy wan >/dev/null 2>&1 || fail radio_policy_failed 'Không áp dụng được cấu hình WiFi khách'
-                [ -n "$old_radio" ] && reload_radio "$old_radio" || true
+                # Guest bands may change with a LAN source: reload both radios.
+                reload_radio "$(radio_for_band 2g 2>/dev/null || true)" || true
+                reload_radio "$(radio_for_band 5g 2>/dev/null || true)" || true
                 uci set wiflow.core.internet_mode='lan'
                 uci set wiflow.core.internet_verified='1'
                 uci set wiflow.core.setup_step='3'
@@ -215,7 +217,7 @@ uci commit wireless
 
 # Uplink is stable. Restore dual-band guest service. Only the target radio is
 # reloaded; the opposite management anchor remains up throughout this step.
-/usr/lib/wiflow/radio-policy wifi "$band" full >/dev/null 2>&1 || fail radio_policy_failed 'Không khôi phục được WiFi khách hai băng tần'
+/usr/lib/wiflow/radio-policy wifi "$band" full >/dev/null 2>&1 || fail radio_policy_failed 'Không áp dụng được băng tần phát WiFi khách'
 reload_radio "$radio" || fail radio_reload_failed 'Không khôi phục được WiFi khách trên radio nguồn'
 sleep 2
 ifup wiflow_wwan >/dev/null 2>&1 || true

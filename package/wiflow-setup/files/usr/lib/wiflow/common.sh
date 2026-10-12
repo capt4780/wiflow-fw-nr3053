@@ -129,6 +129,33 @@ iface_up(){ iface="$1"; st="$(ubus call "network.interface.$iface" status 2>/dev
 iface_route_active(){ iface="$1"; st="$(ubus call "network.interface.$iface" status 2>/dev/null || true)"; dev="$(printf '%s' "$st" | jsonfilter -e '@.l3_device' 2>/dev/null || true)"; [ -n "$dev" ] || dev="$(printf '%s' "$st" | jsonfilter -e '@.device' 2>/dev/null || true)"; [ -n "$dev" ] || return 1; route="$(ip route get 1.1.1.1 2>/dev/null | head -n1)"; printf '%s' "$route" | grep -Fq " dev $dev "; }
 radio_band(){ r="$1"; b="$(uci -q get wireless.$r.band 2>/dev/null || true)"; case "$b" in 2g|5g) printf '%s' "$b"; return;; esac; h="$(uci -q get wireless.$r.hwmode 2>/dev/null || true)"; case "$h" in *11a*|a) printf '5g';; *) printf '2g';; esac; }
 radio_for_band(){ want="$1"; for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do [ "$(radio_band "$r")" = "$want" ] && { printf '%s' "$r"; return 0; }; done; return 1; }
+# Conflict-free broadcast rule. With a Wi-Fi source on band U, the guest AP never
+# runs on U (a STA and an AP on one MTK radio must share a channel, so a source
+# AP that changes channel would drag the guest AP with it). With a LAN source any
+# band choice is allowed. wiflow.core.guest_bands = 2g | 5g | both (unset = both).
+# usage: guest_bands_effective <wifi|wan|setup> [uplink_band]  -> "2g", "5g" or "2g 5g"
+guest_bands_effective(){
+    gbe_mode="$1"; gbe_up="${2:-}"
+    case "$(uci -q get wiflow.core.guest_bands 2>/dev/null || true)" in
+        2g) gbe_want='2g';; 5g) gbe_want='5g';; *) gbe_want='2g 5g';;
+    esac
+    gbe_out=''
+    for gbe_b in $gbe_want; do
+        [ "$gbe_mode" = wifi ] && [ "$gbe_b" = "$gbe_up" ] && continue
+        gbe_out="$gbe_out $gbe_b"
+    done
+    gbe_out="${gbe_out# }"
+    if [ -z "$gbe_out" ] && [ "$gbe_mode" = wifi ]; then
+        if [ "$gbe_up" = 2g ]; then gbe_out=5g; else gbe_out=2g; fi
+    fi
+    printf '%s' "$gbe_out"
+}
+# Band of the saved Wi-Fi source (empty when the source is LAN or unset).
+source_band(){
+    sb_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
+    [ -n "$sb_radio" ] || return 0
+    radio_band "$sb_radio"
+}
 secure_configs(){ [ -f /etc/config/wiflow ] && chmod 600 /etc/config/wiflow 2>/dev/null || true; [ -f /etc/config/wireless ] && chmod 600 /etc/config/wireless 2>/dev/null || true; }
 
 internet_probe(){
