@@ -266,10 +266,22 @@ if [[ "${NR3053_LEAN:-0}" == "1" ]]; then
     exit 1
   fi
   cp "${apks[0]}" "$OUTPUT/"
-  manifests=(bin/targets/mediatek/filogic/*viettel_nr3053*.manifest)
-  if (( ${#manifests[@]} == 1 )); then
+  manifests=( $(find bin/targets -name '*.manifest' 2>/dev/null | grep -i nr3053 || true) )
+  if (( ${#manifests[@]} >= 1 )); then
     cp "${manifests[0]}" "$OUTPUT/nr3053-lean.manifest"
-    echo "NR3053_LEAN_PACKAGE_COUNT=$(wc -l < "${manifests[0]}")"
+  else
+    # Fallback: derive the package list from the installed-package database of the built rootfs.
+    echo "NR3053_MANIFEST_FILE_MISSING_USING_APK_DB; bin/targets contents:"
+    find bin/targets -maxdepth 3 -type f | head -30
+    dbs=( $(find build_dir -path '*root-mediatek*' -path '*lib/apk/db/installed' 2>/dev/null | head -1) )
+    if (( ${#dbs[@]} == 1 )); then
+      awk '/^P:/{p=substr($0,3)} /^V:/{v=substr($0,3)} /^$/{if(p!=""){print p" - "v};p="";v=""} END{if(p!="")print p" - "v}' "${dbs[0]}" | sort > "$OUTPUT/nr3053-lean.manifest"
+    fi
+  fi
+  if [[ -s "$OUTPUT/nr3053-lean.manifest" ]]; then
+    echo "NR3053_LEAN_PACKAGE_COUNT=$(wc -l < "$OUTPUT/nr3053-lean.manifest")"
+  else
+    echo "::warning::NR3053 lean manifest could not be produced"
   fi
 fi
 (
