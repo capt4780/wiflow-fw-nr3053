@@ -98,7 +98,10 @@ uci(){
  return 0
 }
 '''
-        body = RADIO.replace(". /usr/lib/wiflow/common.sh", setup)
+        import re
+        m = re.search(r"^guest_bands_effective\(\)\{.*?^\}\n", COMMON, re.S | re.M)
+        self.assertIsNotNone(m)
+        body = RADIO.replace(". /usr/lib/wiflow/common.sh", setup + m.group(0))
         r = subprocess.run(
             ["sh", "-c", body], capture_output=True, text=True, timeout=5,
             env={**os.environ, "FAIL_CALL": fail_call, "LOST_BAND": "1" if lost_band else "0"},

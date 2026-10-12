@@ -1,0 +1,154 @@
+name: NR3053 Lean Base + Separate Wiflow APK Build (NO FLASH)
+
+# Engineering-only: compiles the public device runtime into an NR3053 image.
+# Neither CI success nor an emitted .itb authorizes flashing.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-nr3053-lean.yml"
+      - "scripts/build-nr3053-base.sh"
+      - "tools/check_nr3053_lean_manifest.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One lane per PR/main ref. Superseded PR commits cannot monopolize CI.
+  # Release/main builds are never cancelled automatically.
+  group: nr3053-lean-base-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Compile APK-native Wiflow package into pinned NR3053 (NO FLASH)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      WIFLOW_SOURCE_BUILD: "1"
+      NR3053_LEAN: "1"
+    steps:
+      - name: Checkout pinned public wrapper and reviewed device source
+        uses: actions/checkout@v4
+      - name: Static tests and public source safety before any compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q tools
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+          python3 tools/verify_public_tree.py --repo .
+          test -f package/wiflow-setup/Makefile
+          test -f package/wiflow-setup/files/www-wiflow/cgi-bin/enroll
+          echo "WIFLOW_NR3053_PRE_BUILD_GATES_PASS"
+      - name: Verify runner capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "CPU_COUNT=$(nproc)"
+          free -h
+          df -h "$GITHUB_WORKSPACE"
+          test "$(df -Pk "$GITHUB_WORKSPACE" | awk 'END {print $4}')" -ge 15728640
+      - name: Install pinned ImmortalWrt build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            build-essential clang flex bison g++ gawk gettext git \
+            libncurses-dev libssl-dev python3 python3-setuptools \
+            rsync unzip zlib1g-dev file wget curl libelf-dev \
+            subversion swig time squashfs-tools
+      - name: Compile lean NR3053 image and separate wiflow-setup .apk
+        shell: bash
+        run: bash scripts/build-nr3053-base.sh
+      - name: Inspect the exact compiled FIT and lean package list
+        id: inspect
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          mkdir -p output
+          exec > >(tee output/inspect.log) 2>&1
+          fail(){ echo "INSPECT_STEP_FAILED $1"; sleep 1; exit 1; }
+          images=(output/*viettel_nr3053*sysupgrade.itb)
+          test "${#images[@]}" -eq 1 || fail "expected_one_itb_found_${#images[@]}"
+          python3 tools/check_nr3053_fit_reference.py "${images[0]}" \
+            --reference reference/nr3053-golden.json \
+            | tee output/golden-compare.json || fail golden_compare
+          python3 tools/audit_nr3053_rootfs.py "${images[0]}" \
+            --output output/base-rootfs-audit.json || fail base_rootfs_audit
+          head -n 12 output/nr3053-lean.manifest | sed 's/^/MANIFEST_SAMPLE /'
+          python3 tools/check_nr3053_lean_manifest.py output/nr3053-lean.manifest \
+            --report output/lean-manifest-report.json \
+            || fail "lean_manifest $(tr -d '\n ' < output/lean-manifest-report.json)"
+          ls output/wiflow-setup-*.apk || fail missing_wiflow_apk
+          python3 - <<'PY' || fail result_assertions
+          import json
+          from pathlib import Path
+          out=Path("output")
+          fit=json.loads((out/"golden-compare.json").read_text())
+          base=json.loads((out/"base-rootfs-audit.json").read_text())
+          lean=json.loads((out/"lean-manifest-report.json").read_text())
+          assert fit["structural_gate"] in ("PASS","WARN") and not fit["errors"],fit
+          assert base["rootfs_audit"]=="PASS",base
+          assert base["firstboot_static"]["static_gate"]=="PASS",base
+          assert lean["lean_gate"]=="PASS",lean
+          assert lean["flash_authorization"]=="BLOCK",lean
+          assert fit["flash_authorization"]=="BLOCK",fit
+          print("LEAN_PACKAGE_COUNT",lean["package_count"])
+          print("NR3053_LEAN_IMAGE_STATIC_INSPECTION_PASS_NO_FLASH")
+          PY
+      - name: Capture reproducible failure context
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          mkdir -p failure-report
+          {
+            echo "RUN_ID=${GITHUB_RUN_ID}"
+            echo "HEAD_SHA=${GITHUB_SHA}"
+            echo "WIFLOW_SOURCE_BUILD=${WIFLOW_SOURCE_BUILD}"
+            echo "STATE=BUILD_OR_OFFLINE_AUDIT_FAILED"
+            echo "FLASH_AUTHORIZATION=BLOCK"
+            echo "SOURCE=PUBLIC_NR3053_EXPERIMENTAL"
+          } > failure-report/STATUS.txt
+          df -h > failure-report/disk.txt
+          free -h > failure-report/memory.txt
+          find output -maxdepth 1 -type f -printf '%f %s bytes\\n' 2>/dev/null > failure-report/output-files.txt || true
+          cp output/*audit.json output/golden-compare.json failure-report/ 2>/dev/null || true
+          echo "NR3053_FAILURE_EVIDENCE_STORED"
+      - name: Preserve failure diagnostics (no firmware on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-wiflow-failure-diagnostics
+          path: failure-report/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload engineering-only image and diagnostic reports
+        if: steps.inspect.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-lean-base-and-wiflow-apk-NOT-FOR-FLASHING
+          path: output/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Upload image even though inspection FAILED (engineering diagnosis only)
+        if: steps.inspect.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nr3053-lean-INSPECTION-FAILED-NOT-FOR-FLASHING
+          path: output/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Fail the job when inspection failed
+        if: steps.inspect.outcome == 'failure'
+        shell: bash
+        run: |
+          tail -n 40 output/inspect.log | sed 's/^/::error::INSPECT_LOG /' || true
+          echo "::error::LEAN_INSPECTION_FAILED_SEE_ANNOTATIONS"
+          exit 1

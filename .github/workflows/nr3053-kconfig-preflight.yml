@@ -7,6 +7,7 @@ on:
     paths:
       - "package/wiflow-setup/Makefile"
       - "scripts/build-nr3053-base.sh"
+      - "tools/check_nr3053_lean_manifest.py"
       - "tools/test_wiflow_kconfig_preflight.py"
       - ".github/workflows/nr3053-kconfig-preflight.yml"
   workflow_dispatch:
@@ -18,7 +19,12 @@ jobs:
   kconfig:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        lean: ["0", "1"]
     env:
+      NR3053_LEAN: ${{ matrix.lean }}
       WIFLOW_SOURCE_BUILD: "1"
       WIFLOW_KCONFIG_ONLY: "1"
     steps:

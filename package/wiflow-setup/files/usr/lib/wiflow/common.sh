@@ -129,6 +129,33 @@ iface_up(){ iface="$1"; st="$(ubus call "network.interface.$iface" status 2>/dev
 iface_route_active(){ iface="$1"; st="$(ubus call "network.interface.$iface" status 2>/dev/null || true)"; dev="$(printf '%s' "$st" | jsonfilter -e '@.l3_device' 2>/dev/null || true)"; [ -n "$dev" ] || dev="$(printf '%s' "$st" | jsonfilter -e '@.device' 2>/dev/null || true)"; [ -n "$dev" ] || return 1; route="$(ip route get 1.1.1.1 2>/dev/null | head -n1)"; printf '%s' "$route" | grep -Fq " dev $dev "; }
 radio_band(){ r="$1"; b="$(uci -q get wireless.$r.band 2>/dev/null || true)"; case "$b" in 2g|5g) printf '%s' "$b"; return;; esac; h="$(uci -q get wireless.$r.hwmode 2>/dev/null || true)"; case "$h" in *11a*|a) printf '5g';; *) printf '2g';; esac; }
 radio_for_band(){ want="$1"; for r in $(uci -q show wireless 2>/dev/null | awk -F= '$2 == "wifi-device" {n=$1;sub(/^wireless\./,"",n);print n}'); do [ "$(radio_band "$r")" = "$want" ] && { printf '%s' "$r"; return 0; }; done; return 1; }
+# Conflict-free broadcast rule. With a Wi-Fi source on band U, the guest AP never
+# runs on U (a STA and an AP on one MTK radio must share a channel, so a source
+# AP that changes channel would drag the guest AP with it). With a LAN source any
+# band choice is allowed. wiflow.core.guest_bands = 2g | 5g | both (unset = both).
+# usage: guest_bands_effective <wifi|wan|setup> [uplink_band]  -> "2g", "5g" or "2g 5g"
+guest_bands_effective(){
+    gbe_mode="$1"; gbe_up="${2:-}"
+    case "$(uci -q get wiflow.core.guest_bands 2>/dev/null || true)" in
+        2g) gbe_want='2g';; 5g) gbe_want='5g';; *) gbe_want='2g 5g';;
+    esac
+    gbe_out=''
+    for gbe_b in $gbe_want; do
+        [ "$gbe_mode" = wifi ] && [ "$gbe_b" = "$gbe_up" ] && continue
+        gbe_out="$gbe_out $gbe_b"
+    done
+    gbe_out="${gbe_out# }"
+    if [ -z "$gbe_out" ] && [ "$gbe_mode" = wifi ]; then
+        if [ "$gbe_up" = 2g ]; then gbe_out=5g; else gbe_out=2g; fi
+    fi
+    printf '%s' "$gbe_out"
+}
+# Band of the saved Wi-Fi source (empty when the source is LAN or unset).
+source_band(){
+    sb_radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
+    [ -n "$sb_radio" ] || return 0
+    radio_band "$sb_radio"
+}
 secure_configs(){ [ -f /etc/config/wiflow ] && chmod 600 /etc/config/wiflow 2>/dev/null || true; [ -f /etc/config/wireless ] && chmod 600 /etc/config/wireless 2>/dev/null || true; }
 
 internet_probe(){
@@ -156,22 +183,64 @@ internet_probe_fast(){
     rm -f "$out"; return 1
 }
 
+# MTWiFi (mt_wifi.ko) is not a cfg80211/nl80211 driver, so `iw dev` never lists
+# its interfaces. The Wi-Fi uplink is an ApCli vif named by the L1 profile
+# (apcli0 on 2.4 GHz, apclix0 on 5 GHz).
+WIFLOW_SYSFS_NET="${WIFLOW_SYSFS_NET:-/sys/class/net}"
+WIFLOW_L1_PROFILE="${WIFLOW_L1_PROFILE:-/etc/wireless/l1profile.dat}"
+apcli_ifnames(){
+    pfxs="$(sed -n 's/^INDEX[0-9]*_apcli_ifname=//p' "$WIFLOW_L1_PROFILE" 2>/dev/null | tr ';' ' ')"
+    [ -n "$pfxs" ] || pfxs='apcli apclix'
+    for pfx in $pfxs; do
+        for d in "$WIFLOW_SYSFS_NET/$pfx"[0-9]*; do
+            [ -e "$d" ] && printf '%s\n' "${d##*/}"
+        done
+    done
+}
+# The MTWiFi-aware iwinfo CLI ships as /usr/bin/iwinfo-ucode and
+# uci-defaults/99-replace-iwinfo moves it over /usr/bin/iwinfo on first boot, so
+# the old name is gone by the time Wiflow runs. Use whichever exists.
+WIFLOW_BIN_DIR="${WIFLOW_BIN_DIR:-/usr/bin}"
+wiflow_iwinfo(){
+    if [ -x "$WIFLOW_BIN_DIR/iwinfo-ucode" ]; then "$WIFLOW_BIN_DIR/iwinfo-ucode" "$@"
+    elif [ -x "$WIFLOW_BIN_DIR/iwinfo" ]; then "$WIFLOW_BIN_DIR/iwinfo" "$@"
+    else return 127; fi
+}
+# iwinfo takes a network interface (ra0/rax0), never a UCI radio section name
+# such as MT7981_1_1. Map a radio to its main interface by band using the L1
+# profile (first entry = 2.4 GHz, second = 5 GHz).
+radio_scan_ifname(){
+    rs_band="$(radio_band "$1")"
+    rs_mains="$(sed -n 's/^INDEX0_main_ifname=//p' "$WIFLOW_L1_PROFILE" 2>/dev/null | head -n1 | tr ';' ' ')"
+    set -- $rs_mains
+    case "$rs_band" in 5g) printf '%s' "${2:-rax0}";; *) printf '%s' "${1:-ra0}";; esac
+}
+# Prints the SSID the vif reports, or nothing when the driver does not report it.
+uplink_ssid_of(){
+    ifn="$1"; s=''
+    s="$(wiflow_iwinfo "$ifn" info 2>/dev/null | sed -n '1s/^.*ESSID: "\(.*\)".*$/\1/p')"
+    if [ -z "$s" ] && command -v iwconfig >/dev/null 2>&1; then
+        s="$(iwconfig "$ifn" 2>/dev/null | sed -n '1s/^.*ESSID:"\(.*\)".*$/\1/p')"
+    fi
+    printf '%s' "$s"
+}
+# Associated = an ApCli vif has carrier and, when the driver reports an SSID,
+# it equals the wanted one. DHCP and the Internet probe remain the real proof.
 wifi_uplink_associated(){
     want="${1:-}"
-    command -v iw >/dev/null 2>&1 || return 1
-    for ifn in $(iw dev 2>/dev/null | awk '/Interface /{i=$2}/type managed/{print i}'); do
-        link="$(iw dev "$ifn" link 2>/dev/null || true)"
-        printf '%s\n' "$link" | grep -q '^Connected to ' || continue
-        [ -z "$want" ] && return 0
-        got="$(printf '%s\n' "$link" | sed -n 's/^[[:space:]]*SSID: //p' | head -n1)"
-        [ "$got" = "$want" ] && return 0
+    for ifn in $(apcli_ifnames); do
+        [ "$(cat "$WIFLOW_SYSFS_NET/$ifn/carrier" 2>/dev/null || echo 0)" = 1 ] || continue
+        [ -n "$want" ] || return 0
+        got="$(uplink_ssid_of "$ifn")"
+        if [ -z "$got" ] || [ "$got" = "$want" ]; then return 0; fi
     done
     return 1
 }
 
 wifi_ssid_visible(){
     radio="$1"; want="$2"; tmp="/tmp/wiflow-visible.$$"
-    ( /usr/bin/iwinfo-ucode "$radio" scan > "$tmp" 2>/dev/null ) & p=$!
+    ifn="$(radio_scan_ifname "$radio")"
+    ( wiflow_iwinfo "$ifn" scan > "$tmp" 2>/dev/null ) & p=$!
     ( sleep 6; kill "$p" 2>/dev/null ) & w=$!
     wait "$p" 2>/dev/null || true; kill "$w" 2>/dev/null || true
     awk -v want="$want" '/ESSID: /{s=$0;sub(/^.*ESSID: "/,"",s);sub(/".*$/,"",s);if(s==want){ok=1;exit}} END{exit(ok?0:1)}' "$tmp" 2>/dev/null
