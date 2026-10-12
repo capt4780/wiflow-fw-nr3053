@@ -69,7 +69,9 @@ jobs:
         run: |
           set -uo pipefail
           shopt -s nullglob
-          fail(){ echo "::error::INSPECT_STEP_FAILED $1"; exit 1; }
+          mkdir -p output
+          exec > >(tee output/inspect.log) 2>&1
+          fail(){ echo "INSPECT_STEP_FAILED $1"; sleep 1; exit 1; }
           images=(output/*viettel_nr3053*sysupgrade.itb)
           test "${#images[@]}" -eq 1 || fail "expected_one_itb_found_${#images[@]}"
           python3 tools/check_nr3053_fit_reference.py "${images[0]}" \
@@ -77,7 +79,7 @@ jobs:
             | tee output/golden-compare.json || fail golden_compare
           python3 tools/audit_nr3053_rootfs.py "${images[0]}" \
             --output output/base-rootfs-audit.json || fail base_rootfs_audit
-          head -n 12 output/nr3053-lean.manifest | sed 's/^/::notice::MANIFEST_SAMPLE /'
+          head -n 12 output/nr3053-lean.manifest | sed 's/^/MANIFEST_SAMPLE /'
           python3 tools/check_nr3053_lean_manifest.py output/nr3053-lean.manifest \
             --report output/lean-manifest-report.json \
             || fail "lean_manifest $(tr -d '\n ' < output/lean-manifest-report.json)"
@@ -147,5 +149,6 @@ jobs:
         if: steps.inspect.outcome == 'failure'
         shell: bash
         run: |
+          tail -n 40 output/inspect.log | sed 's/^/::error::INSPECT_LOG /' || true
           echo "::error::LEAN_INSPECTION_FAILED_SEE_ANNOTATIONS"
           exit 1
