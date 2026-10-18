@@ -85,4 +85,9 @@ PY
     grep -q '^wiflow-setup ' "$OUT/packages.txt" && ok "package wiflow-setup installed" || no "wiflow-setup not in package database"
 fi
 sed -n 's/^DISTRIB_DESCRIPTION=//p' "$F/etc/openwrt_release" | tr -d "'" | sed 's/^/INFO release: /' | tee -a "$R"
-[ "$bad" = 0 ] && say "AUDIT PASSED" || { say "AUDIT FAILED"; exit 1; }
+[ "$bad" = 0 ] && say "AUDIT PASSED" || say "AUDIT FAILED"
+if [ -n "${GITHUB_ACTIONS:-}" ]; then   # readable from the checks API
+    grep '^FAIL' "$R" | head -n 10 | while read -r l; do echo "::error title=audit::$l"; done
+    echo "::notice title=audit report::$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' "$R")"
+fi
+[ "$bad" = 0 ] || exit 1
