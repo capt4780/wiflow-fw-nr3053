@@ -7,7 +7,7 @@
 #    to v2.3.6
 #  - Wiflow files present, removed features absent, package list
 # Usage: scripts/audit-image.sh <sysupgrade.itb> <report dir>
-set -euo pipefail
+set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ITB="$1"; OUT="$2"; G="$ROOT/tools/nr3053-golden.json"
 rm -rf "$OUT"; mkdir -p "$OUT"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
@@ -70,7 +70,7 @@ deny=(/usr/sbin/odhcpd /usr/sbin/odhcp6c /usr/sbin/pppd /usr/sbin/tailscaled /us
       /usr/sbin/wpa_supplicant /etc/init.d/zram /usr/sbin/tcpdump /usr/bin/htop /usr/bin/nano /usr/bin/curl
       /etc/hotplug.d/iface/99-hnat-detect /usr/sbin/iptables-legacy)
 m=0; for p in "${deny[@]}"; do [ -e "$F$p" ] && { no "removed feature still present: $p"; m=1; }; done
-zh="$(find "$F/usr/lib/lua/luci/i18n" "$F/usr/share/luci" -name '*zh*' 2>/dev/null | head -3)"; [ -z "$zh" ] || { no "Chinese translations present: $zh"; m=1; }
+zh="$(find "$F/usr/lib/lua/luci/i18n" "$F/usr/share/luci" "$F/usr/share/ucode/luci" -name '*zh*' 2>/dev/null | head -3 || true)"; [ -z "$zh" ] || { no "Chinese translations present: $zh"; m=1; }
 [ "$m" = 0 ] && ok "removed features absent (IPv6 DHCP/RA, PPP, VPN, ad block, UPnP, DDNS, hardware NAT tools, Chinese UI)"
 
 db="$F/lib/apk/db/installed"
