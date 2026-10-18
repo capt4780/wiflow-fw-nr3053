@@ -1,0 +1,92 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+
+resp="${1:-}"
+[ -f "$resp" ] || exit 2
+jget(){ cat "$resp" 2>/dev/null | jsonfilter -e "$1" 2>/dev/null || true; }
+id="$(jget '@.command.id')"
+action="$(jget '@.command.action')"
+[ -n "$id" ] && [ -n "$action" ] || exit 0
+printf '%s' "$id" | grep -Eq '^[A-Za-z0-9._:-]{1,80}$' || exit 0
+
+last_id="$(uci -q get wiflow.core.last_command_id 2>/dev/null || true)"
+[ "$id" = "$last_id" ] && exit 0
+
+case "$action" in
+reboot)
+    command_result_set "$id" "$action" rebooting 'Đang khởi động lại thiết bị'
+    sync
+    ( sleep 3; reboot || command_result_set "$id" "$action" failed 'Không thể khởi động lại thiết bị' ) >/dev/null 2>&1 &
+    ;;
+
+change_guest_ssid)
+    guest="$(jget '@.command.payload.guest_ssid')"
+    glen="$(printf '%s' "$guest" | wc -c | tr -d ' ')"; case "$glen" in ''|*[!0-9]*) glen=0;; esac
+    source="$(uci -q get wiflow.core.source_ssid 2>/dev/null || true)"
+    if [ "$glen" -lt 1 ] || [ "$glen" -gt 32 ]; then command_result_set "$id" "$action" failed 'Tên WiFi khách phải từ 1 đến 32 ký tự'; exit 0; fi
+    [ -z "$source" ] || [ "$guest" != "$source" ] || { command_result_set "$id" "$action" failed 'WiFi khách phải khác WiFi nguồn'; exit 0; }
+    command_result_set "$id" "$action" running 'Đang đổi tên WiFi khách'
+    (
+        uci set "wiflow.core.guest_ssid=$guest"
+        uci -q get wireless.wiflow_guest_2g >/dev/null 2>&1 && uci set "wireless.wiflow_guest_2g.ssid=$guest"
+        uci -q get wireless.wiflow_guest_5g >/dev/null 2>&1 && uci set "wireless.wiflow_guest_5g.ssid=$guest"
+        if uci commit wiflow && uci commit wireless; then
+            secure_configs
+            command_result_set "$id" "$action" success 'Đã lưu tên WiFi khách; thiết bị đang khởi động lại'
+            sync
+            sleep 2
+            reboot >/dev/null 2>&1 || wifi reload >/dev/null 2>&1 || true
+        else
+            command_result_set "$id" "$action" failed 'Không thể lưu tên WiFi khách'
+        fi
+    ) >/dev/null 2>&1 &
+    ;;
+change_setup_login)
+    username="$(jget '@.command.payload.username')"
+    password="$(jget '@.command.payload.password')"
+    if setup_set_login "$username" "$password"; then
+        command_result_set "$id" "$action" success 'Đã đổi tài khoản Wiflow Setup'
+    else
+        command_result_set "$id" "$action" failed 'Tên đăng nhập hoặc mật khẩu mới không hợp lệ'
+    fi
+    ;;
+reconnect)
+    command_result_set "$id" "$action" running 'Đang kết nối Internet lại'
+    (
+        mode="$(uci -q get wiflow.core.internet_mode 2>/dev/null || true)"
+        ok=0
+        if [ "$mode" = wifi ]; then
+            radio="$(uci -q get wireless.wiflow_uplink.device 2>/dev/null || true)"
+            ifdown wiflow_wwan >/dev/null 2>&1 || true
+            [ -n "$radio" ] && wifi reload "$radio" >/dev/null 2>&1 || true
+            ifup wiflow_wwan >/dev/null 2>&1 || true
+            n=0; while [ "$n" -lt 25 ]; do iface_up wiflow_wwan && iface_route_active wiflow_wwan && internet_probe && { ok=1; break; }; sleep 1; n=$((n+1)); done
+        elif [ "$mode" = lan ]; then
+            ifdown wan >/dev/null 2>&1 || true; sleep 1; ifup wan >/dev/null 2>&1 || true
+            n=0; while [ "$n" -lt 20 ]; do iface_up wan && iface_route_active wan && internet_probe && { ok=1; break; }; sleep 1; n=$((n+1)); done
+        fi
+        if [ "$ok" = 1 ]; then state_set internet_live 1; command_result_set "$id" "$action" success 'Đã kết nối Internet lại'; else state_set internet_live 0; command_result_set "$id" "$action" failed 'Không thể khôi phục kết nối Internet'; fi
+    ) >/dev/null 2>&1 &
+    ;;
+change_wifi)
+    if ! mkdir /tmp/wiflow-uplink.lock 2>/dev/null; then command_result_set "$id" "$action" failed 'Một cấu hình Internet khác đang được xử lý'; exit 0; fi
+    ssid="$(jget '@.command.payload.ssid')"
+    password="$(jget '@.command.payload.password')"
+    band="$(jget '@.command.payload.band')"; [ -n "$band" ] || band=5g
+    bssid="$(jget '@.command.payload.bssid')"
+    enc="$(jget '@.command.payload.enc')"; [ -n "$enc" ] || enc=psk2
+    radio="$(radio_for_band "$band" 2>/dev/null || true)"
+    guest="$(uci -q get wiflow.core.guest_ssid 2>/dev/null || echo Wiflow)"
+    req="/tmp/wiflow-uplink-command-$(printf '%s' "$id" | tr -cd 'A-Za-z0-9_-').json"
+    umask 077
+    printf '{"mode":"wifi","band":"%s","radio":"%s","ssid":"%s","bssid":"%s","password":"%s","guest_ssid":"%s","enc":"%s","command_id":"%s","command_action":"change_wifi"}\n' \
+        "$(json_escape "$band")" "$(json_escape "$radio")" "$(json_escape "$ssid")" "$(json_escape "$bssid")" "$(json_escape "$password")" "$(json_escape "$guest")" "$(json_escape "$enc")" "$(json_escape "$id")" > "$req"
+    chmod 600 "$req"
+    command_result_set "$id" "$action" running 'Đang đổi WiFi nguồn'
+    ( /usr/lib/wiflow/apply-uplink "$req" >/tmp/wiflow-uplink.log 2>&1; rm -rf /tmp/wiflow-uplink.lock ) >/dev/null 2>&1 &
+    ;;
+*)
+    command_result_set "$id" "$action" failed 'Lệnh không được hỗ trợ'
+    ;;
+esac

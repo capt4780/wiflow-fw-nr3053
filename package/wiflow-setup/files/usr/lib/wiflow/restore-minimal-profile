@@ -1,0 +1,15 @@
+#!/bin/sh
+set -u
+ROOT=/etc/wiflow
+STATE="$ROOT/minimal-services.state"
+[ -f "$STATE" ] || exit 0
+while IFS='|' read -r svc state; do
+    [ -n "${svc:-}" ] || continue
+    [ -x "/etc/init.d/$svc" ] || continue
+    if [ "$state" = enabled ]; then
+        "/etc/init.d/$svc" enable >/dev/null 2>&1 || true
+        "/etc/init.d/$svc" start >/dev/null 2>&1 || true
+    fi
+done < "$STATE"
+rm -f "$STATE"
+exit 0

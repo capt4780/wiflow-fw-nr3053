@@ -1,0 +1,34 @@
+Wiflow firmware for Viettel NR3053 — licensing
+
+1. Build scripts and tools (scripts/, tools/, config/, .github/, docs/):
+   MIT License, Copyright (c) 2026 Wiflow.
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+2. The Wiflow application (package/wiflow-setup/), including the Wiflow name,
+   logo and images: Copyright (c) 2026 Wiflow. All rights reserved. Not
+   licensed for use outside Wiflow devices without written permission.
+   Third-party parts inside it keep their own licenses:
+   - Inter fonts: SIL Open Font License 1.1.
+   - LuCI theme base styles (www/luci-static/wiflow/cascade.css, mobile.css)
+     and the LuCI templates it derives from: Apache License 2.0
+     (see www/luci-static/wiflow/NOTICE).
+
+3. ImmortalWrt / OpenWrt, the MediaTek driver packages and every other upstream
+   component fetched at build time keep their own licenses.

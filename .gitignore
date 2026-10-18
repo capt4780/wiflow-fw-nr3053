@@ -1,0 +1,33 @@
+# Build tree and outputs (made by scripts/prepare.sh and GitHub Actions)
+openwrt/
+out/
+dist/
+tmp/
+__pycache__/
+*.py[cod]
+
+# Firmware images and archives never go into Git (releases only)
+*.itb
+*.ipk
+*.apk
+*.img
+*.bin
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
+# Credentials and private data
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+private/
+secrets/
+backups/
+wp-content/

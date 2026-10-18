@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <meta name="theme-color" content="#F3F5F9">
+  <title>Wiflow</title>
+  <link rel="icon" href="/assets/wiflow-logo.png">
+  <link rel="stylesheet" href="/assets/setup-v2.css?v=1.0.26">
+</head>
+<body>
+  <main class="auth">
+    <section class="auth-card">
+      <div class="auth-logo"><img src="/assets/wiflow-logo.png" alt="Wiflow"></div>
+      <div class="sx-h"><h1>Đăng nhập</h1><p>Quản trị Wiflow và LuCI.</p></div>
+      <div id="err" class="al err" role="alert" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div>Tên đăng nhập hoặc mật khẩu không đúng.</div></div>
+      <form method="post" action="/cgi-bin/login" autocomplete="off">
+        <label class="f">Tên đăng nhập<input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required></label>
+        <label class="f">Mật khẩu<span class="f-in"><input id="password" class="has-eye" name="password" type="password" autocomplete="current-password" required><button type="button" class="eye" data-eye="password" aria-label="Hiện mật khẩu"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+        <button class="btn pri" type="submit">Đăng nhập</button>
+      </form>
+    </section>
+    <div class="sx-foot">Quên mật khẩu? <a href="tel:0833880100"><b>0833 880 100</b></a></div>
+  </main>
+  <script>
+    fetch('/cgi-bin/gate-status',{cache:'no-store',credentials:'same-origin'}).then(r=>r.json()).then(x=>{if(x.authenticated)location.replace('/setup.html');else if(!x.unlocked)location.replace('/')}).catch(()=>location.replace('/'));
+    if(location.search.includes('error=1'))document.getElementById('err').hidden=false;
+    document.querySelectorAll('[data-eye]').forEach(function(b){b.onclick=function(){var i=document.getElementById(b.dataset.eye);i.type=i.type==='password'?'text':'password'}});
+  </script>
+</body>
+</html>

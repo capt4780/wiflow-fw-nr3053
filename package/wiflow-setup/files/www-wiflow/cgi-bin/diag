@@ -1,0 +1,56 @@
+#!/bin/sh
+# v1.0.8: plain-text health check for support (no secrets). http://10.0.0.1/cgi-bin/diag
+. /usr/lib/wiflow/common.sh
+printf 'Content-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\n\r\n'
+yn(){ if eval "$1" >/dev/null 2>&1; then echo ok; else echo LOI; fi; }
+echo "Wiflow $WIFLOW_AGENT_VERSION"
+echo "uptime_s: $(cut -d. -f1 /proc/uptime 2>/dev/null)"
+echo "device_id: $(yn '[ -s /etc/wiflow/device-id ]')"
+for w in /www-wiflow /www-wiflow-portal; do echo "logo $w: $(yn "[ -s $w/assets/wiflow-logo.png ]")"; done
+echo "gate_sessions_dir: $(yn "mkdir -p $GATE_SESS && touch $GATE_SESS/.w && rm -f $GATE_SESS/.w")"
+echo "urldecode: $(yn '[ "$(urldecode "A%41+B")" = "AA B" ]')"
+echo "luci_in_wiflow: $(yn 'uci -q get uhttpd.wiflow.ucode_prefix | grep -q luci-sso.uc')"
+echo "luci_static_link: $(yn '[ -d /www-wiflow/luci-static/resources ]')"
+echo "portal_rules: $(yn 'nft list chain inet wiflow_captive forward | grep -q wiflow-captive-v3')"
+echo "portal_authorized_guests: $(nft list set inet wiflow_captive authed 2>/dev/null | grep -o '10\.10\.10\.[0-9]* \. ' | wc -l)"
+echo "portal_sessions_authorized: $(cat $CLIENT_SESSIONS/* 2>/dev/null | awk -F'|' '$6!=0' | wc -l)"
+echo "portal_legacy_fw4_include: $( [ -e /usr/share/nftables.d/table-post/30-wiflow-captive.nft ] && echo CON || echo khong)"
+echo "portal_keepalive: $(uci -q get uhttpd.wiflow_portal.http_keepalive 2>/dev/null || echo '?')"
+umode="$(uci -q get wiflow.core.internet_mode 2>/dev/null || echo none)"; uif=wiflow_wwan; [ "$umode" = lan ] && uif=wan
+wdev="$(ubus call network.interface.$uif status 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)"
+echo "uplink_mode: $umode device=${wdev:-none} addr=$(ubus call network.interface.$uif status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
+v="$(state_get internet_live 2>/dev/null)"; echo "uplink_internet: ${v:-?} last_ok=$(state_get internet_last_ok 2>/dev/null)"
+echo "guest_forward_to_uplink: $( [ -n "$wdev" ] && nft list chain inet fw4 accept_to_wan 2>/dev/null | grep -q "\"$wdev\"" && echo ok || echo LOI)"
+echo "uplink_masquerade: $(yn 'nft list chain inet fw4 srcnat_wan | grep -q masquerade')"
+set -- $(net_status_read); echo "portal_net_status: $1 (cap nhat ${2}s truoc)"
+echo "last_prepare: $(cat /tmp/wiflow-timing-prepare 2>/dev/null || echo none)"
+echo "last_authorize: $(cat /tmp/wiflow-timing-authorize 2>/dev/null || echo none)"
+# v1.0.13: where does guest traffic stop? Packet counters since the last rule load.
+cnt(){ nft list chain inet wiflow_captive "$1" 2>/dev/null | awk -v c="\"$2\"" '$0 ~ c {for(i=1;i<=NF;i++) if($i=="packets"){print $(i+1); exit}}'; }
+ga="$(cnt forward guest-authed)"; go="$(cnt postrouting guest-out)"; gi="$(cnt forward guest-in)"; gd="$(cnt input guest-dns)"
+echo "count_guest_dns_queries: ${gd:-?}"
+echo "count_authorized_guest_packets: ${ga:-?}"
+echo "count_guest_packets_sent_to_uplink: ${go:-?}"
+echo "count_reply_packets_from_uplink: ${gi:-?}"
+if internet_probe_fast; then rnet=ok; else rnet=LOI; fi
+echo "router_internet_now: $rnet"
+if nslookup connectivitycheck.gstatic.com 127.0.0.1 >/dev/null 2>&1; then rdns=ok; else rdns=LOI; fi
+echo "router_dns_now: $rdns"
+m=0; n=0
+for e in $(nft list set inet wiflow_captive authed 2>/dev/null | grep -o '10\.10\.10\.[0-9]* \. [0-9a-fA-F:]*' | tr -d ' '); do
+ n=$((n+1))
+ awk -v p="$e" '{k=$3 "." tolower($2)} k==tolower(p){f=1} END{exit f?0:1}' /tmp/dhcp.leases 2>/dev/null && m=$((m+1))
+done
+echo "authorized_match_dhcp_lease: $m/$n"
+ket=""
+if [ "$rnet" != ok ]; then ket="Router KHONG ra duoc Internet qua nguon: kiem tra modem/WiFi nguon (khong phai loi portal)"
+elif [ "$rdns" != ok ]; then ket="Router co Internet nhung DNS loi"
+elif [ "${n:-0}" = 0 ]; then ket="Chua co khach nao duoc cap quyen (chua bam Xac nhan hoac cap quyen that bai)"
+elif [ "${ga:-0}" = 0 ]; then ket="Khach da cap quyen nhung goi tin khong khop IP/MAC (xem authorized_match_dhcp_lease)"
+elif [ "${go:-0}" = 0 ]; then ket="Goi tin khach bi firewall OpenWrt chan, khong ra WiFi nguon (zone/forwarding)"
+elif [ "${gi:-0}" = 0 ]; then ket="Goi tin da ra WiFi nguon nhung khong co phan hoi (modem/NAT)"
+else ket="Duong di cua khach hoat dong (co gui va co phan hoi)"; fi
+echo "KET_LUAN: $ket"
+echo "service: $(yn '[ -e /etc/rc.d/S*wiflow-setup ] || ls /etc/rc.d/ | grep -q wiflow-setup')"
+echo "paired: $(uci -q get wiflow.core.paired 2>/dev/null || echo 0)"
+echo "last_gate: $(cat /tmp/wiflow-gate-diag 2>/dev/null || echo none)"

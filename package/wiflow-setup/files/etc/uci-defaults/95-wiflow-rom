@@ -1,0 +1,71 @@
+#!/bin/sh
+# Wiflow ROM, first boot (and first boot after a factory reset).
+# Same result as installing the Wiflow package on a fresh router, plus the
+# commercial defaults of this firmware: IPv4 only, no flow offload.
+# It also runs after a firmware upgrade that kept the settings (and when the
+# package is reinstalled): then only the safe part runs, nothing the owner
+# changed (password, hostname, network) is reset.
+[ -f /usr/lib/wiflow/common.sh ] || exit 0
+. /usr/lib/wiflow/common.sh
+
+if [ "$(uci -q get wiflow.core.rom_init)" = 1 ]; then
+	luci_theme_enforce || true
+	luci_root_pw_default 0 || true
+	/etc/init.d/wiflow-setup enable 2>/dev/null
+	/etc/init.d/wiflow-rom enable 2>/dev/null
+	exit 0
+fi
+
+uci -q batch <<EOT
+set system.@system[0].hostname='Wiflow-$WIFLOW_MODEL_CODE'
+set system.@system[0].timezone='ICT-7'
+set system.@system[0].zonename='Asia/Ho_Chi_Minh'
+delete system.ntp.server
+add_list system.ntp.server='vn.pool.ntp.org'
+add_list system.ntp.server='time.google.com'
+add_list system.ntp.server='pool.ntp.org'
+commit system
+EOT
+
+# Management LAN 10.0.0.1 from the very first boot. IPv4 only.
+uci -q batch <<'EOT'
+set network.lan.proto='static'
+set network.lan.ipaddr='10.0.0.1'
+set network.lan.netmask='255.255.255.0'
+set network.lan.delegate='0'
+delete network.lan.ip6assign
+delete network.wan6
+delete network.globals.ula_prefix
+commit network
+set dhcp.lan.dhcpv6='disabled'
+set dhcp.lan.ra='disabled'
+set dhcp.lan.ndp='disabled'
+set dhcp.@dnsmasq[0].filter_aaaa='1'
+commit dhcp
+EOT
+z="$(wan_zone || true)"
+[ -n "$z" ] && { uci -q del_list "firewall.$z.network=wan6"; uci commit firewall; }
+uci -q batch <<'EOT'
+set firewall.@defaults[0].flow_offloading='0'
+set firewall.@defaults[0].flow_offloading_hw='0'
+commit firewall
+EOT
+
+# Wiflow defaults (as a fresh package install).
+uci -q get wiflow.core >/dev/null 2>&1 || uci set wiflow.core='core'
+uci -q get wiflow.core.guest_ssid >/dev/null 2>&1 || uci set wiflow.core.guest_ssid='Wiflow'
+uci set wiflow.core.data_generation='4'
+uci set wiflow.core.rom_init='1'
+uci -q get wiflow.core.internet_verified >/dev/null 2>&1 || uci set wiflow.core.internet_verified='0'
+uci -q get wiflow.core.setup_step >/dev/null 2>&1 || uci set wiflow.core.setup_step='2'
+uci commit wiflow
+secure_configs
+wiflow_link_assets || true
+wiflow_link_luci_fonts || true
+wiflow_link_luci_web || true
+luci_theme_enforce || true
+luci_root_pw_default 1 || true
+rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache 2>/dev/null
+/etc/init.d/wiflow-setup enable 2>/dev/null
+/etc/init.d/wiflow-rom enable 2>/dev/null
+exit 0
