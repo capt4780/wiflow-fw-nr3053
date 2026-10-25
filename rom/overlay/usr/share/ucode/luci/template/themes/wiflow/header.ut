@@ -18,14 +18,15 @@
 -%}
 
 <!DOCTYPE html>
-<html lang="{{ dispatcher.lang }}" data-darkmode="false">
+<html lang="{{ dispatcher.lang }}" translate="no" class="notranslate" data-darkmode="false">
 	<head>
 		<meta charset="utf-8">
+		<meta name="google" content="notranslate">
 		<title>{{ striptags(node?.title ? `${node.title} · Wiflow` : 'Wiflow') }}</title>
 		<meta name="viewport" content="initial-scale=1.0,width=device-width">
 		<meta name="theme-color" content="#0B1B3A">
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
-		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="{{ media }}/mobile.css" />
+		<link rel="stylesheet" media="only screen and (max-width: 854px)" href="{{ media }}/mobile.css" />
 		<link rel="stylesheet" href="{{ media }}/wiflow.css">
 		<link rel="icon" type="image/png" href="{{ media }}/favicon.png">
 		<link rel="apple-touch-icon" href="{{ media }}/apple-touch-icon.png">

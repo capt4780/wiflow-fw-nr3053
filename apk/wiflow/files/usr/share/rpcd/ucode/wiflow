@@ -77,6 +77,19 @@ const methods = {
 		}
 	},
 
+	activate: {
+		call: function() {
+			return W.job_start('activate', {});
+		}
+	},
+
+	diag: {
+		args: { send: false },
+		call: function(req) {
+			return W.job_start('diag', { send: !!req.args.send });
+		}
+	},
+
 	job_clear: {
 		call: function() {
 			if (!W.job_busy())

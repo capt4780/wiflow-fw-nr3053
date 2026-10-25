@@ -120,7 +120,7 @@ function auto_tick(mode, online, via) {
 
 function watchdog(mode) {
 	const up = W.uptime();
-	const want_wifi = mode != 'lan' && W.uci_get('wireless', 'wiflow_uplink') == 'wifi-iface'
+	const want_wifi = mode != 'lan' && W.core('activated') == '1' && W.uci_get('wireless', 'wiflow_uplink') == 'wifi-iface'
 		&& W.uci_get('wireless', 'wiflow_uplink', 'disabled') != '1';
 	const want_wan = mode != 'wifi' && W.wan_carrier();
 
@@ -151,15 +151,19 @@ function watchdog(mode) {
 		W.st_set('watchdog_restarts', W.st_get('watchdog_restarts', 0) + 1);
 
 		if (c[0] == 'wifi') {
+			// Gentle first: the station alone looks for its source again; the
+			// guest WiFi keeps running. The whole WiFi is reloaded only after
+			// 10 minutes down, and at most once every 30 minutes.
 			const r = W.radio_named(W.uci_get('wireless', 'wiflow_uplink', 'device'));
-			if (n % 3 == 0) {
+			const last_full = W.st_get('wifi_reload_at', 0);
+			if (up - since >= 30 * TICK && (!last_full || up - last_full >= 90 * TICK)) {
+				W.st_set('wifi_reload_at', up);
 				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: khởi động lại WiFi`);
 				W.run('wifi reload');
 			}
 			else {
-				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: kết nối lại`);
-				const sta = W.sta_if(r);
-				W.run(`iwpriv ${W.q(sta)} set ApCliEnable=1; iwpriv ${W.q(sta)} set ApCliAutoConnect=3`);
+				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: kết nối lại WiFi nguồn`);
+				W.sta_kick(r);
 			}
 			W.run('ifup wiflow_wwan');
 		}
@@ -283,10 +287,9 @@ function df_total() {
 }
 
 function diag_send(id) {
-	const text = sprintf('Wiflow %s, Wiflow OS %s, %s\nmode=%s via=%s online=%s\nwan=%s wwan=%s\n',
-		W.VERSION, W.os_version(), W.MODEL, W.core('internet_mode', 'auto'), W.uplink_active(),
-		W.st_get('online', false), W.if_ipv4(W.ifstatus('wan')) ?? '-', W.if_ipv4(W.ifstatus('wiflow_wwan')) ?? '-');
-	const r = W.http('POST', '/devices/diag', { command_id: id, health: health(), text: text, log: W.wlog_list(150) }, W.auth(), 20);
+	const text = W.diag_text();
+	writefile(`${W.RUN}/diag.txt`, text);
+	const r = W.http('POST', '/devices/diag', { command_id: id, health: health(), text: substr(text, 0, 16000), log: W.wlog_list(150) }, W.auth(), 20);
 	return !!r.body?.ok;
 }
 

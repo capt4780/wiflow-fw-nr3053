@@ -1,2 +1,14 @@
-#!/bin/sh
-echo "iwpriv $*" >> /tmp/mock/calls.log
+#!/usr/bin/env python3
+# mt_wifi iwpriv mock: "iwpriv apcli0 set Key=Value". Station keys are kept
+# in /tmp/mock/apcli.json; ApCliEnable=1 makes netsim join with them.
+import json, os, subprocess, sys
+a = sys.argv[1:]
+with open('/tmp/mock/calls.log', 'a') as f: f.write('iwpriv %s\n' % ' '.join(a))
+if len(a) >= 3 and a[1] == 'set' and a[0].startswith('apcli') and '=' in a[2]:
+    k, v = a[2].split('=', 1)
+    p = '/tmp/mock/apcli.json'
+    st = json.load(open(p)) if os.path.exists(p) else {}
+    st.setdefault(a[0], {})[k] = v
+    json.dump(st, open(p, 'w'))
+    if k == 'ApCliEnable':
+        subprocess.run([os.environ['WFT'] + '/netsim.py', 'iwpriv ' + a[2]])

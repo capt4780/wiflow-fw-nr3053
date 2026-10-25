@@ -7,6 +7,11 @@
 					"status",
 					"scan"
 				]
+			},
+			"file": {
+				"/tmp/wiflow/diag.txt": [
+					"read"
+				]
 			}
 		},
 		"write": {
@@ -17,7 +22,9 @@
 					"reconnect",
 					"pair",
 					"unpair",
-					"job_clear"
+					"job_clear",
+					"activate",
+					"diag"
 				]
 			}
 		}

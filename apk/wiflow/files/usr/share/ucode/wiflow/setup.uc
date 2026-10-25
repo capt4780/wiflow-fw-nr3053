@@ -10,7 +10,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -336,6 +336,48 @@ export function iw_info(ifn) {
 	};
 };
 
+export function sta_up(r) {
+	const i = sta_if(r);
+	return !!access(`/sys/class/net/${i}`) && sysflag_up(i);
+};
+
+// mt_wifi station settings at run time (the same keys mtwifi writes in its
+// .dat from uci). Used to change the source without reloading the WiFi.
+const APCLI_AUTH = {
+	none: [ 'OPEN', 'NONE' ], psk: [ 'WPAPSK', 'AES' ], 'psk-mixed': [ 'WPAPSKWPA2PSK', 'AES' ],
+	psk2: [ 'WPA2PSK', 'AES' ], sae: [ 'WPA3PSK', 'AES' ]
+};
+
+function apcli_set(i, k, v) {
+	return run(`iwpriv ${q(i)} set ${q(k + '=' + v)}`).code == 0;
+};
+
+export function sta_join(r, ssid, enc, key) {
+	const i = sta_if(r);
+	const a = APCLI_AUTH[enc] ?? APCLI_AUTH.psk2;
+	apcli_set(i, 'ApCliEnable', '0');
+	sleep(500);
+	apcli_set(i, 'ApCliAuthMode', a[0]);
+	apcli_set(i, 'ApCliEncrypType', a[1]);
+	apcli_set(i, 'ApCliPMFMFPC', enc == 'sae' ? '1' : '0');
+	apcli_set(i, 'ApCliPMFMFPR', enc == 'sae' ? '1' : '0');
+	apcli_set(i, 'ApCliSsid', ssid);
+	if (enc != 'none')
+		apcli_set(i, 'ApCliWPAPSK', key);
+	apcli_set(i, 'ApCliEnable', '1');
+	apcli_set(i, 'ApCliAutoConnect', '3');
+	sleep(2000);
+};
+
+// Ask the station to find its source again (what mtwifi does after setup).
+export function sta_kick(r) {
+	const i = sta_if(r);
+	apcli_set(i, 'ApCliEnable', '0');
+	sleep(500);
+	apcli_set(i, 'ApCliEnable', '1');
+	apcli_set(i, 'ApCliAutoConnect', '3');
+};
+
 export function sta_associated(r, want) {
 	const i = iw_info(sta_if(r));
 	if (!i || !i.up || !i.bssid || !i.ssid)
@@ -429,7 +471,31 @@ export function scan() {
 			best[k] = n;
 	}
 	const guest = core('guest_ssid', 'Wiflow');
-	return sort(filter(values(best), n => n.ssid != guest), (a, b) => b.signal - a.signal);
+	const list = sort(filter(values(best), n => n.ssid != guest), (a, b) => b.signal - a.signal);
+
+	// Advice for a stable source: 5 GHz on a non-DFS channel when its signal
+	// is good, otherwise 2.4 GHz. DFS channels (52-144) can make the radio
+	// wait 60 s or jump channel on radar; weak signals drop.
+	const by_ssid = {};
+	for (let n in list) {
+		n.dfs = n.band == '5g' && n.channel >= 52 && n.channel <= 144;
+		n.weak = n.signal < -75;
+		if (!by_ssid[n.ssid]) by_ssid[n.ssid] = [];
+		push(by_ssid[n.ssid], n);
+	}
+	for (let ssid, rows in by_ssid) {
+		let pick = null;
+		for (let n in rows)
+			if (n.band == '5g' && !n.dfs && n.signal >= -70) pick = n;
+		if (!pick)
+			for (let n in rows)
+				if (n.band == '2g' && (!pick || n.signal > pick.signal)) pick = n;
+		if (!pick)
+			pick = rows[0];
+		if (length(rows) > 1 || (!pick.dfs && !pick.weak))
+			pick.recommended = true;
+	}
+	return list;
 };
 
 export function guest_ifnames() {
@@ -476,6 +542,14 @@ export function wp_error_text(code) {
 	return WP_ERRORS[code] ?? `Máy chủ trả lỗi ${code}`;
 };
 
+// Channel per band as configured ("auto" = follows the source WiFi).
+export function guest_channels() {
+	const out = {};
+	for (let r in radios())
+		out[r.band] = uci_get('wireless', r.name, 'channel') ?? 'auto';
+	return out;
+};
+
 export function status() {
 	const mode = core('internet_mode', 'auto');
 	const via = uplink_active();
@@ -512,8 +586,10 @@ export function status() {
 		guest: {
 			ssid: core('guest_ssid', 'Wiflow'), bands: gbands, clients: st_get('clients_now', 0),
 			up: length(gbands) > 0, subnet: `${GUEST_NET}.0/24`,
-			follows: src_ssid && source.enabled ? src_radio?.band : null
+			follows: src_ssid && source.enabled ? src_radio?.band : null,
+			channels: guest_channels()
 		},
+		activated: core('activated', '0') == '1',
 		wp: {
 			paired: core('paired', '0') == '1' && !!core('device_token'),
 			account: core('account_public_id'),
@@ -523,6 +599,50 @@ export function status() {
 		},
 		job: st_get('job')
 	};
+};
+
+/* ------------------------------------------------------------ diagnostics */
+// Plain-text report for support: no passwords, no guest MACs.
+
+export function diag_text() {
+	const lines = [];
+	const add = (t) => push(lines, t);
+	add(`Wiflow Setup ${VERSION} / Wiflow OS ${os_version()} / ${MODEL} / ${device_id() ?? '-'}`);
+	add(`time ${time()} uptime ${uptime()}s`);
+	add('');
+	add(`== status`);
+	add(sprintf('%.J', status()));
+	add('');
+	add('== radios');
+	for (let r in radios()) {
+		const info = iw('info', r.phy) ?? {};
+		add(sprintf('%s %s phy=%s channel(uci)=%s htmode=%s now: ch=%s ssid=%s txpower=%s',
+			r.name, r.band, r.phy, uci_get('wireless', r.name, 'channel') ?? '-', uci_get('wireless', r.name, 'htmode') ?? '-',
+			info.channel ?? '-', info.ssid ?? '-', info.txpower ?? '-'));
+		const sta = iw_info(sta_if(r));
+		if (sta) add(sprintf('  %s up=%s ssid=%s bssid=%s signal=%s ch=%s', sta_if(r), sta.up, sta.ssid ?? '-', sta.bssid ?? '-', sta.signal, sta.channel));
+		add(sprintf('  guests on %s: %d', r.phy, length(iw('assoclist', r.phy)?.results ?? [])));
+	}
+	add('');
+	add('== wireless (keys hidden)');
+	add(replace(sh('uci -q show wireless'), /\.key='[^']*'/g, ".key='***'"));
+	add('== network');
+	add(sh('uci -q show network'));
+	add('== interfaces');
+	for (let i in [ 'wan', 'wiflow_wwan', 'lan', 'wiflow_guest' ]) {
+		const s = ifstatus(i);
+		add(sprintf('%s up=%s dev=%s ip=%s gw=%s', i, s?.up, s?.l3_device ?? s?.device, if_ipv4(s) ?? '-', if_gateway(i) ?? '-'));
+	}
+	add('== routes');
+	add(readfile('/proc/net/route') ?? '');
+	add('== wiflow log');
+	add(readfile(`${RUN}/log`) ?? '');
+	add('== system log (wifi, network, wiflow)');
+	const tail = (a, n) => slice(a, max(0, length(a) - n));
+	add(join('\n', tail(filter(split(sh('logread'), '\n'), l => match(l, /wiflow|mtwifi|apcli|netifd|hostapd|kernel/)), 200)));
+	add('== kernel');
+	add(join('\n', tail(split(sh('dmesg'), '\n'), 80)));
+	return join('\n', lines) + '\n';
 };
 
 /* -------------------------------------------------------------- jobs */

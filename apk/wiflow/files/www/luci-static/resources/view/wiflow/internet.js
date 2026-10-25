@@ -75,13 +75,29 @@ return view.extend({
 						return;
 					}
 					keyErr.style.display = 'none';
-					return wf.follow(`Kết nối “${picked.ssid}”`, () => wf.callSetUplink(mode == 'lan' ? 'auto' : mode, picked.ssid, picked.bssid, picked.band, key, picked.encryption))
+					const net = picked;
+					const join = () => wf.follow(`Kết nối “${net.ssid}”`, () => wf.callSetUplink(mode == 'lan' ? 'auto' : mode, net.ssid, net.bssid, net.band, key, net.encryption))
 						.then(j => { if (j?.state == 'success') location.reload(); });
+					const why = [];
+					if (net.dfs) why.push(`“${net.ssid}” dùng kênh ${net.channel} (kênh DFS). Router có thể phải chờ 1 phút hoặc đổi kênh khi gặp radar, WiFi khách băng 5G sẽ ngắt theo.`);
+					if (net.weak) why.push(`Sóng ${net.signal} dBm là yếu, kết nối dễ chập chờn. Nên đặt router gần nguồn hơn (từ −65 dBm trở lên).`);
+					const alt = currentNets.find(n => n.ssid == net.ssid && n !== net && n.recommended);
+					if (alt) why.push(`Cùng mạng này ở băng ${alt.band == '5g' ? '5G' : '2.4G'} ổn định hơn.`);
+					if (!why.length) return join();
+					ui.showModal('Kết nối có thể không ổn định', [
+						...why.map(t => E('p', {}, t)),
+						E('div', { 'class': 'right' }, [
+							E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, 'Chọn mạng khác'), ' ',
+							E('button', { 'class': 'btn cbi-button-positive important', 'click': () => { ui.hideModal(); return join(); } }, 'Vẫn kết nối')
+						])
+					]);
 				} }, 'Kết nối')
 			])
 		]);
 
+		let currentNets = [];
 		const showNets = (nets) => {
+			currentNets = nets;
 			list.replaceChildren();
 			nets.forEach(net => {
 				const li = E('li', { 'click': () => {
@@ -95,7 +111,12 @@ return view.extend({
 					if (!keyIn.disabled) keyIn.focus();
 				} }, [
 					wf.bars(net.signal),
-					E('div', { 'class': 'n' }, [ E('b', {}, net.ssid || '(ẩn)'), E('span', {}, `${net.signal} dBm · kênh ${net.channel}`) ]),
+					E('div', { 'class': 'n' }, [
+						E('b', {}, [ net.ssid || '(ẩn)',
+							net.recommended ? E('span', { 'class': 'wf-tag ok' }, 'Nên dùng') : '',
+							net.dfs ? E('span', { 'class': 'wf-tag warn' }, 'Kênh DFS') : '',
+							net.weak ? E('span', { 'class': 'wf-tag warn' }, 'Sóng yếu') : '' ]),
+						E('span', {}, `${net.signal} dBm · kênh ${net.channel}`) ]),
 					net.encryption && net.encryption != 'none' ? wf.icon('lock', 'wf-lock') : '',
 					wf.band(net.band)
 				]);
@@ -135,9 +156,13 @@ return view.extend({
 			E('div', { 'class': 'wf-actions' }, [ scanBtn ]),
 			list,
 			joinBox,
-			wf.note('WiFi khách vẫn phát cả 2 băng. Băng đang bắt WiFi nguồn sẽ tự chạy theo kênh của WiFi nguồn.')
+			wf.note('Nên dùng WiFi nguồn 5G kênh thường (36–48, 149–165) có sóng từ −65 dBm. WiFi khách vẫn phát cả 2 băng; băng đang bắt nguồn chạy theo kênh của nguồn, băng còn lại giữ kênh cố định.')
 		]);
 		if (mode == 'lan') wifiCard.style.display = 'none';
+		if (!s.activated) {
+			scanBtn.disabled = true;
+			wifiCard.appendChild(wf.activateNote());
+		}
 
 		this.showNets = showNets;
 

@@ -237,10 +237,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .tabs,.cbi-tabmenu{flex-wrap:wrap!important;overflow:visible!important}
 .tabs>li,.cbi-tabmenu>li{flex:0 1 auto!important;min-width:0}
 .tabs>li>a,.cbi-tabmenu>li>a{white-space:normal}
-.table .td.cbi-section-actions{overflow:visible!important;flex-basis:100%!important}
-.td.cbi-section-actions>div{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
-.td.cbi-section-actions>div>*,.td.cbi-section-actions>*>form>*{margin:0!important;flex:0 0 auto!important}
-.cbi-section-actions .cbi-button,.cbi-section-actions .btn{overflow:visible!important;text-overflow:clip!important}
 .cbi-button,.btn{text-overflow:clip}
 .cbi-page-actions{flex-wrap:wrap;gap:8px}.cbi-page-actions>.cbi-button,.cbi-page-actions>.btn{min-width:max-content;overflow:visible;text-overflow:clip}
 /* Wiflow OS 1.0.0 (standalone LuCI, no Setup app) */
@@ -255,13 +251,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .cbi-section-descr,.cbi-map-descr{max-width:90ch}
 .cbi-value>.cbi-value-description{grid-column:2}
 @media(max-width:900px){.cbi-value-field,.cbi-value>.cbi-value-description{grid-column:1}}
-/* row actions stay on one line on wide screens (Startup, Processes, Interfaces,
-   Wireless, Firewall rules, LEDs) instead of one button per line */
-.cbi-map{container-type:inline-size}
-@container (min-width:800px){
- .td.cbi-section-actions{width:1%;white-space:nowrap}
- .td.cbi-section-actions>div{flex-wrap:nowrap;align-items:center}
-}
 /* list inputs with an add button (SSH-Keys, DNS addresses, …): the button keeps its label */
 .cbi-dynlist{display:flex;flex-direction:column;gap:6px;max-width:100%}
 .cbi-dynlist>.add-item{display:flex;gap:8px;align-items:center;width:100%;max-width:560px}
@@ -274,12 +263,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 @media(min-width:600px) and (max-width:900px){.cbi-page-actions{justify-content:flex-end}.cbi-page-actions>*{flex:0 0 auto}}
 /* selects inside table rows (Firewall zones, …) keep a readable width */
 .table .td select,.table .td .cbi-dropdown:not(.btn):not(.cbi-button){min-width:104px!important;width:100%}
-/* narrower content: row actions wrap two per line instead of one per line */
-@container (min-width:600px) and (max-width:799px){
- .td.cbi-section-actions>div{min-width:184px;justify-content:flex-end}
- /* a wide settings table scrolls inside its card instead of pushing the page sideways */
- .cbi-section-node:has(>.cbi-section-table){overflow-x:auto;-webkit-overflow-scrolling:touch}
-}
 /* gate + login card: the full Wiflow logo (mark + wordmark), transparent PNG, as is */
 .modal.login::before{width:168px;height:148px;margin:0 auto 10px;border-radius:0;box-shadow:none;background:url(wiflow-logo.png) center/contain no-repeat}
 .modal.wf-gate input[name="wf_gate_code"]{text-transform:uppercase;letter-spacing:.08em;font-weight:600;text-align:center}
@@ -307,3 +290,151 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 body.wf-login,body.wf-login #modal_overlay{background:#fff!important}
 .modal.login{border:0!important;box-shadow:none!important;background:#fff}
 .modal.login::before{width:128px;height:112px;margin:0 auto 16px}
+
+/* ===== Tables, one set of rules (Wiflow OS 1.0.0 b16) =====
+   Wider than 900 px: a real table. The action cell is as narrow as its
+   buttons, which stay side by side on one line (Startup, Processes,
+   Interfaces, Wireless, Firewall, LEDs, Software, SSH keys...).
+   Content area 900 px and narrower (phones, tablets, and a desktop window
+   next to the sidebar): every row is a card, the cell
+   titles show as labels and the buttons wrap side by side under them. */
+.td.cbi-section-actions{width:1%!important;white-space:nowrap;text-align:right;overflow:visible!important}
+.td.cbi-section-actions>div,.td.cbi-section-actions>span{display:flex!important;flex-wrap:nowrap;justify-content:flex-end;align-items:center;gap:6px}
+.td.cbi-section-actions>div>*,.td.cbi-section-actions>span>*,.td.cbi-section-actions>*>form>*{flex:0 0 auto!important;margin:0!important;width:auto}
+.td.cbi-section-actions .btn,.td.cbi-section-actions .cbi-button{overflow:visible!important;text-overflow:clip!important;white-space:nowrap;min-width:0;padding:0 14px}
+.td.cbi-section-actions>*>form{display:inline-flex;gap:6px}
+.table .td{overflow-wrap:break-word}
+.table .td.nowrap,.table .th.nowrap{overflow-wrap:normal}
+@container wfmain (max-width:900px){
+ .table .tr{display:flex!important;flex-wrap:wrap;gap:2px 0}
+ .table .tr.table-titles,.table .tr.cbi-section-table-titles,.table .tr.cbi-section-table-descr{display:none!important}
+ .td.cbi-section-actions{width:auto!important;flex:1 1 100%!important;padding-top:8px!important}
+ .td.cbi-section-actions>div,.td.cbi-section-actions>span{flex-wrap:wrap;justify-content:flex-start}
+ .td.cbi-section-actions::before{display:none!important}
+}
+
+/* The card layout follows the width of the content area, not the screen:
+   the table part of mobile.css, scoped to #maincontent. */
+#maincontent{container:wfmain/inline-size}
+@container wfmain (max-width:900px){
+	.table {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+	}
+
+	.tr {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		border-top: 1px solid var(--border-color-medium);
+		padding: 5px 0;
+		margin: 0 -3px;
+	}
+
+	.table .th,
+	.table .td,
+	.table .tr::before {
+		flex: 1 1 50%;
+		align-self: flex-start;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		word-wrap: break-word;
+		display: inline-block;
+		border-top: none;
+		padding: 3px;
+		box-sizing: border-box;
+	}
+
+	.table .td.cbi-dropdown-open {
+		overflow: visible;
+	}
+
+	.col-1 { flex: 1 1 30px !important; -webkit-flex: 1 1 30px !important; }
+	.col-2 { flex: 2 2 60px !important; -webkit-flex: 2 2 60px !important; }
+	.col-3 { flex: 3 3 90px !important; -webkit-flex: 3 3 90px !important; }
+	.col-4 { flex: 4 4 120px !important; -webkit-flex: 4 4 120px !important; }
+	.col-5 { flex: 5 5 150px !important; -webkit-flex: 5 5 150px !important; }
+	.col-6 { flex: 6 6 180px !important; -webkit-flex: 6 6 180px !important; }
+	.col-7 { flex: 7 7 210px !important; -webkit-flex: 7 7 210px !important; }
+	.col-8 { flex: 8 8 240px !important; -webkit-flex: 8 8 240px !important; }
+	.col-9 { flex: 9 9 270px !important; -webkit-flex: 9 9 270px !important; }
+	.col-10 { flex: 10 10 300px !important; -webkit-flex: 10 10 300px !important; }
+
+	.td select {
+		word-wrap: normal;
+	}
+
+	.td[data-widget="button"],
+	.td[data-widget="fvalue"] {
+		flex: 1 1 17%;
+		text-align: left;
+	}
+
+	.td.cbi-value-field {
+		align-self: flex-start;
+		flex-basis: 100%;
+		margin-bottom: .3em;
+	}
+
+	.td.cbi-value-field .cbi-button {
+		width: 100%;
+	}
+
+	.table.cbi-section-table {
+		border: none;
+		background: none;
+		margin: 0;
+	}
+
+	.tr.table-titles,
+	.cbi-section-table-titles,
+	.cbi-section-table-descr {
+		display: none;
+	}
+
+	.cbi-section-table-row {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		margin: 0 0 .5em 0;
+	}
+
+	.cbi-section-table + .cbi-section-create {
+		padding-top: 0;
+	}
+
+	.tr[data-title]::before {
+		display: block;
+		flex: 1 1 100%;
+		background: var(--background-color-low) !important;
+		font-size: 16px;
+		border-bottom: 1px solid var(--border-color-medium);
+	}
+
+	.td[data-title]::before {
+		content: attr(data-title);
+		font-weight: bold;
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: pre-line;
+	}
+
+	.td[data-description]::after {
+		display: block;
+	}
+
+	.td[data-title] ~ .td.cbi-section-actions {
+		align-self: flex-start;
+	}
+
+	.td.cbi-section-actions {
+		overflow: initial;
+		max-width: 100%;
+		padding: 3px 2px;
+		flex-basis: 100%;
+	}
+
+}

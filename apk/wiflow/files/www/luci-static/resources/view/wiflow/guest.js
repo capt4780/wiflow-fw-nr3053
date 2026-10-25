@@ -27,6 +27,9 @@ return view.extend({
 			return wf.follow('Đổi tên WiFi khách', () => wf.callSetGuest(v)).then(j => { if (j?.state == 'success') location.reload(); });
 		} }, 'Lưu tên WiFi');
 
+		if (!s.activated)
+			return E('div', { 'class': 'wf-page' }, [ wf.head('WiFi khách', 'WiFi mở cho khách, tách riêng khỏi mạng quản trị của router.'), wf.activateNote() ]);
+
 		return E('div', { 'class': 'wf-page' }, [
 			wf.head('WiFi khách', 'WiFi mở cho khách, tách riêng khỏi mạng quản trị của router.'),
 			E('div', { 'class': 'wf-grid' }, [
@@ -42,6 +45,7 @@ return view.extend({
 				wf.card('globe', 'Đang phát', '', [
 					wf.kv([
 						[ 'Băng phát', bands ],
+						[ 'Kênh', ['2g', '5g'].filter(b => g.channels?.[b]).map(b => `${b == '5g' ? '5G' : '2.4G'} ${g.channels[b] == 'auto' ? 'theo WiFi nguồn' : 'kênh ' + g.channels[b]}`).join(' · ') || '—' ],
 						[ 'Khách đang kết nối', String(g.clients ?? 0) ],
 						[ 'Mạng khách', g.subnet || '10.10.10.0/24' ],
 						[ 'Bảo mật', 'Mở, khách không thấy nhau' ]

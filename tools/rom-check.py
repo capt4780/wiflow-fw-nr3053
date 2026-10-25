@@ -209,7 +209,12 @@ checks = {
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
     "LuCI package upload accepts the unsigned Wiflow Setup apk":
-        '--allow-untrusted' in open(F + "/usr/libexec/package-manager-call").read(),
+        '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
+    "LuCI pages are not offered for machine translation":
+        'translate="no"' in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
+    "phone/tablet layout by viewport width (tables become cards up to 900 px)":
+        "max-device-width" not in open(F + "/www/luci-static/wiflow/mobile.css").read()
+        and "(max-width: 854px)" in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
     "anonymous ubus cannot call session.login":
         "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }

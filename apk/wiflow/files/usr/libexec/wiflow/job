@@ -115,6 +115,8 @@ function uplink() {
 		step('Đang lưu chế độ kết nối…');
 		const what = P.apply_mode(mode);
 		W.core_set({ internet_mode: mode });
+		if (W.core('activated') == '1' && P.plan_radios())
+			what.wireless = true;
 		P.reload(what);
 		W.st_set('override', null);
 		W.wlog('uplink', { auto: 'Internet tự động: cáp trước, WiFi nguồn dự phòng', lan: 'Internet chỉ qua cáp WAN', wifi: 'Internet chỉ qua WiFi nguồn' }[mode]);
@@ -127,6 +129,8 @@ function uplink() {
 	}
 
 	/* join a source WiFi */
+	if (W.core('activated') != '1')
+		done(false, 'Hãy bấm “Bật Wiflow” ở trang Tổng quan trước khi bắt WiFi nguồn.');
 	const ssid = req.ssid;
 	const band = req.band ?? '2g';
 	let enc = req.encryption ?? (length(req.key) ? 'psk2' : 'none');
@@ -149,6 +153,14 @@ function uplink() {
 	step(`Đang chuẩn bị kết nối “${ssid}”…`);
 	txn_begin();
 
+	// Same radio, station already running: switch the source in the driver
+	// (iwpriv on apcli0 / apclix0). The guest AP on that radio and the other
+	// radio keep running; nothing is reloaded. Otherwise (first source, other
+	// band) the WiFi is reloaded once.
+	const prev_dev = W.uci_get('wireless', 'wiflow_uplink', 'device');
+	const live = prev_dev == r.name && W.uci_get('wireless', 'wiflow_uplink', 'disabled') != '1'
+		&& W.core('internet_mode', 'auto') != 'lan' && W.sta_up(r);
+
 	const c = cursor();
 	c.load('wireless');
 	c.delete('wireless', 'wiflow_uplink');
@@ -162,24 +174,38 @@ function uplink() {
 		c.set('wireless', 'wiflow_uplink', 'key', key);
 	c.commit('wireless');
 	W.run('chmod 600 /etc/config/wireless');
-	P.apply_mode(final_mode);
+	const m = P.apply_mode(final_mode);
+	const replanned = P.plan_radios();
 	W.st_set('override', null);
 
 	step(`Đang kết nối “${ssid}”…`);
-	P.reload({ network: true, wireless: true });
-	sleep(3000);
-
-	if (!wait_for(30, () => W.sta_associated(r, ssid))) {
-		step('Đang kiểm tra lại WiFi nguồn…');
-		W.run('ifup wiflow_wwan');
-		if (!wait_for(10, () => W.sta_associated(r, ssid))) {
-			txn_rollback();
-			const seen = length(filter(W.scan(), n => n.ssid == ssid && n.band == band)) > 0;
-			W.wlog('uplink', `Không kết nối được WiFi nguồn “${ssid}”`);
-			done(false, seen
-				? `Không vào được “${ssid}”. Kiểm tra lại mật khẩu.`
-				: `Không thấy “${ssid}”. Kiểm tra tên WiFi, khoảng cách hoặc băng tần.`);
+	let joined = false;
+	if (live && !replanned && !m.wireless) {
+		W.sta_join(r, ssid, enc, key);
+		if (m.network) P.reload({ network: true });
+		joined = wait_for(25, () => W.sta_associated(r, ssid));
+		if (joined)
+			W.run('ifup wiflow_wwan');
+		else
+			step(`Đang thử lại “${ssid}”…`);
+	}
+	if (!joined) {
+		P.reload({ network: true, wireless: true });
+		sleep(3000);
+		joined = wait_for(30, () => W.sta_associated(r, ssid));
+		if (!joined) {
+			step('Đang kiểm tra lại WiFi nguồn…');
+			W.run('ifup wiflow_wwan');
+			joined = wait_for(10, () => W.sta_associated(r, ssid));
 		}
+	}
+	if (!joined) {
+		txn_rollback();
+		const seen = length(filter(W.scan(), n => n.ssid == ssid && n.band == band)) > 0;
+		W.wlog('uplink', `Không kết nối được WiFi nguồn “${ssid}”`);
+		done(false, seen
+			? `Không vào được “${ssid}”. Kiểm tra lại mật khẩu.`
+			: `Không thấy “${ssid}”. Kiểm tra tên WiFi, khoảng cách hoặc băng tần.`);
 	}
 
 	step('Đang nhận địa chỉ mạng…');
@@ -213,6 +239,50 @@ function uplink() {
 		: `Đã kết nối Internet qua “${ssid}”.`);
 }
 
+/* ---------------------------------------------------------------- activate */
+// The router's WiFi becomes the Wiflow guest WiFi (open, 10.10.10.x) on both
+// bands, each on a quiet fixed channel. The admin's own WiFi connection drops
+// here: the page tells them to join "Wiflow" and open 10.0.0.1 again.
+
+function activate() {
+	if (W.core('activated') == '1')
+		done(true, 'Wiflow đã được bật.');
+	step('Đang quét kênh WiFi xung quanh…');
+	const nets = W.scan();
+	const ch = P.pick_channels(nets);
+	W.core_set({ ch_2g: ch['2g'], ch_5g: ch['5g'] });
+	step('Đang bật WiFi khách…');
+	P.backup_stock();
+	P.ensure_networks();
+	P.ensure_wireless(true);
+	W.core_set({ activated: '1' });
+	P.apply_mode(W.core('internet_mode', 'auto'));
+	P.plan_radios();
+	P.reload({ network: true, wireless: true, firewall: true, dhcp: true });
+	W.wlog('system', `Đã bật Wiflow: WiFi khách “${W.core('guest_ssid', 'Wiflow')}”, kênh 2.4G ${ch['2g']}, 5G ${ch['5g']}`);
+	done(true, `Đã bật Wiflow. WiFi khách “${W.core('guest_ssid', 'Wiflow')}” đang phát (2.4G kênh ${ch['2g']}, 5G kênh ${ch['5g']}).`);
+}
+
+/* -------------------------------------------------------------------- diag */
+
+function diag() {
+	step('Đang thu thập thông tin…');
+	W.st_set('diag_at', W.now());
+	const text = W.diag_text();
+	writefile(`${W.RUN}/diag.txt`, text);
+	if (req.send) {
+		step('Đang gửi cho Wiflow…');
+		const a = W.auth();
+		if (!a)
+			done(false, 'Router chưa kết nối tài khoản Wiflow, chỉ tải được báo cáo về máy.');
+		const r = W.http('POST', '/devices/diag', { command_id: 'local', health: {}, text: substr(text, 0, 16000), log: W.wlog_list(150) }, a, 20);
+		if (!r.body?.ok)
+			done(false, 'Không gửi được báo cáo. Bạn có thể tải báo cáo về máy.');
+		done(true, 'Đã gửi báo cáo chẩn đoán cho Wiflow.');
+	}
+	done(true, 'Báo cáo chẩn đoán đã sẵn sàng.', { file: `${W.RUN}/diag.txt` });
+}
+
 /* -------------------------------------------------------------------- scan */
 
 function scan() {
@@ -230,6 +300,8 @@ function guest() {
 	const src = W.uci_get('wireless', 'wiflow_uplink', 'ssid');
 	if (src && src == ssid)
 		done(false, 'Tên WiFi khách phải khác WiFi nguồn.');
+	if (W.core('activated') != '1')
+		done(false, 'Hãy bấm “Bật Wiflow” ở trang Tổng quan trước.');
 	step('Đang đổi tên WiFi khách…');
 	W.core_set({ guest_ssid: ssid });
 	if (P.ensure_wireless(false))
@@ -337,6 +409,8 @@ switch (kind) {
 case 'uplink': uplink(); break;
 case 'guest': guest(); break;
 case 'scan': scan(); break;
+case 'activate': activate(); break;
+case 'diag': diag(); break;
 case 'reconnect': reconnect(); break;
 case 'pair': pair(); break;
 case 'unpair': unpair(); break;

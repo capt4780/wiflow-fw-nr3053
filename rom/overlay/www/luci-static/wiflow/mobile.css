@@ -2,7 +2,7 @@ header h3 a, header .brand {
 	display:none !important;
 }
 
-@media screen and (max-device-width: 600px) {
+@media screen and (max-width: 900px) {
 	.modal {
 		margin: 1.5em auto;
 	}
@@ -347,7 +347,7 @@ header h3 a, header .brand {
 	}
 }
 
-@media screen and (max-device-width: 375px) {
+@media screen and (max-width: 375px) {
 	.cbi-page-actions {
 		display: flex;
 		justify-content: space-between;

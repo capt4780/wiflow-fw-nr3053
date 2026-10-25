@@ -43,7 +43,9 @@ start)
     { "ssid": "Cafe Sua Da", "bssid": "AA:BB:CC:00:00:01", "band": "2g", "channel": 6, "signal": -58, "enc": "psk2", "key": "cafe1234", "subnet": "192.168.31" },
     { "ssid": "Cafe Sua Da 5G", "bssid": "AA:BB:CC:00:00:02", "band": "5g", "channel": 36, "signal": -66, "enc": "mixed", "key": "cafe1234", "subnet": "192.168.32" },
     { "ssid": "Free WiFi Lobby", "bssid": "AA:BB:CC:00:00:03", "band": "2g", "channel": 11, "signal": -82, "enc": "none", "subnet": "10.0.0" },
-    { "ssid": "Corp", "bssid": "AA:BB:CC:00:00:04", "band": "5g", "channel": 149, "signal": -70, "enc": "eap" }
+    { "ssid": "Corp", "bssid": "AA:BB:CC:00:00:04", "band": "5g", "channel": 149, "signal": -70, "enc": "eap" },
+    { "ssid": "Nha Ben Canh", "bssid": "AA:BB:CC:00:00:05", "band": "2g", "channel": 6, "signal": -64, "enc": "psk2", "key": "bencanh123", "subnet": "192.168.40" },
+    { "ssid": "Office 5G", "bssid": "AA:BB:CC:00:00:06", "band": "5g", "channel": 100, "signal": -60, "enc": "psk2", "key": "office1234", "subnet": "192.168.50" }
   ],
   "clients": { "ra0": [], "rax0": [] } }
 EOF

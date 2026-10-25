@@ -31,7 +31,7 @@ $B x /usr/libexec/wiflow/provision boot
 expect "install: device id" "$(cat /etc/wiflow/device-id)" '^WIFDID-NR3053-[0-9]{6}$'
 expect "install: gate code added" "$(uci_() { "$PFX/bin/uci" "$@"; }; LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q get wiflow_gate.main.code)" "WIFDIDNR3053 $(cut -c15-20 /etc/wiflow/device-id)"
 U(){ LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q "$@"; }
-expect "install: stock APs replaced by guest APs" "$(U show wireless | grep -c "=wifi-iface")/$(U get wireless.wiflow_guest_2g.ssid)/$(U get wireless.wiflow_guest_5g.network)" '^2/Wiflow/wiflow_guest$'
+expect "install: WiFi untouched until 'Bật Wiflow'" "$(U get wiflow.core.activated)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.wiflow_guest_2g)" '^0\|Wiflow 2.4G\|$'
 expect "install: guest network" "$(U get network.wiflow_guest.ipaddr) $(U get firewall.wiflow_guest.input) $(U get firewall.wiflow_guest_wan.dest)" '^10.10.10.1/24 REJECT wan$'
 expect "install: uplink in wan zone" "$(U show firewall | grep "network=.*wiflow_wwan")" 'wiflow_wwan'
 cp -r /etc/config /tmp/cfg.before
@@ -40,14 +40,26 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 $B agent
-r="$(job scan)"; expect "scan job" "$r" '^success\|Tìm thấy 3 mạng'
+r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
+expect "source WiFi needs activation" "$r" '^failed\|.*Bật Wiflow'
+r="$(job activate)"; expect "activate" "$r" '^success\|Đã bật Wiflow'
+expect "activate: stock APs replaced by guest APs" "$(U show wireless | grep -c "=wifi-iface")/$(U get wireless.wiflow_guest_2g.ssid)/$(U get wireless.wiflow_guest_5g.network)/$(U get wireless.wiflow_guest_2g.isolate)" '^2/Wiflow/wiflow_guest/1$'
+expect "activate: fixed quiet channels, 20/80 MHz" "$(U get wireless.MT7981_1_1.channel)/$(U get wireless.MT7981_1_1.htmode) $(U get wireless.MT7981_1_2.channel)/$(U get wireless.MT7981_1_2.htmode)" '^1/HE20 (36|149)/HE80$'
+r="$(job scan)"; expect "scan job" "$r" '^success\|Tìm thấy 5 mạng'
 expect "scan: enterprise hidden, mixed WPA2/3 as psk2" "$(st "sorted((n['ssid'],n['band'],n['encryption']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', '5g', 'psk2'\).*\('Free WiFi Lobby', '2g', 'none'\)"
+expect "scan: advice (5G non-DFS good signal, DFS flagged)" "$(st "sorted((n['ssid'], bool(n.get('recommended')), n['dfs'], n['weak']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', True, False, False\).*\('Office 5G', False, True, False\)"
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"wrongpass","encryption":"psk2"}')"
 expect "wrong password fails and rolls back" "$r|$(U -q get wireless.wiflow_uplink.ssid)" '^failed\|Không vào được.*mật khẩu\.\|$'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 expect "join 2.4G source" "$r" '^success\|Đã kết nối “Cafe Sua Da”'
 wait_for 15 "s['internet']['source'].get('connected') and s['internet']['online']" && pass "status: source connected, online" || fail "status after join: $(st "s['internet']")"
 expect "guest follows source band" "$(st "s['guest']['follows']")" '^2g$'
+expect "source radio follows the source, other radio fixed" "$(U get wireless.MT7981_1_1.channel) $(U get wireless.MT7981_1_2.channel)" '^auto (36|149)$'
+: > /tmp/mock/calls.log
+r="$(job set_uplink '{"mode":"auto","ssid":"Nha Ben Canh","band":"2g","key":"bencanh123","encryption":"psk2"}')"
+expect "switch source on the same band" "$r" '^success\|Đã kết nối “Nha Ben Canh”'
+grep -q "iwpriv apcli0 set ApCliSsid=Nha Ben Canh" /tmp/mock/calls.log && ! grep -q "^wifi reload" /tmp/mock/calls.log && pass "same-band switch without reloading the WiFi" || fail "same-band switch reloaded WiFi: $(grep -E '^wifi|ApCliSsid' /tmp/mock/calls.log | tr '\n' ';')"
+r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 r="$(job set_uplink '{"mode":"wifi","ssid":"Free WiFi Lobby","band":"2g","key":"","encryption":"none"}')"
 expect "source on 10.0.0.x refused" "$r|$(U get wireless.wiflow_uplink.ssid)" '^failed\|.*trùng mạng nội bộ.*\|Cafe Sua Da$'
 r="$(job set_uplink '{"mode":"wifi","ssid":"Cafe Sua Da 5G","band":"5g","key":"cafe1234","encryption":"psk2"}')"
@@ -74,7 +86,7 @@ r="$(job pair '{"code":"ZZZZ-1111-2222"}')"; expect "pair: unknown code" "$r" '^
 r="$(job pair '{"code":"abcd-1234-efgh"}')"; expect "pair" "$r" '^success\|Đã kết nối tài khoản WIFUID482913'
 wait_for 20 "s['wp']['online']" && pass "heartbeat accepted" || fail "heartbeat: $(st "s['wp']")"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['connection'], b['guest_ssid'], b['health']['uplink_active'])")" '^1.1.0 4 auto Wiflow Cafe lan$'
+expect "heartbeat body" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['connection'], b['guest_ssid'], b['health']['uplink_active'])")" '^1\.[0-9]+\.[0-9]+ 4 auto Wiflow Cafe lan$'
 
 python3 -c "import json; w=json.load(open('/tmp/mock/world.json')); w['clients']={'ra0':['11:22:33:44:55:66','11:22:33:44:55:77'],'rax0':[]}; json.dump(w,open('/tmp/mock/world.json','w'))"
 sleep 14
@@ -113,6 +125,7 @@ wait_for 60 "not s['wp']['paired']" && pass "owner unpair in app: router forgets
 wp "s['codes']['QWER5678TYUI']={'account':'WIFUID555111'}; s['commands']=[]"
 r="$(job pair '{"code":"QWER5678TYUI"}')"; expect "pair again" "$r" 'WIFUID555111'
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
+r="$(job diag)"; expect "diagnostic report" "$r|$(grep -c '== radios' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234\|bencanh123' /tmp/wiflow/diag.txt)" '^success\|.*\|1\|0$'
 
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 pgrep -f '^/usr/bin/ucode /usr/libexec/wiflow/agen[t]' >/dev/null && fail "agent ignores SIGTERM" || pass "agent stops on SIGTERM"

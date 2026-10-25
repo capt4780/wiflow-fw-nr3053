@@ -31,17 +31,24 @@ function boot() {
 	if (W.core('last_command_status') == 'rebooting')
 		W.core_set({ last_command_status: 'success', last_command_message: 'Thiết bị đã khởi động lại' });
 
-	const first = !access(MARK);
-	if (first)
-		P.backup_stock();
+	// Wiflow takes over the WiFi only once the admin presses "Bật Wiflow"
+	// (job activate). An install of 1.1.x had already done so.
+	if (W.core('activated') == null)
+		W.core_set({ activated: W.uci_get('wireless', 'wiflow_guest_2g') == 'wifi-iface' ? '1' : '0' });
+	const active = W.core('activated') == '1';
+
 	P.ensure_networks();
-	const wl = P.ensure_wireless(first);
-	const m = P.apply_mode(W.core('internet_mode', 'auto'));
+	let wl = false;
+	if (active) {
+		wl = P.ensure_wireless(false);
+		wl = P.plan_radios() || wl;
+	}
+	const m = P.apply_mode(active ? W.core('internet_mode', 'auto') : 'auto');
+	if (active && m.wireless)
+		wl = P.plan_radios() || wl;
 	writefile(MARK, W.VERSION);
 
 	P.reload({ network: true, wireless: wl || m.wireless, firewall: true, dhcp: true });
-	if (first)
-		W.wlog('system', `Wiflow ${W.VERSION} đã được cài: WiFi khách “${W.core('guest_ssid', 'Wiflow')}”, mạng khách ${W.GUEST_NET}.0/24`);
 }
 
 function remove() {

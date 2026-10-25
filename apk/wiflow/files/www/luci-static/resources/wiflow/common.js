@@ -2,6 +2,7 @@
 'require baseclass';
 'require rpc';
 'require ui';
+'require fs';
 
 /* Wiflow Setup shared bits: ubus calls to the wiflow rpcd plugin, the page
    styling (light, same palette as the Wiflow theme) and small view helpers. */
@@ -54,6 +55,14 @@ const CSS = `
 .wf-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase}
 .wf-big{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:2px 0 0}
 .wf-sub{font-size:12.5px;color:var(--wf-muted)}
+.wf-hero{border-color:#BFD3FF;background:linear-gradient(180deg,#F5F8FF,#fff);margin:0 0 16px}
+.wf-hero p{margin:0 0 6px;font-size:13.5px;line-height:1.55;color:var(--wf-text)}
+.wf-hero ul{margin:6px 0 0 18px;padding:0;font-size:13px;line-height:1.6}
+.wf-hero ul li{color:var(--wf-text);list-style:disc}
+.wf-hero ul li::marker{color:var(--wf-blue)}
+.wf-tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:600;margin-left:6px;vertical-align:1px}
+.wf-tag.ok{background:var(--wf-mint-soft);color:var(--wf-mint)}
+.wf-tag.warn{background:var(--wf-amber-soft);color:var(--wf-amber)}
 .wf-wait{display:flex;align-items:center;gap:14px;padding:6px 0 4px}
 .wf-spin{width:22px;height:22px;flex:none;border-radius:50%;border:3px solid var(--wf-blue-soft);border-top-color:var(--wf-blue);animation:wf-spin .8s linear infinite}
 @keyframes wf-spin{to{transform:rotate(360deg)}}
@@ -81,6 +90,21 @@ return baseclass.extend({
 	callPair: rpc.declare({ object: 'wiflow', method: 'pair', params: [ 'code' ] }),
 	callUnpair: rpc.declare({ object: 'wiflow', method: 'unpair', params: [ 'force' ] }),
 	callJobClear: rpc.declare({ object: 'wiflow', method: 'job_clear' }),
+	callActivate: rpc.declare({ object: 'wiflow', method: 'activate' }),
+	callDiag: rpc.declare({ object: 'wiflow', method: 'diag', params: [ 'send' ] }),
+
+	/* The diagnostic report as a file download. */
+	downloadDiag() {
+		return fs.read('/tmp/wiflow/diag.txt').then(txt => {
+			const a = E('a', { 'href': URL.createObjectURL(new Blob([ txt ], { type: 'text/plain' })), 'download': `wiflow-diag-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.txt` });
+			document.body.appendChild(a); a.click(); a.remove();
+		}, () => this.notify(false, 'Không đọc được báo cáo.'));
+	},
+
+	/* Shown on pages that need the WiFi until Wiflow is switched on. */
+	activateNote() {
+		return this.note(E('span', {}, [ 'Wiflow chưa quản lý WiFi của router. Bấm ', E('a', { 'href': L.url('admin/wiflow/overview') }, '“Bật Wiflow”'), ' ở trang Tổng quan trước.' ]));
+	},
 
 	/* Start a background change and follow it in a modal until it is done.
 	   Joining a WiFi reloads the radios, so the page may lose the router for

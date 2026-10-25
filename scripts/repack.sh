@@ -83,16 +83,19 @@ PY
 
 # LuCI > System > Software, "Upload package": a package file chosen by the
 # admin (e.g. the Wiflow Setup .apk) installs without the ImmortalWrt feed
-# signature; packages from the online feeds are still verified.
+# signature and without contacting the feeds; online feed packages are
+# still verified.
 P="$F/usr/libexec/package-manager-call"
 grep -qF 'if flock -x 200; then' "$P" || die "package-manager-call: install anchor not found"
 python3 - "$P" <<'PY'
 import sys
 p = sys.argv[1]; s = open(p).read()
 add = ('\t\t\t# Wiflow OS: a local package file uploaded by the admin is not signed\n'
-       '\t\t\t# by the feed key; allow it (online feed packages stay verified).\n'
+       '\t\t\t# by the feed key; allow it (online feed packages stay verified). It\n'
+       '\t\t\t# needs nothing from the feeds, so they are not contacted either (no\n'
+       '\t\t\t# false "Errors" when the router has no Internet yet).\n'
        '\t\t\tif [ $ipkg_bin = "apk" ] && [ "$action" = "add" ]; then\n'
-       '\t\t\t\tfor a in "$@"; do [ -f "$a" ] && { cmd="$cmd --allow-untrusted"; break; }; done\n'
+       '\t\t\t\tfor a in "$@"; do [ -f "$a" ] && { cmd="$cmd --allow-untrusted --no-network --repositories-file /dev/null"; break; }; done\n'
        '\t\t\tfi\n\n')
 assert s.count('\t\t\tif flock -x 200; then') == 1
 s = s.replace('\t\t\tif flock -x 200; then', add + '\t\t\tif flock -x 200; then', 1)
