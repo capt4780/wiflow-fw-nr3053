@@ -232,52 +232,19 @@ export function ensure_wireless(first) {
 	return changed;
 };
 
-// Channels for a stable guest WiFi (chosen once, when Wiflow is switched on):
-// 2.4 GHz on 1, 6 or 11, 5 GHz on 36 or 149 (never a DFS channel), the one
-// with the least WiFi around it.
-export function pick_channels(nets) {
-	const load = (from, to, band) => {
-		let s = 0;
-		for (let n in nets ?? [])
-			if (n.band == band && n.channel >= from && n.channel <= to)
-				s += max(1, n.signal + 100);
-		return s;
-	};
-	let c2 = 6, best = load(2, 10, '2g');
-	for (let ch in [ 1, 11 ]) {
-		const l = load(ch - 4, ch + 4, '2g');
-		if (l < best) { best = l; c2 = ch; }
-	}
-	const c5 = load(149, 165, '5g') < load(36, 48, '5g') ? 149 : 36;
-	return { '2g': c2, '5g': c5 };
-};
-
-// Radio settings that keep the source and the guests stable on mt_wifi:
-//  - the radio that carries the source station (repeater mode): channel
-//    "auto", the driver follows the source's channel;
-//  - every other radio: the fixed channel picked above, no automatic
-//    channel changes that would drop the guests;
-//  - 2.4 GHz 20 MHz, 5 GHz 80 MHz (160 MHz would need DFS channels).
-// Returns true when the wireless config changed.
+// Radio settings: both radios on channel "auto" and everything else as the
+// stock config, the way LuCI's own Join Network works on this router. On
+// mt_wifi the station moves its radio to the source's channel, which a fixed
+// channel would prevent. Returns true when the wireless config changed.
 export function plan_radios() {
 	const c = cursor();
 	c.load('wireless');
-	const up = (W.core('internet_mode', 'auto') != 'lan'
-		&& c.get('wireless', 'wiflow_uplink') == 'wifi-iface'
-		&& c.get('wireless', 'wiflow_uplink', 'disabled') != '1')
-		? c.get('wireless', 'wiflow_uplink', 'device') : null;
 	let changed = false;
-	for (let r in W.radios()) {
-		const want = {
-			channel: r.name == up ? 'auto' : W.core(`ch_${r.band}`, r.band == '2g' ? '6' : '36'),
-			htmode: r.band == '2g' ? 'HE20' : 'HE80'
-		};
-		for (let k, v in want)
-			if (c.get('wireless', r.name, k) != v) {
-				c.set('wireless', r.name, k, v);
-				changed = true;
-			}
-	}
+	for (let r in W.radios())
+		if (c.get('wireless', r.name, 'channel') != 'auto') {
+			c.set('wireless', r.name, 'channel', 'auto');
+			changed = true;
+		}
 	if (changed)
 		c.commit('wireless');
 	return changed;

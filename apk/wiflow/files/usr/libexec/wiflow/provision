@@ -31,8 +31,8 @@ function boot() {
 	if (W.core('last_command_status') == 'rebooting')
 		W.core_set({ last_command_status: 'success', last_command_message: 'Thiết bị đã khởi động lại' });
 
-	// Wiflow takes over the WiFi only once the admin presses "Bật Wiflow"
-	// (job activate). An install of 1.1.x had already done so.
+	// Wiflow takes over the WiFi the first time an Internet source is chosen
+	// (job uplink). An install of 1.1.x had already done so.
 	if (W.core('activated') == null)
 		W.core_set({ activated: W.uci_get('wireless', 'wiflow_guest_2g') == 'wifi-iface' ? '1' : '0' });
 	const active = W.core('activated') == '1';

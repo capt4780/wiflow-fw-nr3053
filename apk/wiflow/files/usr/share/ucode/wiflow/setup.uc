@@ -10,7 +10,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -341,43 +341,6 @@ export function sta_up(r) {
 	return !!access(`/sys/class/net/${i}`) && sysflag_up(i);
 };
 
-// mt_wifi station settings at run time (the same keys mtwifi writes in its
-// .dat from uci). Used to change the source without reloading the WiFi.
-const APCLI_AUTH = {
-	none: [ 'OPEN', 'NONE' ], psk: [ 'WPAPSK', 'AES' ], 'psk-mixed': [ 'WPAPSKWPA2PSK', 'AES' ],
-	psk2: [ 'WPA2PSK', 'AES' ], sae: [ 'WPA3PSK', 'AES' ]
-};
-
-function apcli_set(i, k, v) {
-	return run(`iwpriv ${q(i)} set ${q(k + '=' + v)}`).code == 0;
-};
-
-export function sta_join(r, ssid, enc, key) {
-	const i = sta_if(r);
-	const a = APCLI_AUTH[enc] ?? APCLI_AUTH.psk2;
-	apcli_set(i, 'ApCliEnable', '0');
-	sleep(500);
-	apcli_set(i, 'ApCliAuthMode', a[0]);
-	apcli_set(i, 'ApCliEncrypType', a[1]);
-	apcli_set(i, 'ApCliPMFMFPC', enc == 'sae' ? '1' : '0');
-	apcli_set(i, 'ApCliPMFMFPR', enc == 'sae' ? '1' : '0');
-	apcli_set(i, 'ApCliSsid', ssid);
-	if (enc != 'none')
-		apcli_set(i, 'ApCliWPAPSK', key);
-	apcli_set(i, 'ApCliEnable', '1');
-	apcli_set(i, 'ApCliAutoConnect', '3');
-	sleep(2000);
-};
-
-// Ask the station to find its source again (what mtwifi does after setup).
-export function sta_kick(r) {
-	const i = sta_if(r);
-	apcli_set(i, 'ApCliEnable', '0');
-	sleep(500);
-	apcli_set(i, 'ApCliEnable', '1');
-	apcli_set(i, 'ApCliAutoConnect', '3');
-};
-
 export function sta_associated(r, want) {
 	const i = iw_info(sta_if(r));
 	if (!i || !i.up || !i.bssid || !i.ssid)
@@ -414,86 +377,25 @@ function scan_iwinfo(r) {
 	return out;
 };
 
-// mt_wifi site survey (iwpriv). The table looks like
-//   No  Ch  SSID                              BSSID               Security    Siganl(%)W-Mode ...
-//   0   36  Cafe 5G                           aa:bb:cc:dd:ee:ff   WPA2PSK/AES 81       11a/n/ac ...
-// Columns are found from the header; the SSID is everything between its
-// column and the BSSID (it may hold spaces). A 5 GHz survey takes 4-8 s:
-// the table is read until it stops growing.
-function sec_enc(sec) {
-	sec = uc(sec ?? '');
-	if (match(sec, /OWE|WEP|EAP|1X|ENT/)) return null;
-	if (match(sec, /WPA/) && !match(sec, /PSK|SAE/)) return null;	// WPA2/AES = enterprise
-	if (match(sec, /WPA3/) && !match(sec, /WPA2|WPAPSK/)) return 'sae';
-	if (match(sec, /WPA2|WPA3/)) return 'psk2';
-	if (match(sec, /WPA/)) return 'psk';
-	return 'none';
-};
-
-export function parse_survey(text) {
-	const out = [];
-	let s0 = -1, has_no = false;
-	for (let l in split(text ?? '', '\n')) {
-		l = replace(l, /\r/g, '');
-		if (index(l, 'SSID') >= 0 && index(l, 'BSSID') >= 0) {
-			s0 = index(l, 'SSID');
-			has_no = !!match(l, /^\s*No\b/);
-			continue;
-		}
-		const m = match(l, /([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5})/);
-		if (s0 < 0 || !m)
-			continue;
-		const at = index(l, m[1]);
-		const head = split(trim(replace(substr(l, 0, min(s0, at)), /\s+/g, ' ')), ' ');
-		const ch = num(has_no ? head[1] : head[length(head) - 1], 0);
-		const ssid = trim(substr(l, s0, at - s0));
-		const rest = split(trim(replace(substr(l, at + 17), /\s+/g, ' ')), ' ');
-		const enc = sec_enc(rest[0]);
-		if (!enc || !length(ssid) || !bssid_ok(m[1]) || match(ssid, /^0x[0-9a-fA-F]*$/))
-			continue;
-		const sv = num(rest[1], 0);
-		// percent in most builds, dBm (negative) in some
-		const sig = sv < 0 ? sv : (sv > 0 ? int(sv / 2) - 100 : -95);
-		push(out, { ssid: ssid, bssid: uc(m[1]), encryption: enc, channel: ch, signal: sig });
-	}
-	return out;
-};
-
-function scan_site_survey(r, secs) {
-	if (!access('/usr/sbin/iwpriv') && !access('/usr/bin/iwpriv') && !length(sh('command -v iwpriv')))
-		return [];
-	// survey 100-140 too, even before the WiFi was reloaded with region 7
-	if (r.band == '5g')
-		run(`iwpriv ${q(r.phy)} set CountryRegionABand=7`);
-	run(`iwpriv ${q(r.phy)} set SiteSurvey=1`);
-	let best = [], same = 0, raw = '';
-	const t0 = uptime();
-	sleep(2500);
-	while (true) {
-		raw = sh(`iwpriv ${q(r.phy)} get_site_survey`);
-		const got = parse_survey(raw);
-		if (length(got) > 0 && length(got) == length(best)) same++;
-		else same = 0;
-		if (length(got) >= length(best)) best = got;
-		if (same >= 1 || uptime() - t0 >= secs)
+// Networks heard by one radio: the system scan (libiwinfo), the same one
+// LuCI's Scan button uses. Up to 3 tries, 2 s apart, until it lists something.
+// The list is kept for the diagnostics report.
+export function scan_radio(r) {
+	let found = [], tries = 0;
+	while (tries < 3) {
+		tries++;
+		found = scan_iwinfo(r);
+		if (length(found) > 0)
 			break;
-		sleep(1500);
+		if (tries < 3)
+			sleep(2000);
 	}
 	mkdir(RUN, 0700);
-	writefile(`${RUN}/survey-${r.band}.txt`, `uptime ${uptime()} ${r.phy} bytes=${length(raw)} rows=${length(best)}\n${raw}`);
-	return best;
-};
-
-// Networks heard by one radio: libiwinfo first, then the driver survey;
-// the two lists are merged by BSSID (either may miss entries on mt_wifi).
-export function scan_radio(r) {
-	let found = scan_iwinfo(r);
-	const n_iw = length(found);
-	const seen = {};
-	for (let n in found) seen[n.bssid] = true;
-	for (let n in scan_site_survey(r, r.band == '5g' ? 14 : 9))
-		if (!seen[n.bssid]) { seen[n.bssid] = true; push(found, n); }
-	st_set(`scan_${r.band}`, { at: uptime(), iwinfo: n_iw, total: length(found) });
+	const rec = [ sprintf('uptime %d %s tries=%d networks=%d', uptime(), r.phy, tries, length(found)) ];
+	for (let n in found)
+		push(rec, sprintf('  %-32s ch=%-3d %4d dBm %-5s %s', n.ssid, n.channel, n.signal, n.encryption, n.bssid));
+	writefile(`${RUN}/scan-${r.band}.txt`, join('\n', rec) + '\n');
+	st_set(`scan_${r.band}`, { at: uptime(), tries: tries, total: length(found) });
 	return found;
 };
 
@@ -788,13 +690,11 @@ export function diag_text() {
 	add(readfile(`${RUN}/log`) ?? '');
 	add('== last join failure');
 	add(readfile(`${RUN}/join-fail.txt`) ?? '(none)');
-	add('== last WiFi source test');
-	add(readfile(`${RUN}/wifitest.txt`) ?? '(none)');
 	add('== last scan');
 	for (let b in [ '2g', '5g' ])
 		add(sprintf('%s %J', b, st_get(`scan_${b}`)));
 	for (let b in [ '2g', '5g' ])
-		add(readfile(`${RUN}/survey-${b}.txt`) ?? '');
+		add(readfile(`${RUN}/scan-${b}.txt`) ?? '');
 	// mt_wifi logs every scanned channel at notice level: keep it out.
 	const noise = /AsicSwitchChannel|MtCmd|dpd_flatness|scan_type|EDCCA|PrintSrCmd|BcnCheck|TakeChannelOpCharge|ReleaseChannelOpCharge|ChannelInfo|SYNC - |MlmeEnqueue|wdev_do_|HcUpdate|Ch(Switch|annel)Op/;
 	const tail = (a, n) => slice(a, max(0, length(a) - n));

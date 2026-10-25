@@ -57,15 +57,6 @@ def main():
         ssid = uci('wireless.wiflow_uplink.ssid')
         key = uci('wireless.wiflow_uplink.key') or ''
         enc = uci('wireless.wiflow_uplink.encryption') or 'none'
-        # run-time station settings (iwpriv) win until the next WiFi reload
-        rt = (json.load(open('/tmp/mock/apcli.json')) if os.path.exists('/tmp/mock/apcli.json') else {}).get(sta)
-        if rt:
-            if rt.get('ApCliEnable') == '0':
-                ssid = None
-            else:
-                ssid = rt.get('ApCliSsid', ssid)
-                key = rt.get('ApCliWPAPSK', key)
-                enc = 'none' if rt.get('ApCliAuthMode') == 'OPEN' else 'psk2'
         band = '5g' if radio == 'MT7981_1_2' else '2g'
         ap = next((a for a in world['aps'] if a['ssid'] == ssid and a['band'] == band), None)
         ok = ap is not None and (ap['enc'] == 'none' or ap.get('key') == key) and ((ap['enc'] == 'none') == (enc == 'none'))

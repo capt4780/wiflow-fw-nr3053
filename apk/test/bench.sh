@@ -14,7 +14,7 @@ F="$(cd "$WFT/../wiflow/files" && pwd)"
 PFX="${PFX:-/opt/pfx}"
 U="${UCODE_DIR:-$PFX/ucode}"
 PIDF=/tmp/wfbench.pid
-ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_TICK=${WIFLOW_TICK:-20}"
+ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_TICK=${WIFLOW_TICK:-20} WIFLOW_JOIN_WAIT=${WIFLOW_JOIN_WAIT:-60}"
 
 x() { nsenter -t "$(cat $PIDF)" -n -m env -i HOME=/root $ENVP "$@"; }
 

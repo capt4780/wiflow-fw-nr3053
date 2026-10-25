@@ -83,6 +83,30 @@ jobs:
           V="$(sed -n "s/^export const VERSION = '\(.*\)';/\1/p" apk/wiflow/files/usr/share/ucode/wiflow/setup.uc)"
           TAG="wiflow-setup-v$V-b${{ github.run_number }}"
           {
+            echo "Wiflow Setup $V cho Wiflow OS trên Viettel NR3053: bắt WiFi nguồn đúng như Join Network của LuCI (quét bằng hệ thống, ghi cấu hình, khởi động lại WiFi một lần), không còn lệnh iwpriv; mở thẳng trang quản trị, chọn nguồn Internet trước."
+            echo
+            echo "- Nạp Wiflow OS mới nhất (mục Releases, nr3053-os-v1.0.0-…) trước: bản này cài được gói tải lên và không còn hiện lỗi giả khi cài."
+            echo "- Cài: LuCI → System → Software → **Upload Package…** → chọn file \`.apk\` → Install."
+            echo "- Sau khi cài, WiFi chưa đổi. Tải lại trang, bấm **Wiflow Setup** ở đầu thanh bên: chọn dây LAN hoặc WiFi nguồn. Lần đầu chọn nguồn, router đồng thời đổi WiFi thành WiFi khách (mạng 10.10.10.x)."
+            echo
+            echo '```'; cat dist/SHA256SUMS; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wiflow-setup-apk
+          path: dist/
+          retention-days: 30
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V="$(sed -n "s/^export const VERSION = '\(.*\)';/\1/p" apk/wiflow/files/usr/share/ucode/wiflow/setup.uc)"
+          TAG="wiflow-setup-v$V-b${{ github.run_number }}"
+          {
             echo "Wiflow Setup $V cho Wiflow OS trên Viettel NR3053: giao diện Wiflow Setup như CR6609 (Trạng thái, Internet, WiFi khách, Hệ thống), Internet nguồn (dây LAN / WiFi nguồn / tự động), WiFi khách, tài khoản Wiflow."
             echo
             echo "- Nạp Wiflow OS mới nhất (mục Releases, nr3053-os-v1.0.0-…) trước: bản này cài được gói tải lên và không còn hiện lỗi giả khi cài."

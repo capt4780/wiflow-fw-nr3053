@@ -8,13 +8,12 @@ Wiflow Setup là gói `.apk` cài lên Wiflow OS. Khung giao diện (sidebar tr�
 2. Tải file `wiflow-setup-<phiên bản>.apk` ở mục Releases của repo.
 3. Mở `http://10.0.0.1`, nhập Gate rồi đăng nhập (`wiflow` / `wiflow` hoặc `root` / `1234`).
 4. Vào **System → Software**, bấm **Upload Package…**, chọn file `.apk`, rồi bấm **Install**.
-5. Tải lại trang, bấm **Wiflow Setup** ở đầu thanh bên. Lúc này WiFi của router chưa thay đổi. Trang cài đặt hiện 4 bước:
-   1. **WiFi khách**: đặt tên rồi bấm **Bật Wiflow**. WiFi `Wiflow 2.4G` / `Wiflow 5G` đổi thành WiFi khách (mở) trên mạng `10.10.10.x`, mỗi băng một kênh cố định ít nhiễu. Nếu bạn đang dùng WiFi của router, sau khoảng 30 giây hãy kết nối vào WiFi khách rồi mở lại `http://10.0.0.1`.
-   2. **Internet nguồn**: chọn **Dây LAN** (bấm Kiểm tra dây LAN) hoặc **WiFi của modem** (chọn mạng, nhập mật khẩu).
-   3. **Liên kết tài khoản**: nhập mã 12 ký tự từ app Wiflow, hoặc bấm Để sau.
-   4. **Hoàn tất**.
+5. Tải lại trang, bấm **Wiflow Setup** ở đầu thanh bên. Lúc này WiFi của router chưa thay đổi. Trang mở ở **Internet**, bạn chọn nguồn Internet trước, các trang khác vẫn dùng được bất cứ lúc nào:
+   - **Dây LAN**: cắm dây từ modem vào cổng WAN rồi bấm **Kiểm tra dây LAN**.
+   - **WiFi của modem**: chạm một mạng trong danh sách, nhập mật khẩu, bấm **Kết nối**.
 
-Bản 1.2.x đã bật Wiflow thì bỏ qua bước 1.
+   Lần đầu chọn nguồn, router đồng thời đổi WiFi `Wiflow 2.4G` / `Wiflow 5G` thành WiFi khách **Wiflow** (mở, mạng `10.10.10.x`, cả hai băng) và bắt nguồn trong một lần khởi động lại WiFi, khoảng 30–60 giây. Điện thoại đang dùng WiFi của router sẽ rớt: kết nối vào WiFi **Wiflow** rồi mở lại `http://10.0.0.1`. Muốn đổi tên WiFi khách, vào trang **WiFi khách** (đổi trước hay sau đều được).
+6. Trang **Trạng thái** nhắc việc còn thiếu (Internet nguồn, liên kết tài khoản). Liên kết tài khoản ở trang **Hệ thống**: nhập mã 12 ký tự từ app Wiflow, có thể để sau.
 
 Nếu router đang chạy bản cũ (trước build 15), cài qua SSH:
 
@@ -51,17 +50,19 @@ Cách bắt WiFi nguồn: chạm một mạng trong thẻ **WiFi nguồn**, nh�
 
 Router dùng quốc gia Việt Nam: băng 5 GHz quét và bắt được modem ở mọi kênh 36–64, 100–140, 149–165. Các bản trước dùng mã CN nên không thấy modem phát ở kênh 100–140. Múi giờ mặc định UTC+7 (Hồ Chí Minh / Hà Nội); nếu bạn đổi múi giờ trong LuCI, Wiflow giữ lựa chọn của bạn.
 
-Nếu bấm Kết nối mà không vào được WiFi nguồn, bấm **Kiểm tra chi tiết**. Router quét lại, thử kết nối theo mọi cách (ghi cấu hình rồi khởi động lại WiFi; đổi trực tiếp trong driver; các kiểu bảo mật khác) và ghi lại phản hồi của chip WiFi mỗi 2 giây, khoảng 3 phút. Cách nào kết nối được thì router giữ luôn. Bấm **Tải kết quả** và gửi file cho Wiflow (mật khẩu đã được che).
+Router bắt WiFi nguồn đúng như nút **Scan → Join Network** của LuCI: quét bằng hệ thống (tối đa 3 lần), ghi một mạng client, khởi động lại WiFi một lần rồi chờ driver tự dò và vào nguồn (20–60 giây). Wiflow không gửi lệnh nào khác vào driver MediaTek.
+
+Nếu không vào được WiFi nguồn, router trả cấu hình cũ và báo lý do. Vào **Hệ thống → Tải báo cáo** và gửi file cho Wiflow: báo cáo có bảng quét, trạng thái driver lúc thất bại và nhật ký (mật khẩu đã được che).
 
 ### Cách router bắt và phát WiFi
 
 Router dùng chế độ repeater của chip MediaTek: bắt WiFi nguồn và phát WiFi khách trên cùng một băng. WiFi khách luôn phát ở cả 2 băng.
 
 - Băng đang bắt WiFi nguồn phát WiFi khách theo kênh của WiFi nguồn. Tốc độ tối đa ở băng này còn khoảng một nửa vì sóng được dùng chung; khách vẫn dùng bình thường.
-- Băng còn lại giữ kênh cố định (chọn lúc bật Wiflow), khách ở băng này đủ tốc độ.
+- Hai băng đều để kênh tự động như cấu hình gốc của router; băng còn lại giữ nguyên, khách ở băng này đủ tốc độ.
 - Router không bao giờ tắt phát ở băng đang bắt nguồn (kiểu "bắt băng này, phát băng kia" dễ lỗi trên chip MediaTek).
-- Khi đổi sang WiFi nguồn khác cùng băng, router đổi ngay trong driver, không khởi động lại WiFi, khách không bị rớt.
-- Khi mất WiFi nguồn, router chỉ yêu cầu phần bắt sóng tìm lại nguồn. Chỉ khi mất quá 10 phút router mới khởi động lại WiFi, tối đa 1 lần mỗi 30 phút.
+- Đổi WiFi nguồn là một lần khởi động lại WiFi (như Save & Apply trong LuCI), khách rớt khoảng nửa phút.
+- Khi mất WiFi nguồn, driver tự dò lại nguồn; Wiflow chỉ xin lại địa chỉ mạng. Chỉ khi mất quá 10 phút router mới khởi động lại WiFi, tối đa 1 lần mỗi 30 phút.
 
 Danh sách WiFi nguồn có nhãn:
 

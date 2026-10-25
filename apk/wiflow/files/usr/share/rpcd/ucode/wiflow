@@ -27,7 +27,7 @@ const methods = {
 	},
 
 	set_uplink: {
-		args: { mode: 'auto', ssid: '', bssid: '', band: '', key: '', encryption: '' },
+		args: { mode: 'auto', ssid: '', bssid: '', band: '', key: '', encryption: '', guest_ssid: '' },
 		call: function(req) {
 			const a = req.args;
 			const mode = str(a.mode) || 'auto';
@@ -41,6 +41,8 @@ const methods = {
 				r.band = a.band;
 				r.key = str(a.key);
 				r.encryption = str(a.encryption) || (length(r.key) ? 'psk2' : 'none');
+				if (length(str(a.guest_ssid)) && length(str(a.guest_ssid)) <= 32)
+					r.guest_ssid = str(a.guest_ssid);
 			}
 			return W.job_start('uplink', r);
 		}
@@ -76,16 +78,6 @@ const methods = {
 		args: { force: false },
 		call: function(req) {
 			return W.job_start('unpair', { force: !!req.args.force });
-		}
-	},
-
-	activate: {
-		args: { ssid: '' },
-		call: function(req) {
-			const s = str(req.args.ssid);
-			if (length(s) > 32)
-				return { ok: false, error: 'Tên WiFi khách cần từ 1 đến 32 ký tự.' };
-			return W.job_start('activate', length(s) ? { ssid: s } : {});
 		}
 	},
 
@@ -136,17 +128,6 @@ const methods = {
 				return { ok: false, error: e };
 			W.wlog('security', 'Đã đổi tài khoản đăng nhập Wiflow Setup');
 			return { ok: true, session: true };
-		}
-	},
-
-	// "Kiểm tra WiFi nguồn" (about 3 minutes)
-	wifitest: {
-		args: { ssid: '', band: '', key: '', encryption: '' },
-		call: function(req) {
-			const a = req.args;
-			if (!length(str(a.ssid)) || index([ '2g', '5g' ], a.band) < 0)
-				return { ok: false, error: 'Chọn WiFi nguồn cần kiểm tra.' };
-			return W.job_start('wifitest', { ssid: a.ssid, band: a.band, key: str(a.key), encryption: str(a.encryption) || (length(str(a.key)) ? 'psk2' : 'none') });
 		}
 	},
 

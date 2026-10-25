@@ -3,7 +3,7 @@
 #   sudo -E apk/test/run.sh        (PFX / UCODE_DIR as for bench.sh)
 T="$(cd "$(dirname "$0")" && pwd)"
 B="$T/bench.sh"
-export WIFLOW_TICK=4
+export WIFLOW_TICK=4 WIFLOW_JOIN_WAIT=12
 fails=0
 pass(){ echo "PASS $*"; }
 fail(){ echo "FAIL $*"; fails=$((fails+1)); }
@@ -31,7 +31,7 @@ $B x /usr/libexec/wiflow/provision boot
 expect "install: device id" "$(cat /etc/wiflow/device-id)" '^WIFDID-NR3053-[0-9]{6}$'
 expect "install: gate code added" "$(uci_() { "$PFX/bin/uci" "$@"; }; LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q get wiflow_gate.main.code)" "WIFDIDNR3053 $(cut -c15-20 /etc/wiflow/device-id)"
 U(){ LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q "$@"; }
-expect "install: WiFi untouched until 'Bật Wiflow'" "$(U get wiflow.core.activated)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.wiflow_guest_2g)" '^0\|Wiflow 2.4G\|$'
+expect "install: WiFi untouched until the first Internet source" "$(U get wiflow.core.activated)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.wiflow_guest_2g)" '^0\|Wiflow 2.4G\|$'
 expect "install: guest network" "$(U get network.wiflow_guest.ipaddr) $(U get firewall.wiflow_guest.input) $(U get firewall.wiflow_guest_wan.dest)" '^10.10.10.1/24 REJECT wan$'
 expect "install: uplink in wan zone" "$(U show firewall | grep "network=.*wiflow_wwan")" 'wiflow_wwan'
 expect "install: Vietnam time and country" "$(U get system.@system[0].zonename) $(U get system.@system[0].timezone) $(U get wireless.MT7981_1_1.country)/$(U get wireless.MT7981_1_2.country)" '^Asia/Ho_Chi_Minh <\+07>-7 VN/VN$'
@@ -41,35 +41,33 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 $B agent
-r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
-expect "source WiFi needs activation" "$r" '^failed\|.*Bật Wiflow'
-r="$(job activate)"; expect "activate" "$r" '^success\|Đã bật Wiflow'
-expect "activate: stock APs replaced by guest APs" "$(U show wireless | grep -c "=wifi-iface")/$(U get wireless.wiflow_guest_2g.ssid)/$(U get wireless.wiflow_guest_5g.network)/$(U get wireless.wiflow_guest_2g.isolate)" '^2/Wiflow/wiflow_guest/1$'
-expect "activate: fixed quiet channels, 20/80 MHz" "$(U get wireless.MT7981_1_1.channel)/$(U get wireless.MT7981_1_1.htmode) $(U get wireless.MT7981_1_2.channel)/$(U get wireless.MT7981_1_2.htmode)" '^1/HE20 (36|149)/HE80$'
+r="$(job set_guest '{"ssid":"Wiflow Quan"}')"
+expect "guest name before the first source: only kept" "$r|$(U get wiflow.core.guest_ssid)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wiflow.core.activated)" '^success\|.*\|Wiflow Quan\|Wiflow 2.4G\|0$'
 r="$(job scan)"; expect "scan job" "$r" '^success\|Tìm thấy 5 mạng'
 expect "scan: enterprise hidden, mixed WPA2/3 as psk2" "$(st "sorted((n['ssid'],n['band'],n['encryption']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', '5g', 'psk2'\).*\('Free WiFi Lobby', '2g', 'none'\)"
 expect "scan: advice (5G non-DFS good signal, DFS flagged)" "$(st "sorted((n['ssid'], bool(n.get('recommended')), n['dfs'], n['weak']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', True, False, False\).*\('Office 5G', False, True, False\)"
 $B world 'w["iwinfo_empty"]=["5g"]'
 r="$(job scan '{"band":"5g"}')"
-expect "scan 5G when libiwinfo sees nothing: driver survey" "$r|$(st "sorted((n['ssid'],n['band'],n['channel'],n['encryption']) for n in s['job']['networks'])")" "^success\|.*\('Cafe Sua Da 5G', '5g', 1?[0-9]+, 'psk2'\).*\('Office 5G', '5g', (5[2-9]|[6-9][0-9]|1[0-4][0-9]), 'psk2'\)"
-expect "scan cache keeps the other band" "$(st "sorted(set(n['band'] for n in s['scan']['networks']))")" "^\['2g', '5g'\]$"
+expect "scan 5G hearing nothing: 3 tries of the system scan" "$r|$(head -1 /tmp/wiflow/scan-5g.txt)" '^success\|Không tìm thấy WiFi nào\.\|.* tries=3 networks=0$'
+expect "scan cache keeps the other band" "$(st "sorted(set(n['band'] for n in s['scan']['networks']))")" "^\['2g'\]$"
 $B world 'w["iwinfo_empty"]=[]'
+r="$(job scan '{"band":"5g"}')"
+expect "scan 5G again: both bands cached, list written for the report" "$(st "sorted(set(n['band'] for n in s['scan']['networks']))")|$(grep -c 'Cafe Sua Da 5G' /tmp/wiflow/scan-5g.txt)" '^\[.2g., .5g.\]\|1$'
+: > /tmp/mock/calls.log
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"wrongpass","encryption":"psk2"}')"
-expect "wrong password fails and rolls back" "$r|$(U -q get wireless.wiflow_uplink.ssid)" '^failed\|Không vào được.*mật khẩu\.\|$'
+expect "wrong password: fails, uplink rolled back" "$r|$(U -q get wireless.wiflow_uplink.ssid)" '^failed\|Không vào được.*mật khẩu\.\|$'
 expect "failed join leaves driver notes for the report" "$(head -1 /tmp/wiflow/join-fail.txt)|$(grep -c wrongpass /tmp/wiflow/join-fail.txt)" '^join "Cafe Sua Da" on MT7981_1_1 .*failed: not associated.*\|0$'
+expect "first join took over the WiFi: guest APs, name kept, stock radio settings" "$(U get wiflow.core.activated) $(U show wireless | grep -c "=wifi-iface")/$(U get wireless.wiflow_guest_2g.ssid)/$(U get wireless.wiflow_guest_5g.network)/$(U get wireless.wiflow_guest_2g.isolate) $(U get wireless.MT7981_1_1.htmode)/$(U get wireless.MT7981_1_2.htmode) $(U get wireless.MT7981_1_1.channel)/$(U get wireless.MT7981_1_2.channel)" '^1 2/Wiflow Quan/wiflow_guest/1 HE40/HE160 auto/auto$'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 expect "join 2.4G source" "$r" '^success\|Đã kết nối “Cafe Sua Da”'
 wait_for 15 "s['internet']['source'].get('connected') and s['internet']['online']" && pass "status: source connected, online" || fail "status after join: $(st "s['internet']")"
 expect "guest follows source band" "$(st "s['guest']['follows']")" '^2g$'
-expect "source radio follows the source, other radio fixed" "$(U get wireless.MT7981_1_1.channel) $(U get wireless.MT7981_1_2.channel)" '^auto (36|149)$'
+expect "LuCI-style source: sta on the radio, own network, wan zone" "$(U get wireless.wiflow_uplink.mode)/$(U get wireless.wiflow_uplink.device)/$(U get wireless.wiflow_uplink.network)/$(U get network.wiflow_wwan.proto)" '^sta/MT7981_1_1/wiflow_wwan/dhcp$'
 : > /tmp/mock/calls.log
 r="$(job set_uplink '{"mode":"auto","ssid":"Nha Ben Canh","band":"2g","key":"bencanh123","encryption":"psk2"}')"
 expect "switch source on the same band" "$r" '^success\|Đã kết nối “Nha Ben Canh”'
-grep -q "iwpriv apcli0 set ApCliSsid=Nha Ben Canh" /tmp/mock/calls.log && ! grep -q "^wifi reload" /tmp/mock/calls.log && pass "same-band switch without reloading the WiFi" || fail "same-band switch reloaded WiFi: $(grep -E '^wifi|ApCliSsid' /tmp/mock/calls.log | tr '\n' ';')"
-call wifitest '{"ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}' >/dev/null
-for i in $(seq 1 120); do sleep 2; r="$(st "(s['job'] or {}).get('state','') + '|' + (s['job'] or {}).get('message','')")"; case "$r" in running*) ;; *) break;; esac; done
-expect "WiFi source test: joins, keeps it, writes the log (no key)" "$r|$(grep -c 'cách 1: KẾT NỐI ĐƯỢC' /tmp/wiflow/wifitest.txt)|$(grep -c cafe1234 /tmp/wiflow/wifitest.txt)|$(U get wireless.wiflow_uplink.ssid)" '^success\|.*giữ kết nối.*\|1\|0\|Cafe Sua Da$'
-expect "WiFi source test: scan and both paths recorded" "$(grep -c '<== chọn' /tmp/wiflow/wifitest.txt) $(grep -c '== cách 2' /tmp/wiflow/wifitest.txt)" '^[1-9][0-9]* 1$'
+expect "switch source: one WiFi reload, as LuCI Apply" "$(grep -c '^wifi reload' /tmp/mock/calls.log)" '^1$'
+grep -rq iwpriv "$T/../wiflow/files/usr" "$T/../wiflow/files/www" && fail "package still calls iwpriv" || pass "package never touches the driver with iwpriv"
 $B world 'w["iw_blind"]=True'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 expect "join when the driver hides the BSSID (DHCP is the proof)" "$r" '^success\|Đã kết nối “Cafe Sua Da”'

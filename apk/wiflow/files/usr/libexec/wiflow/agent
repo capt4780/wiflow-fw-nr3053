@@ -151,20 +151,17 @@ function watchdog(mode) {
 		W.st_set('watchdog_restarts', W.st_get('watchdog_restarts', 0) + 1);
 
 		if (c[0] == 'wifi') {
-			// Gentle first: the station alone looks for its source again; the
-			// guest WiFi keeps running. The whole WiFi is reloaded only after
-			// 10 minutes down, and at most once every 30 minutes.
-			const r = W.radio_named(W.uci_get('wireless', 'wiflow_uplink', 'device'));
+			// Gentle first: ask for the address again, nothing else is touched
+			// (the driver looks for its source by itself). The whole WiFi is
+			// reloaded only after 10 minutes down, at most once every 30 minutes.
 			const last_full = W.st_get('wifi_reload_at', 0);
 			if (up - since >= 30 * TICK && (!last_full || up - last_full >= 90 * TICK)) {
 				W.st_set('wifi_reload_at', up);
 				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: khởi động lại WiFi`);
 				W.run('wifi reload');
 			}
-			else {
-				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: kết nối lại WiFi nguồn`);
-				W.sta_kick(r);
-			}
+			else
+				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: xin lại địa chỉ mạng`);
 			W.run('ifup wiflow_wwan');
 		}
 		else {

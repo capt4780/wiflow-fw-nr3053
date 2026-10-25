@@ -84,7 +84,7 @@ async function api(action,data={},timeout=15000){
     return {ok:r.ok,networks:nets,error:r.error};
   }
   case 'connect':{
-    const a=data.ssid?{mode:data.mode||'auto',ssid:data.ssid,band:data.band||'2g',key:data.password||'',encryption:ENC_OK.includes(data.enc)?data.enc:'psk2'}:{mode:data.mode||'auto'};
+    const a=data.ssid?{mode:data.mode||'auto',ssid:data.ssid,band:data.band||'2g',key:data.password||'',encryption:ENC_OK.includes(data.enc)?data.enc:'psk2',guest_ssid:data.guest_ssid||''}:{mode:data.mode||'auto'};
     const r=await ubus('wiflow','set_uplink',a);return r.ok===false?{ok:false,error:r.error}:{ok:true};
   }
   case 'job':{
@@ -95,7 +95,6 @@ async function api(action,data={},timeout=15000){
   case 'guest_ssid':return await startJob('set_guest',{ssid:data.guest_ssid},'guest',90000);
   case 'pair':return await startJob('pair',{code:data.pairing_code},'pair',60000);
   case 'unpair':return await startJob('unpair',{force:!!data.force},'unpair',40000);
-  case 'activate':return await startJob('activate',{ssid:data.ssid||''},'activate',120000);
   case 'diag_send':return await startJob('diag',{send:true},'diag',60000);
   case 'diag_file':{const r=await startJob('diag',{},'diag',60000);if(!r.ok)return r;const f=await ubus('file','read',{path:'/tmp/wiflow/diag.txt'});return {ok:true,text:f.data||''}}
   case 'reset':return await startJob('reset',{},'reset',120000);
@@ -174,7 +173,7 @@ const kidsOf=n=>Object.entries((n&&n.children)||{}).filter(([k,v])=>v&&v.satisfi
 async function loadMenu(){try{const r=await fetch('/cgi-bin/luci/admin/menu',{cache:'no-store',credentials:'same-origin'});const j=await r.json();S.menu=kidsOf(((j.children||{}).admin)||{});shell()}catch(e){S.menu=[]}}
 function shell(){
   const open=S.navOpen||(S.navOpen={wiflow:true});
-  let h=`<li class="dropdown active${open.wiflow?' open':''}"><a class="menu" href="#" data-grp="wiflow" aria-expanded="${!!open.wiflow}">${micon('wiflow')}<span>Wiflow Setup</span>${CHEV}</a><ul class="dropdown-menu">${NAV.map(([id,l])=>`<li class="${S.page===id&&!S.wiz?'active':''}"><a href="#${id}" data-go="${id}"${S.page===id?' aria-current="page"':''}>${l}</a></li>`).join('')}</ul></li>`;
+  let h=`<li class="dropdown active${open.wiflow?' open':''}"><a class="menu" href="#" data-grp="wiflow" aria-expanded="${!!open.wiflow}">${micon('wiflow')}<span>Wiflow Setup</span>${CHEV}</a><ul class="dropdown-menu">${NAV.map(([id,l])=>`<li class="${S.page===id?'active':''}"><a href="#${id}" data-go="${id}"${S.page===id?' aria-current="page"':''}>${l}</a></li>`).join('')}</ul></li>`;
   for(const g of (S.menu||[])){
     if(g.name==='wiflow')continue;const kids=kidsOf(g);
     if(!kids.length){h+=`<li><a href="/cgi-bin/luci/admin/${encodeURIComponent(g.name)}"${g.name==='logout'?' data-logout':''}>${micon(g.name)}<span>${esc(g.title==='Log out'?'Đăng xuất':g.title)}</span></a></li>`;continue}
@@ -183,7 +182,7 @@ function shell(){
   if(!S.menu||!S.menu.some(g=>g.name==='logout'))h+=`<li><a href="${LOGOUT}" data-logout>${micon('logout')}<span>Đăng xuất</span></a></li>`;
   $('#sideNav').innerHTML=h;
   $$('[data-grp]').forEach(a=>a.onclick=e=>{e.preventDefault();const g=a.dataset.grp;open[g]=!open[g];shell()});
-  $$('[data-go]').forEach(b=>b.onclick=e=>{e.preventDefault();menuClose();if(!S.wiz)go(b.dataset.go)});
+  $$('[data-go]').forEach(b=>b.onclick=e=>{e.preventDefault();menuClose();go(b.dataset.go)});
   $$('#sideNav [data-logout]').forEach(a=>a.onclick=e=>{e.preventDefault();try{sessionStorage.removeItem('wf-sid')}catch(x){}location.href=LOGOUT});
   head();
 }
@@ -194,14 +193,14 @@ function menuClose(){document.body.classList.remove('wf-menu-open');const b=$('#
 function livePill(){
   const st=S.st||{};
   if(!S.st)return ['Đang tải','warn'];
-  if(!st.activated)return ['Chưa bật Wiflow','warn'];
+  if(!st.activated)return ['Chưa thiết lập','warn'];
   if(!+st.internet_live)return ['Mất Internet','bad'];
   if(st.internet_mode==='auto'&&st.uplink_active==='wifi')return ['Dự phòng',''];
   return ['Hoạt động',''];
 }
 function head(){
-  const st=S.st||{},t=S.wiz?['Cài đặt Wiflow','Làm lần lượt 4 bước, có thể làm lại sau trong từng trang']:(TITLES[S.page]||['Wiflow','']),[pt,pc]=livePill();
-  let sub=t[1];if(!S.wiz&&S.page==='status'&&S.ov)sub=`Cập nhật trực tiếp · tự kiểm tra lúc ${hhmm(S.ov.now)}`;
+  const st=S.st||{},t=TITLES[S.page]||['Wiflow',''],[pt,pc]=livePill();
+  let sub=t[1];if(S.page==='status'&&S.ov)sub=`Cập nhật trực tiếp · tự kiểm tra lúc ${hhmm(S.ov.now)}`;
   $('#dTitle').textContent=t[0];$('#dSub').textContent=sub;
   $('#crumb').innerHTML=`Wiflow Setup › <b>${esc(t[0])}</b>`;
   const p=$('#dPill');p.className='pill'+(pc?' '+pc:'');p.innerHTML=`<span class="dot${pc?' '+(pc==='bad'?'bad':'warn'):''}"></span><span>${pt}</span>`;
@@ -218,8 +217,7 @@ function go(p,force){
   if(p==='system')loadLog();
 }
 function render(enter){
-  if(S.wiz){renderWizard();return}
-  $('#shell').classList.remove('wizmode');head();
+  head();
   const v=$('#view');const f={status:vStatus,internet:vInternet,guest:vGuest,system:vSystem}[S.page]||vStatus;
   const html=f();if(!enter&&html===S.lastRender)return;S.lastRender=html;
   const sc=$('#body').scrollTop,rail=$('.rail',v),rs=rail?rail.scrollLeft:0;
@@ -246,7 +244,7 @@ async function loop(){
     if(S.page==='internet'&&tick%3===0)await loadInet();
     if(S.page==='guest'&&tick%3===0&&S.guest){try{const r=await api('guest_get',{},8000);if(r.ok)S.guest=r}catch(e){}}
     if(S.page==='system'&&tick%6===0)await loadLog();
-    if(!editing()&&!S.wiz)render();
+    if(!editing())render();
   }
 }
 
@@ -261,6 +259,7 @@ function vStatus(){
   const banners=[];
   if(st.safe_mode)banners.push(['warn','Chế độ an toàn','Cổng chào gặp lỗi, khách đang được dùng Internet trực tiếp. Wiflow sẽ tự bật lại sau ít phút.']);
   if(st.sched_closed)banners.push(['warn','Ngoài giờ phục vụ','Khách vẫn bắt được WiFi nhưng Internet đang tạm dừng theo lịch.']);
+  if(!+st.internet_verified)banners.push(['info','Chưa có Internet nguồn','Cắm dây LAN hoặc chọn WiFi của modem để router có Internet.','internet']);
   if(!+st.paired)banners.push(['info','Chưa liên kết tài khoản','Liên kết để theo dõi và điều khiển router từ app Wiflow.','system']);
   if(st.reboot_required)banners.push(['info','Đã cài bản Wiflow mới','Khởi động lại router để chạy bản mới.','system']);
   // guests by hour today
@@ -404,10 +403,10 @@ async function scan(){
   if(S.scan.busy)return;S.scan.busy=true;if(S.page==='internet')render();
   const seen={},all=[];
   const put=()=>{all.sort((a,b)=>(b.current-a.current)||((b.signal??-200)-(a.signal??-200)));const sn={};return all.filter(n=>{const k=n.ssid+'|'+n.band;if(sn[k])return false;sn[k]=1;return true}).slice(0,24)};
-  for(const band of ['5g','2g']){try{const r=await api('scan',{band},70000);if(r.ok===false&&r.error)toast(r.error,true);(r.networks||[]).forEach(n=>{if(n.ssid&&n.ssid!==(S.st||{}).guest_ssid)all.push(n)});if(band==='5g'&&all.length){S.scan.list=put();if((S.page==='internet'||S.wiz)&&!editing())render()}}catch(e){if(e.message==='auth')return}}
+  for(const band of ['5g','2g']){try{const r=await api('scan',{band},70000);if(r.ok===false&&r.error)toast(r.error,true);(r.networks||[]).forEach(n=>{if(n.ssid&&n.ssid!==(S.st||{}).guest_ssid)all.push(n)});if(band==='5g'&&all.length){S.scan.list=put();if(S.page==='internet'&&!editing())render()}}catch(e){if(e.message==='auth')return}}
   all.sort((a,b)=>(b.current-a.current)||((b.signal??-200)-(a.signal??-200)));
   S.scan.list=put();S.scan.busy=false;S.scan.at=Date.now();
-  if(S.page==='internet'||S.wiz)render();
+  if(S.page==='internet')render();
 }
 async function pickMode(mode){
   const st=S.st||{},saved=(S.inet||{}).wifi_ssid||'';
@@ -418,59 +417,38 @@ async function pickMode(mode){
   const l=$('.nets');if(l)l.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function wifiSheet(n){
-  const open=n&&n.enc==='none',guest=(S.st||{}).guest_ssid||'';
+  const open=n&&n.enc==='none',guest=(S.st||{}).guest_ssid||'',first=!(S.st||{}).activated;
   const c=sheet(`<div class="hd"><span class="ic" style="width:48px;height:48px;background:var(--mint);color:var(--mintI)">${ico(n?'wifi':'plus','width:22px;height:22px')}</span><div style="min-width:0"><b>${n?esc(n.ssid):'Mạng ẩn'}</b><span>${open?'Mạng mở':'Nhập mật khẩu mạng nguồn'}</span></div></div>
    ${n?'':`<input class="in" id="wSsid" placeholder="Tên WiFi" autocapitalize="none" spellcheck="false">`}
    ${open?'':`<div class="in-wrap"><input class="in" id="wPass" type="password" style="padding:0 52px 0 16px" placeholder="Mật khẩu" autocomplete="off"><button type="button" class="eye" id="wEye" aria-label="Hiện mật khẩu">${ico('eye')}</button></div>`}
    ${n&&n.dfs?`<div class="msg warn">Kênh DFS (${n.channel}): khi gặp radar router phải chờ khoảng 1 phút hoặc đổi kênh, WiFi khách 5 GHz ngắt theo. Nếu modem có cả 2.4 GHz, nên chọn 2.4 GHz.</div>`:''}
    ${n&&n.weak&&!n.dfs?`<div class="msg warn">Sóng yếu (${n.signal} dBm), dễ chập chờn. Nên đặt router gần modem hơn.</div>`:''}
    ${n&&n.ssid===guest?`<div class="msg warn">Mạng này trùng tên WiFi khách. Wiflow sẽ đổi WiFi khách thành “${esc(guest)} Free”.</div>`:''}
-   <div class="msg info" style="font-size:12.5px">${ico('alert','width:16px;height:16px')}<span>Lần đầu bắt WiFi nguồn, WiFi của router khởi động lại khoảng 30 giây. Nếu bạn đang dùng WiFi khách, hãy kết nối lại rồi mở 10.0.0.1.</span></div>
-   <div class="two"><button class="btn" data-no>Huỷ</button><button class="btn pri" data-yes>Kết nối</button></div>
-   <button type="button" class="btn ghost" data-test style="height:32px;font-weight:500">Kiểm tra chi tiết thay vì kết nối</button>`);
-  $('[data-test]',c).onclick=()=>{const ssid=n?n.ssid:($('#wSsid',c).value||'').trim(),pass=open?'':($('#wPass',c)||{}).value||'';if(!ssid){$('#wSsid',c).focus();return}if(!open&&pass.length<8){toast('Mật khẩu WiFi tối thiểu 8 ký tự',true);return}runTest({ssid,band:n?n.band:'5g',key:pass,encryption:n?n.enc:'psk2'})};
+   <div class="msg info" style="font-size:12.5px">${ico('alert','width:16px;height:16px')}<span>${first?`Lần đầu, WiFi của router đổi thành WiFi khách “${esc(guest||'Wiflow')}” (mở, cả 2.4 GHz và 5 GHz). WiFi khởi động lại khoảng 30–60 giây. Hãy kết nối lại WiFi “${esc(guest||'Wiflow')}” rồi mở 10.0.0.1.`:'WiFi của router khởi động lại khoảng 30–60 giây. Nếu bạn đang dùng WiFi khách, hãy kết nối lại rồi mở 10.0.0.1.'}</span></div>
+   <div class="two"><button class="btn" data-no>Huỷ</button><button class="btn pri" data-yes>Kết nối</button></div>`);
   const eye=$('#wEye',c);if(eye)eye.onclick=()=>{const i=$('#wPass',c);i.type=i.type==='password'?'text':'password'};
   $('[data-no]',c).onclick=closeSheet;
   const go2=()=>{const ssid=n?n.ssid:($('#wSsid',c).value||'').trim(),pass=open?'':($('#wPass',c)||{}).value||'';
     if(!ssid){$('#wSsid',c).focus();return}if(!open&&pass.length<8){toast('Mật khẩu WiFi tối thiểu 8 ký tự',true);return}
-    const st=S.st||{};let mode=S.pend==='auto'||S.pend==='wifi'?S.pend:(st.internet_mode==='wifi'?'wifi':'auto');if(S.wiz)mode=S.wiz.mode||'auto';
+    const st=S.st||{};let mode=S.pend==='auto'||S.pend==='wifi'?S.pend:(st.internet_mode==='wifi'?'wifi':'auto');
     runConnect({mode,band:n?n.band:'5g',radio:n?n.radio:'',ssid,bssid:n?n.bssid:'',password:pass,enc:n?n.enc:'psk2',guest_ssid:n&&n.ssid===guest?guest+' Free':''},'wifi',ssid)};
   $('[data-yes]',c).onclick=go2;$$('input',c).forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go2()});
 }
 const PH={wifi:[['preparing','Chuẩn bị'],['associating','Kết nối WiFi nguồn'],['dhcp','Nhận địa chỉ mạng'],['internet_check','Kiểm tra Internet']],lan:[['preparing','Chuẩn bị'],['dhcp','Nhận địa chỉ qua dây'],['internet_check','Kiểm tra Internet']]};
 function stages(kind,phase,state){const list=PH[kind]||PH.wifi;let at=list.findIndex(p=>p[0]===phase);if(at<0)at=0;
   return `<ol class="stages">${list.map(([k,t],i)=>{let c='';if(state==='success'||i<at)c='done';else if(i===at)c=state==='failed'?'fail':'now';return `<li class="${c}"><span class="sd">${c==='done'?ico('check'):c==='fail'?ico('x'):c==='now'?'<span class="spin" style="width:14px;height:14px;border-width:2px"></span>':''}</span>${t}</li>`}).join('')}</ol>`}
-/* "Kiểm tra chi tiết": the router tries every way to join and logs the driver (about 3 minutes) */
-async function runTest(d){
-  const c=sheet(`<div class="hd"><span class="ic" style="width:48px;height:48px;background:var(--accS);color:var(--acc)">${ico('tool','width:22px;height:22px')}</span><div style="min-width:0"><b>${esc(d.ssid)}</b><span>Kiểm tra chi tiết WiFi nguồn</span></div></div><div class="msg info" id="tm"><span class="spin" style="width:16px;height:16px;border-width:2px"></span><span>Đang bắt đầu…</span></div><div class="note">Khoảng 3 phút. WiFi khách có thể ngắt vài lần trong lúc kiểm tra. Nếu mất kết nối, hãy kết nối lại WiFi rồi mở 10.0.0.1, kết quả vẫn được lưu trên router.</div><div id="tr"></div>`);
-  $('#sheet').dataset.lock='1';
-  const msg=(t,cls)=>{const m=$('#tm',c);if(m){m.className='msg '+(cls||'info');m.innerHTML=(cls?'':'<span class="spin" style="width:16px;height:16px;border-width:2px"></span>')+`<span>${esc(t)}</span>`}};
-  const end=(ok,t)=>{msg(t,ok?'ok':'err');delete $('#sheet').dataset.lock;$('#tr',c).innerHTML='<div class="two"><button class="btn" data-close>Đóng</button><button class="btn pri" data-dl>Tải kết quả</button></div>';$('[data-close]',c).onclick=()=>{closeSheet();refreshStatus().then(()=>{loadInet();render()})};$('[data-dl]',c).onclick=()=>dlFile('/tmp/wiflow/wifitest.txt','wiflow-wifi-test')};
-  try{const r=await ubus('wiflow','wifitest',{ssid:d.ssid,band:d.band||'2g',key:d.key||'',encryption:d.encryption||''});if(r.ok===false){end(false,r.error||'Không bắt đầu được');return}}catch(e){if(e.message!=='auth')end(false,'Không bắt đầu được');return}
-  const t0=Date.now();let miss=0;
-  for(;;){await sleep(2500);if(!$('#sheet'))return;
-    try{const s=await ubus('wiflow','status',{},10000);miss=0;const j=s.job||{};
-      if(j.kind!=='wifitest'){end(false,'Không thấy việc kiểm tra trên router.');return}
-      if(j.state==='running'){msg(j.message||'Đang kiểm tra…');continue}
-      end(!!j.ok,j.message||'Đã kiểm tra xong');return}
-    catch(e){if(e.message==='auth')return;if(++miss>40){end(false,'Mất kết nối tới router. Kết nối lại rồi tải kết quả ở Hệ thống → Tải báo cáo.');return}msg('Đang chờ router… (WiFi có thể vừa khởi động lại)')}
-    if(Date.now()-t0>420000){end(false,'Quá thời gian chờ.');return}}
-}
-async function dlFile(path,name){try{const f=await ubus('file','read',{path});const d=new Date(),n=`${name}-${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}${pad2(d.getHours())}${pad2(d.getMinutes())}.txt`,a=document.createElement('a');a.href=URL.createObjectURL(new Blob([f.data||''],{type:'text/plain'}));a.download=n;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast('Đã tải '+n)}catch(e){toast('Chưa có kết quả để tải',true)}}
 async function runConnect(data,kind,ssid){
   const c=sheet(`<div class="hd"><span class="ic" style="width:48px;height:48px;background:var(--accS);color:var(--acc)">${ico(kind==='lan'?'lan':'wifi','width:22px;height:22px')}</span><div style="min-width:0"><b>${kind==='lan'?'Kiểm tra dây LAN':ssid?esc(ssid):'Đổi kiểu kết nối'}</b><span>Đang kết nối Internet</span></div></div><div id="stg">${stages(kind,'preparing','running')}</div><div id="jm" class="note">Giữ trang này mở. Nếu mất kết nối, hãy kết nối lại WiFi rồi mở 10.0.0.1.</div>`);
   $('#sheet').dataset.lock='1';S.pend='';
-  const fail=(msg,code)=>{const tips={wifi_auth_failed:'Kiểm tra lại mật khẩu (phân biệt chữ hoa, chữ thường).',wifi_not_found:'Đặt router gần modem hơn hoặc thử băng tần khác.',internet_failed:'Modem có thể đang mất Internet.',dhcp_failed:'Khởi động lại modem rồi thử lại.',source_subnet_conflict:'Đổi dải địa chỉ modem nguồn.',no_backup_wifi:'Chọn một WiFi nguồn trước.'};
-    const canTest=kind==='wifi'&&data.ssid;
-    $('#jm',c).outerHTML=`<div class="msg err">${esc(msg)}${tips[code]?' '+tips[code]:''}</div>${canTest?'<div class="note">Bấm Kiểm tra chi tiết: router thử mọi cách kết nối và ghi lại phản hồi của chip WiFi (khoảng 3 phút) để Wiflow tìm đúng nguyên nhân.</div>':''}<div class="two"><button class="btn" data-close>Đóng</button>${canTest?'<button class="btn pri" data-test>Kiểm tra chi tiết</button>':''}</div>`;delete $('#sheet').dataset.lock;$('[data-close]',c).onclick=closeSheet;
-    const tb=$('[data-test]',c);if(tb)tb.onclick=()=>runTest({ssid:data.ssid,band:data.band,key:data.password,encryption:data.enc})};
+  const fail=(msg)=>{
+    $('#jm',c).outerHTML=`<div class="msg err">${esc(msg)}</div><div class="note">Cần hỗ trợ: Hệ thống → Tải báo cáo, rồi gửi file cho Wiflow.</div><button class="btn pri" data-close>Đóng</button>`;delete $('#sheet').dataset.lock;$('[data-close]',c).onclick=closeSheet};
   try{const r=await api('connect',data,10000);if(r.ok===false){$('#stg',c).innerHTML=stages(kind,'preparing','failed');fail(r.error||'Không bắt đầu được');return}}catch(e){}
   const t0=Date.now();
   for(;;){
     await sleep(2000);if(!$('#sheet'))return;
     try{const j=await api('job',{},8000);
-      if(j.job==='success'){$('#stg',c).innerHTML=stages(kind,'internet_check','success');delete $('#sheet').dataset.lock;await refreshStatus();await loadInet();closeSheet();toast(j.message||'Đã kết nối Internet');if(S.wiz){S.wiz.step=3;renderWizard()}else render();return}
-      if(j.job==='failed'){$('#stg',c).innerHTML=stages(kind,j.phase&&j.phase!=='failed'?j.phase:'preparing','failed');fail(j.message||'Không kết nối được',j.error_code);await refreshStatus();return}
+      if(j.job==='success'){$('#stg',c).innerHTML=stages(kind,'internet_check','success');delete $('#sheet').dataset.lock;await refreshStatus();await loadInet();closeSheet();toast(j.message||'Đã kết nối Internet');render();return}
+      if(j.job==='failed'){$('#stg',c).innerHTML=stages(kind,j.phase&&j.phase!=='failed'?j.phase:'preparing','failed');fail(j.message||'Không kết nối được');await refreshStatus();return}
       $('#stg',c).innerHTML=stages(kind,j.phase||'preparing','running');
       if(j.job==='idle'&&Date.now()-t0>20000){fail('Router chưa bắt đầu kết nối. Thử lại.');return}
     }catch(e){if(e.message==='auth')return}
@@ -680,7 +658,7 @@ async function pairNow(){
   const i=$('#pairCode'),code=(i.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length!==12){toast('Mã liên kết gồm 12 ký tự',true);i.focus();return}
   const b=$('#pairGo');b.disabled=true;b.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span>Đang liên kết';
   try{const r=await api('pair',{pairing_code:code});if(!r.ok){toast(r.error||'Không liên kết được',true);b.disabled=false;b.textContent='Liên kết';return false}
-    await refreshStatus();toast(r.message||'Đã liên kết tài khoản Wiflow');if(S.wiz){S.wiz.step=4;renderWizard()}else render();return true}catch(e){toast('Không liên kết được',true);b.disabled=false;b.textContent='Liên kết';return false}
+    await refreshStatus();toast(r.message||'Đã liên kết tài khoản Wiflow');render();return true}catch(e){toast('Không liên kết được',true);b.disabled=false;b.textContent='Liên kết';return false}
 }
 /* .apk upload: LuCI's upload endpoint, then the router's package manager (same as System → Software). */
 async function upload(f){
@@ -701,67 +679,20 @@ async function upload(f){
   x.onerror=()=>{S.up.err='Tải lên bị gián đoạn';render()};x.send(fd);
 }
 
-/* ================= FIRST SETUP ================= */
-/* NR3053: 1 · WiFi khách (Bật Wiflow) → 2 · Internet nguồn → 3 · Liên kết → 4 · Hoàn tất */
-function renderWizard(){
-  const w=S.wiz,st=S.st||{},v=$('#view');$('#shell').classList.add('wizmode');shell();
-  const bar=`<div class="wiz-steps" aria-hidden="true">${[1,2,3,4].map(i=>`<span class="${i<=w.step?'on':''}"></span>`).join('')}</div><div class="note" id="stepLabel" style="padding:0">Bước ${w.step}/4 · ${['WiFi khách','Internet nguồn','Liên kết tài khoản','Hoàn tất'][w.step-1]}</div>`;
-  let h='';
-  if(w.step===1){
-    h=`${bar}<h1>WiFi khách</h1><p class="lead">Router sẽ đổi WiFi đang phát thành WiFi khách mở cho khách hàng, ở cả 2.4 GHz và 5 GHz, mỗi băng một kênh ít nhiễu. Trang quản trị vẫn là 10.0.0.1.</p>
-     <div class="card"><label class="lbl" for="wGuest">Tên WiFi khách</label><input class="in" id="wGuest" maxlength="32" value="${esc(st.guest_ssid||'Wiflow')}" style="font-weight:500">
-     <div class="msg info" style="font-size:12.5px">${ico('alert','width:16px;height:16px')}<span>Nếu bạn đang dùng WiFi của router, sau khoảng 30 giây hãy kết nối vào WiFi khách rồi mở lại 10.0.0.1.</span></div>
-     <button class="btn pri" id="wAct">Bật Wiflow</button></div>`;
-  }else if(w.step===2){
-    const nets=S.scan.list||[];
-    h=`${bar}<h1>Internet nguồn</h1><p class="lead">Router lấy Internet từ đâu?</p>
-     <div class="pick" role="radiogroup"><button type="button" role="radio" aria-checked="${w.src==='wifi'}" data-src="wifi"><span class="ic" style="background:var(--mint);color:var(--mintI)">${ico('wifi')}</span><b>WiFi của modem</b><span class="s">Không cần dây. Sau này cắm dây, router tự ưu tiên dây.</span></button>
-      <button type="button" role="radio" aria-checked="${w.src==='lan'}" data-src="lan"><span class="ic" style="background:var(--accS);color:var(--acc)">${ico('lan')}</span><b>Dây LAN</b><span class="s">Dây từ modem cắm vào cổng WAN</span></button></div>
-     ${w.src==='lan'?`<div class="card"><div class="note" style="padding:0">Cắm dây mạng từ modem vào cổng WAN của router rồi bấm kiểm tra.</div><button class="btn pri" id="lanGo">Kiểm tra dây LAN</button></div>`:''}
-     ${w.src==='wifi'?`<div class="card" style="padding:18px 10px 10px;gap:4px"><div style="display:flex;align-items:center;padding:0 8px 8px"><b style="flex:1;font-weight:500">Chọn WiFi của modem</b><button type="button" class="btn ghost" id="rescan" style="color:var(--acc);height:36px">${S.scan.busy?'<span class="spin"></span>':'Quét lại'}</button></div><div class="nets">${nets.length?nets.map((n,i)=>`<button type="button" class="net-i" data-net="${i}">${sigBars(n.signal)}<div class="n"><b>${esc(n.ssid)}</b><span>${n.enc==='none'?'Mạng mở':'Có mật khẩu'} · ${n.band==='5g'?'5 GHz':'2.4 GHz'}${n.recommended?' · <em class="rec">Nên dùng</em>':''}${n.dfs?' · DFS':''}${n.weak?' · Sóng yếu':''}</span></div><span class="db">${n.signal!=null?n.signal+' dBm':''}</span><span class="tick">${ico(n.enc==='none'?'wifi':'lock')}</span></button>`).join(''):`<div class="note" style="padding:10px 12px">${S.scan.busy?'Đang tìm WiFi xung quanh… (5 GHz cần khoảng 15 giây)':'Chưa thấy mạng nào.'}</div>`}<button type="button" class="net-i" data-net="hidden"><span class="sig" style="opacity:.4"><i></i><i></i><i></i><i></i></span><div class="n"><b>Mạng ẩn</b><span>Tự nhập tên WiFi</span></div><span class="tick">${ico('plus')}</span></button></div></div>`:''}
-     <button class="btn ghost" id="skip2">Để sau</button>`;
-  }else if(w.step===3){
-    h=`${bar}<h1>Liên kết tài khoản</h1><p class="lead">Gắn router vào app Wiflow để theo dõi khách, nhận sự kiện và điều khiển từ xa.</p>
-     <div class="card"><div class="note" style="padding:0">Mở app Wiflow → Thiết bị → Thêm thiết bị để lấy mã 12 ký tự.</div><input class="in" id="pairCode" maxlength="14" placeholder="Mã liên kết" autocapitalize="characters" spellcheck="false" style="letter-spacing:.1em"><button class="btn pri" id="pairGo">${ico('link','width:16px;height:16px')}Liên kết</button><button class="btn ghost" id="skip">Để sau</button></div>`;
-  }else{
-    h=`${bar}<div class="card done-hero"><span class="ok">${ico('check')}</span><h1>Wiflow đã sẵn sàng</h1><p class="lead">WiFi khách “${esc(st.guest_ssid||'Wiflow')}” đang phát. ${+st.paired?'Router đã gắn với tài khoản Wiflow.':'Bạn có thể liên kết tài khoản sau trong Hệ thống.'}</p><button class="btn pri" id="finish">Vào trang quản trị</button></div>`;
-  }
-  const anim=w.shown!==w.step;w.shown=w.step;
-  v.innerHTML=`<div class="wiz"${anim?'':' style="animation:none"'}>${h}</div>`;
-  const wa=$('#wAct',v);if(wa)wa.onclick=async()=>{const n=$('#wGuest').value.trim();if(!n||new TextEncoder().encode(n).length>32){toast('Tên WiFi khách 1–32 ký tự',true);return}
-    wa.disabled=true;wa.innerHTML='<span class="spin" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></span>Đang bật WiFi khách';
-    try{const r=await api('activate',{ssid:n});
-      if(r.job&&r.job.state==='lost'){sheet(`<div class="done-hero"><span class="ok">${ico('wifi')}</span><div class="h" style="font-size:22px">Kết nối lại WiFi</div><div class="note">WiFi của router vừa đổi thành “${esc(n)}”. Kết nối vào WiFi này (hoặc dùng dây LAN) rồi mở lại http://10.0.0.1.</div></div>`);$('#sheet').dataset.lock='1';return}
-      if(!r.ok){toast(r.error||'Chưa bật được Wiflow',true);wa.disabled=false;wa.textContent='Bật Wiflow';return}
-      await refreshStatus();toast(r.message||'Đã bật Wiflow');w.step=+(S.st||{}).internet_verified?(+(S.st||{}).paired?4:3):2;if(w.step===2){w.src='wifi';scan()}renderWizard()}
-    catch(e){if(e.message!=='auth'){wa.disabled=false;wa.textContent='Bật Wiflow'}}};
-  $$('[data-src]',v).forEach(b=>b.onclick=()=>{w.src=b.dataset.src;w.mode='auto';if(w.src==='wifi'&&!S.scan.list)scan();renderWizard()});
-  const lg=$('#lanGo',v);if(lg)lg.onclick=()=>runConnect({mode:'auto'},'lan');
-  const rs=$('#rescan',v);if(rs)rs.onclick=()=>scan();
-  $$('[data-net]',v).forEach(b=>b.onclick=()=>{const k=b.dataset.net;wifiSheet(k==='hidden'?null:S.scan.list[+k])});
-  const s2=$('#skip2',v);if(s2)s2.onclick=()=>{w.step=+st.paired?4:3;renderWizard()};
-  const pg=$('#pairGo',v);if(pg)pg.onclick=pairNow;
-  const sk=$('#skip',v);if(sk)sk.onclick=()=>{try{localStorage.setItem('wf-skip-pair','1')}catch(e){}w.step=4;renderWizard()};
-  const fi=$('#finish',v);if(fi)fi.onclick=()=>{S.wiz=null;try{localStorage.setItem('wf-skip-pair','1')}catch(e){}go('status')};
-}
-
 /* ================= start ================= */
 async function init(){
   let s;try{s=await refreshStatus()}catch(e){return}
   if(!s){$('#view').innerHTML=`<div class="card"><div class="msg err">Không tải được dữ liệu. Kiểm tra bạn vẫn kết nối WiFi của router hoặc dây LAN, và gói Wiflow Setup đang chạy.</div><button class="btn pri" onclick="location.reload()">Tải lại</button></div>`;return}
-  let skip=false;try{skip=localStorage.getItem('wf-skip-pair')==='1'}catch(e){}
-  if(!s.activated)S.wiz={step:1,src:'',mode:'auto'};
-  else if(!+s.internet_verified&&!+s.paired)S.wiz={step:2,src:'',mode:'auto'};
-  else if(!+s.paired&&!skip)S.wiz={step:3};
-  const h=location.hash.slice(1);S.page=NAV.some(n=>n[0]===h)?h:'status';
-  shell();loadMenu();
-  if(S.wiz){renderWizard()}else render(true);
-  refreshOverview().then(()=>{if(!S.wiz&&!editing())render()});
-  if(!S.wiz)go(S.page);
+  // Nothing is locked: the first page is the Internet source while there is none,
+  // every menu entry works at any time.
+  const h=location.hash.slice(1);S.page=NAV.some(n=>n[0]===h)?h:(+s.internet_verified?'status':'internet');
+  shell();loadMenu();render(true);
+  refreshOverview().then(()=>{if(!editing())render()});
+  go(S.page);
   try{const j=await api('job',{},8000);if(j.job==='running'){toast('Đang có một thay đổi Internet chạy dở…')}}catch(e){}
   loop();
 }
-window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(!S.wiz&&NAV.some(n=>n[0]===h)&&h!==S.page)go(h)});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(NAV.some(n=>n[0]===h)&&h!==S.page)go(h)});
 window.addEventListener('resize',()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>{if(!editing())render()},200)});
 init();
 })();
