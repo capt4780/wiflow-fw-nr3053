@@ -8,9 +8,11 @@
 
 {%
 	import { getuid, getspnam } from 'luci.core';
+	import { readfile } from 'fs';
 
 	const boardinfo = ubus.call('system', 'board');
 	const model = striptags(boardinfo?.model ?? 'Wiflow router');
+	const wiflow_os = trim(readfile('/etc/wiflow_release') ?? '');
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
@@ -41,14 +43,14 @@
 		{% if (!blank_page): %}
 		<div class="wf-shell">
 		<aside class="wf-side" id="wf-side">
-			<a class="wf-side-brand brand" href="{{ dispatcher.build_url('admin') }}"><span class="wf-tile"><img src="{{ media }}/wiflow-mark.png" alt=""></span><span><b>Wiflow</b><span>{{ model }}</span></span></a>
+			<a class="wf-side-brand brand" href="{{ dispatcher.build_url('admin') }}"><img class="wf-logo" src="{{ media }}/wiflow-logo.png" alt="Wiflow"><span class="wf-dev"><span class="wf-model">{{ model }}</span><span class="wf-ver">Wiflow OS {{ wiflow_os }}</span></span></a>
 			<ul class="wf-nav" id="topmenu" style="display:none"></ul>
 			<div class="wf-side-foot">Need help?<br><b>0833 880 100</b><br>wiflow@projifylab.com</div>
 		</aside>
 		<div class="wf-main">
 		<header class="wf-top">
 			<button class="wf-burger" id="wf-burger" type="button" aria-label="Menu" aria-controls="wf-side" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-			<a class="wf-mlogo" href="{{ dispatcher.build_url('admin') }}"><img src="{{ media }}/wiflow-mark.png" alt=""><span>Wiflow</span></a>
+			<a class="wf-mlogo" href="{{ dispatcher.build_url('admin') }}"><img src="{{ media }}/wiflow-logo.png" alt="Wiflow"></a>
 			<div class="wf-crumb" id="wf-crumb"></div>
 			<div id="indicators" class="pull-right"></div>
 		</header>

@@ -179,7 +179,7 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/usr/share/ucode/luci/template/themes/wiflow/footer.ut",
         "/usr/share/ucode/luci/template/themes/wiflow/sysauth.ut",
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
-        "/www/luci-static/wiflow/wiflow-mark.png", "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
+        "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
         "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
         "/usr/sbin/hostapd", "/usr/sbin/iwpriv", "/usr/bin/curl", "/bin/uclient-fetch", "/usr/bin/jsonfilter",

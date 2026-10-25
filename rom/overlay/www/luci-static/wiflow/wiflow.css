@@ -27,9 +27,7 @@ h4{font-size:15px}
 .wf-shell{display:flex;min-height:100vh;min-height:100dvh}
 .wf-side{flex:none;width:260px;background:var(--wf-ink);color:#fff;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;scrollbar-width:thin;z-index:850}
 .wf-side-brand{display:flex;align-items:center;gap:12px;padding:20px 18px 18px;text-decoration:none!important;color:#fff!important}
-.wf-tile{flex:none;width:44px;height:44px;border-radius:12px;background:#fff;display:flex!important;align-items:center;justify-content:center;overflow:hidden;margin:0;padding:0}
-.wf-tile img{display:block;width:36px;height:36px;object-fit:contain;margin:0;float:none}
-.wf-side-brand b{display:block;font-size:16px;letter-spacing:-.01em}.wf-side-brand>span:not(.wf-tile){min-width:0}.wf-side-brand>span:not(.wf-tile)>span{display:block;font-size:12px;color:rgba(255,255,255,.62);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 .wf-nav{list-style:none;margin:0;padding:4px 10px 16px;display:block!important}
 .wf-nav>li{margin:2px 0}
 .wf-nav>li>a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;color:rgba(255,255,255,.82)!important;font-weight:600;font-size:14px;text-decoration:none!important;text-shadow:none}
@@ -151,7 +149,7 @@ code,pre{border-radius:10px;background:#EEF1F6;border:0;color:var(--wf-text)}
 body.wf-login{background:var(--wf-paper)}
 body.wf-login #modal_overlay{background:var(--wf-paper);-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal.login{max-width:400px;width:100%;margin:auto;padding:30px 26px 24px;border-radius:24px;box-shadow:0 1px 2px rgba(11,27,58,.04),0 18px 50px rgba(11,27,58,.08);border:1px solid var(--wf-line)}
-.modal.login::before{content:"";display:block;width:84px;height:84px;margin:0 auto 14px;background:url(wiflow-mark-256.png) center/contain no-repeat}
+.modal.login::before{content:"";display:block;width:84px;height:84px;margin:0 auto 14px;background:url(wiflow-logo.png) center/contain no-repeat}
 .modal.login>h4{text-align:center;font-size:22px;margin:0 0 4px}
 .modal.login .wf-login-sub{text-align:center;margin:0 0 8px;font-size:13px;color:var(--wf-muted)}
 .modal.login .cbi-section{border:0;padding:6px 0 0;margin:0;box-shadow:none;background:none}
@@ -257,7 +255,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .cbi-section-descr,.cbi-map-descr{max-width:90ch}
 .cbi-value>.cbi-value-description{grid-column:2}
 @media(max-width:900px){.cbi-value-field,.cbi-value>.cbi-value-description{grid-column:1}}
-.wf-tile img{width:38px;height:38px}
 /* row actions stay on one line on wide screens (Startup, Processes, Interfaces,
    Wireless, Firewall rules, LEDs) instead of one button per line */
 .cbi-map{container-type:inline-size}
@@ -283,10 +280,30 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
  /* a wide settings table scrolls inside its card instead of pushing the page sideways */
  .cbi-section-node:has(>.cbi-section-table){overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
-/* logo = the original Wiflow artwork, rounded; it fills its tile (no white frame) */
-.wf-tile{width:44px;height:44px;border-radius:12px;background:none;padding:0}
-.wf-tile img{width:44px!important;height:44px!important;border-radius:12px;object-fit:cover}
-.wf-mlogo img{width:32px;height:32px;border-radius:9px;object-fit:cover}
 /* gate + login card: the full Wiflow logo (mark + wordmark), transparent PNG, as is */
 .modal.login::before{width:168px;height:148px;margin:0 auto 10px;border-radius:0;box-shadow:none;background:url(wiflow-logo.png) center/contain no-repeat}
 .modal.wf-gate input[name="wf_gate_code"]{text-transform:uppercase;letter-spacing:.08em;font-weight:600;text-align:center}
+
+/* ===== One logo: the full Wiflow logo (transparent PNG, unchanged) =====
+   Light sidebar so the dark "Wiflow" wordmark keeps its original colour. */
+.wf-side{background:#fff;color:var(--wf-text);border-right:1px solid var(--wf-line)}
+@media (min-width:901px){.wf-shell{background:linear-gradient(90deg,#fff 260px,transparent 260px)}}
+.wf-nav>li>a{color:var(--wf-text)!important}
+.wf-nav>li>a:hover{background:#F1F4F9;color:var(--wf-text)!important}
+.wf-nav>li.active>a{color:var(--wf-text)!important}
+.wf-nav ul a{color:var(--wf-muted)!important}
+.wf-nav ul a:hover{color:var(--wf-text)!important;background:#F1F4F9}
+.wf-nav ul li.active>a{color:#fff!important;background:var(--wf-blue)}
+.wf-side-foot{border-top:1px solid var(--wf-line);color:var(--wf-muted)}
+.wf-side-foot b{color:var(--wf-text)}
+@media (max-width:900px){body.wf-menu-open .wf-side{box-shadow:0 0 0 100vmax rgba(11,27,58,.35)}}
+.wf-mlogo img{width:auto;height:36px;border-radius:0}
+.wf-side-brand{display:flex;flex-direction:row;align-items:center;gap:14px;padding:18px 18px 16px;margin:0 12px 10px;border-bottom:1px solid var(--wf-line);color:var(--wf-text)!important;text-decoration:none!important}
+.wf-side-brand .wf-logo{display:block;width:56px;height:auto;flex:none;margin:0}
+.wf-dev{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wf-dev .wf-model{font-weight:600;font-size:14px;color:var(--wf-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-dev .wf-ver{font-size:12px;color:var(--wf-muted)}
+/* gate + login: white page, no card frame, no shadow */
+body.wf-login,body.wf-login #modal_overlay{background:#fff!important}
+.modal.login{border:0!important;box-shadow:none!important;background:#fff}
+.modal.login::before{width:128px;height:112px;margin:0 auto 16px}
