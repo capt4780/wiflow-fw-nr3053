@@ -41,15 +41,26 @@ def sha(p):
 
 
 # --- WiFi stack identical to v2.3.6 ---
+# One intended change: mtwifi's country table maps VN to A-band region 7
+# (36-64, 100-140, 149-165) instead of 0; everything else byte-identical.
+PATCHED = {"/usr/share/schema/mtwifi/dat-defs.json": (b'"VN": [ 1, 7 ]', b'"VN": [ 1, 0 ]')}
+def sha_stock(p):
+    b = open(F + p, "rb").read()
+    if p in PATCHED:
+        new, old = PATCHED[p]
+        if b.count(new) != 1:
+            return None
+        b = b.replace(new, old)
+    return hashlib.sha256(b).hexdigest()
 diff = [p for p, h in golden["must_match"].items()
-        if not os.path.isfile(F + p) or sha(F + p) != h]
+        if not os.path.isfile(F + p) or sha_stock(p) != h]
 diff += [p for p, h in golden["info"].items()
-         if not os.path.isfile(F + p) or sha(F + p) != h]
+         if not os.path.isfile(F + p) or sha_stock(p) != h]
 n = len(golden["must_match"]) + len(golden["info"])
 if diff:
     fail("differs from v2.3.6: " + ", ".join(diff))
 else:
-    ok(f"WiFi driver, firmware, profiles, board and upgrade files: {n} files identical to v2.3.6")
+    ok(f"WiFi driver, firmware, profiles, board and upgrade files: {n} files identical to v2.3.6 (country table: only VN -> region 7)")
 
 
 # --- shared libraries ---
