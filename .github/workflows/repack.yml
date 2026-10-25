@@ -95,7 +95,7 @@ jobs:
           {
             echo "Wiflow OS $V cho Viettel NR3053: ImmortalWrt v2.3.6 làm gọn, kernel và driver WiFi giữ nguyên."
             echo
-            echo "- Router: \`http://10.0.0.1\`, LuCI \`root\` / \`1234\`"
+            echo "- Router: \`http://10.0.0.1\`, Gate \`WIFDIDNR3053\`, LuCI \`wiflow\` / \`wiflow\` hoặc \`root\` / \`1234\`"
             echo "- WiFi: \`Wiflow 2.4G\`, \`Wiflow 5G\` (mở)"
             echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
             echo

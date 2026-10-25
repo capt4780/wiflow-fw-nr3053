@@ -55,6 +55,37 @@ D="$F/www/luci-static/resources/view/status/include/40_dhcp.js"
 grep -qF "table,E('h3',_('Active DHCPv6 Leases')),table6]" "$D" || die "40_dhcp.js: DHCPv6 lease table not found"
 sed -i "s/table,E('h3',_('Active DHCPv6 Leases')),table6\]/table]/" "$D"
 
+# Access gate before the LuCI login (rom/overlay/usr/share/ucode/wiflow/gate.uc):
+# the dispatcher only checks username/password once the gate is passed, and
+# anonymous ubus may no longer call session.login directly (LuCI logs in
+# through the dispatcher, never through /ubus).
+D="$F/usr/share/ucode/luci/dispatcher.uc"
+grep -qF "import { urldecode, urlencode } from 'luci.http';" "$D" || die "dispatcher.uc: import anchor not found"
+grep -qF "if (user != null && pass != null)" "$D" || die "dispatcher.uc: login anchor not found"
+python3 - "$D" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+s = s.replace("import { urldecode, urlencode } from 'luci.http';",
+              "import { urldecode, urlencode } from 'luci.http';\nimport { passed as wiflow_gate_passed } from 'wiflow.gate';", 1)
+assert s.count("if (user != null && pass != null)") == 1
+s = s.replace("if (user != null && pass != null)", "if (user != null && pass != null && wiflow_gate_passed(http))", 1)
+open(p, 'w').write(s)
+PY
+A="$F/usr/share/rpcd/acl.d/unauthenticated.json"
+python3 - "$A" <<'PY'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p))
+sess = d["unauthenticated"]["read"]["ubus"]["session"]
+assert "login" in sess
+d["unauthenticated"]["read"]["ubus"]["session"] = [x for x in sess if x != "login"]
+open(p, "w").write(json.dumps(d, indent="\t") + "\n")
+PY
+
+# second web admin account wiflow / wiflow (root / 1234 stays for deep access)
+grep -q "option username 'root'" "$F/etc/config/rpcd" || die "rpcd: root login not found"
+whash="$(openssl passwd -1 wiflow)"
+printf "\nconfig login\n\toption username 'wiflow'\n\toption password '%s'\n\tlist read '*'\n\tlist write '*'\n" "$whash" >> "$F/etc/config/rpcd"
+
 # root password 1234
 hash="$(openssl passwd -1 1234)"
 sed -i "s|^root:[^:]*:|root:$hash:|" "$F/etc/shadow"

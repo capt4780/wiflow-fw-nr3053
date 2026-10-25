@@ -258,7 +258,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .cbi-value>.cbi-value-description{grid-column:2}
 @media(max-width:900px){.cbi-value-field,.cbi-value>.cbi-value-description{grid-column:1}}
 .wf-tile img{width:38px;height:38px}
-.modal.login::before{background-image:url(wiflow-mark-256.png)}
 /* row actions stay on one line on wide screens (Startup, Processes, Interfaces,
    Wireless, Firewall rules, LEDs) instead of one button per line */
 .cbi-map{container-type:inline-size}
@@ -288,4 +287,6 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .wf-tile{width:44px;height:44px;border-radius:12px;background:none;padding:0}
 .wf-tile img{width:44px!important;height:44px!important;border-radius:12px;object-fit:cover}
 .wf-mlogo img{width:32px;height:32px;border-radius:9px;object-fit:cover}
-.modal.login::before{width:96px;height:96px;border-radius:22px;background:url(wiflow-mark-256.png) center/cover no-repeat;box-shadow:0 6px 18px rgba(11,27,58,.12)}
+/* gate + login card: the full Wiflow logo (mark + wordmark), transparent PNG, as is */
+.modal.login::before{width:168px;height:148px;margin:0 auto 10px;border-radius:0;box-shadow:none;background:url(wiflow-logo.png) center/contain no-repeat}
+.modal.wf-gate input[name="wf_gate_code"]{text-transform:uppercase;letter-spacing:.08em;font-weight:600;text-align:center}

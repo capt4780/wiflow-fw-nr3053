@@ -6,7 +6,7 @@ Wiflow OS là bản ImmortalWrt v2.3.6 đang chạy ổn định, được **đ�
 - **Giữ nguyên từng byte v2.3.6:** kernel, device tree, driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng, script nâng cấp. Bootloader và dữ liệu hiệu chỉnh không bị đụng tới.
 - **Rootfs làm gọn:** chỉ giữ gói Wiflow cần (`tools/lean-keep.txt` cùng các gói phụ thuộc), gỡ hết phần còn lại.
 - **Thương hiệu Wiflow:** theme LuCI Wiflow (duy nhất), logo và favicon từ ảnh gốc (`rom/brand`, `tools/make-brand.py`), tên máy, banner.
-- **Mặc định:** `10.0.0.1`, `root` / `1234`, WiFi mở `Wiflow 2.4G` / `Wiflow 5G`, HNAT tắt.
+- **Mặc định:** `10.0.0.1`, Gate `WIFDIDNR3053` trước khi đăng nhập, `wiflow` / `wiflow` và `root` / `1234`, WiFi mở `Wiflow 2.4G` / `Wiflow 5G`, HNAT tắt.
 
 Ứng dụng Wiflow (Setup, portal, kết nối WordPress) là gói `.apk` riêng, cài sau qua LuCI → System → Software.
 

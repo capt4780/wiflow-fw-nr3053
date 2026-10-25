@@ -26,7 +26,8 @@ Wiflow OS là chính bản v2.3.6 được làm gọn:
 | | |
 |---|---|
 | Địa chỉ router | `http://10.0.0.1`, máy nối LAN hoặc WiFi nhận IP `10.0.0.x` |
-| Đăng nhập LuCI | `root` / `1234` |
+| Mã truy cập (Gate) | `WIFDIDNR3053`, nhập trước khi đăng nhập; hiệu lực 12 giờ trên trình duyệt đó |
+| Đăng nhập LuCI | `wiflow` / `wiflow` (quản trị hằng ngày) hoặc `root` / `1234` (truy cập chuyên sâu); cả hai đều toàn quyền |
 | WiFi | `Wiflow 2.4G` và `Wiflow 5G`, mở, không mật khẩu |
 | SSH | `root@10.0.0.1`, mật khẩu `1234` |
 
@@ -35,7 +36,7 @@ Wiflow OS là chính bản v2.3.6 được làm gọn:
 
 ## Reset
 
-Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặc định của Wiflow OS: `10.0.0.1`, `root` / `1234`, WiFi `Wiflow 2.4G` / `Wiflow 5G`.
+Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặc định của Wiflow OS: `10.0.0.1`, Gate `WIFDIDNR3053`, `wiflow` / `wiflow` và `root` / `1234`, WiFi `Wiflow 2.4G` / `Wiflow 5G`.
 
 ## Quay về v2.3.6 / cứu router
 
@@ -54,6 +55,7 @@ Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặ
 |---|---|
 | Nền | ImmortalWrt v2.3.6 (quytttb/immortalwrt-mt798x-rebase `495af17`), kernel 6.12.94, driver WiFi MediaTek mt_wifi 7.6.7.3 |
 | Giữ | Mạng lõi, tường lửa nftables, DHCP/DNS, driver và công cụ WiFi MediaTek, curl/HTTPS, LuCI tiếng Anh gốc OpenWrt (Status, Network, Wireless, Firewall, System, Software), SSH, apk |
-| Giao diện | Theme LuCI Wiflow, theme duy nhất, không đổi được |
+| Giao diện | Theme LuCI Wiflow, theme duy nhất, không đổi được; logo Wiflow đầy đủ ở trang Gate và đăng nhập |
+| Gate | Nhập sai 5 lần thì địa chỉ đó bị khóa 60 giây. Router chỉ kiểm tra tài khoản sau khi qua Gate |
 | Đã bỏ | PPPoE, Tailscale, WireGuard, chặn quảng cáo, DDNS, UPnP, TurboACC, EQoS, IPv6 (DHCPv6/RA), zram, iptables cũ, htop/nano/tcpdump, theme Aurora/Bootstrap, mọi gói dịch (chỉ tiếng Anh) |
 | Tăng tốc phần cứng | HNAT tắt, để mọi gói tin đi qua tường lửa |

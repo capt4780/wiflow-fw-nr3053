@@ -2,11 +2,52 @@
  Wiflow theme for LuCI — derived from luci-theme-bootstrap (openwrt-25.12)
  Copyright 2022 Jo-Philipp Wich
  Licensed to the public under the Apache License 2.0.
+ Wiflow: an access code (gate) comes before the login form; see
+ /usr/share/ucode/wiflow/gate.uc. The dispatcher refuses credentials until
+ the gate is passed, so this page only decides which form to show.
 -#}
+
+{%
+	import { passed as gate_passed, attempt as gate_attempt } from 'wiflow.gate';
+
+	const gate_try = gate_attempt(http);
+	if (gate_try?.cookie)
+		http.header('Set-Cookie', gate_try.cookie);
+
+	const gate_ok = gate_try?.ok || gate_passed(http);
+	const login_user = fuser ?? 'wiflow';
+-%}
 
 {% include('header', { blank_page: true, wf_login: true }) %}
 
-<section hidden>
+{% if (!gate_ok): %}
+<section hidden data-title="Access code" data-gate="1">
+	<p class="wf-login-sub">Enter the Wiflow access code to continue.</p>
+	<form method="post" class="cbi-map" autocomplete="off">
+		<div class="cbi-section">
+			<div class="cbi-section-node">
+				<div class="cbi-value">
+					<label class="cbi-value-title" for="wf_gate_code">Access code</label>
+					<div class="cbi-value-field">
+						<input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
+					</div>
+				</div>
+			</div>
+		</div>
+	</form>
+
+	<hr>
+
+	{% if (gate_try?.error == 'locked'): %}
+	<div class="alert-message error">Too many wrong codes. Try again in {{ gate_try.wait }} seconds.</div>
+	{% elif (gate_try?.error == 'invalid'): %}
+	<div class="alert-message error">Wrong access code. {{ gate_try.left }} {{ gate_try.left == 1 ? 'attempt' : 'attempts' }} left.</div>
+	{% endif %}
+
+	<button class="btn cbi-button-positive important">Continue</button>
+</section>
+{% else %}
+<section hidden data-title="Authorization Required">
 	<p class="wf-login-sub">Wiflow router administration</p>
 	<form method="post" class="cbi-map">
 		<div class="cbi-section">
@@ -14,7 +55,7 @@
 				<div class="cbi-value">
 					<label class="cbi-value-title" for="luci_username">{{ _('Username') }}</label>
 					<div class="cbi-value-field">
-						<input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(duser, true) }}">
+						<input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}">
 					</div>
 				</div>
 				<div class="cbi-value">
@@ -29,7 +70,7 @@
 
 	<hr>
 
-	{% if (fuser): %}
+	{% if (fuser && gate_passed(http)): %}
 	<div class="alert-message error">
 		{{ _('Invalid username and/or password! Please try again.') }}
 	</div>
@@ -37,6 +78,7 @@
 
 	<button class="btn cbi-button-positive important">{{ _('Log in') }}</button>
 </section>
+{% endif %}
 
 <div class="wf-login-foot">Support <b>0833 880 100</b> · wiflow@projifylab.com</div>
 

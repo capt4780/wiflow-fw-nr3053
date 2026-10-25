@@ -179,7 +179,7 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/usr/share/ucode/luci/template/themes/wiflow/footer.ut",
         "/usr/share/ucode/luci/template/themes/wiflow/sysauth.ut",
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
-        "/www/luci-static/wiflow/wiflow-mark.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
+        "/www/luci-static/wiflow/wiflow-mark.png", "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
         "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
         "/usr/sbin/hostapd", "/usr/sbin/iwpriv", "/usr/bin/curl", "/bin/uclient-fetch", "/usr/bin/jsonfilter",
@@ -202,6 +202,14 @@ checks = {
     "DISTRIB_RELEASE kept as v2.3.6 (25.12-SNAPSHOT)":
         "DISTRIB_RELEASE='25.12-SNAPSHOT'" in open(F + "/etc/openwrt_release").read(),
     "hostname default Wiflow": "hostname='Wiflow'" in cg,
+    "web login wiflow added, root kept": "option username 'wiflow'" in open(F + "/etc/config/rpcd").read()
+        and "option username 'root'" in open(F + "/etc/config/rpcd").read(),
+    "access gate: module, codes, dispatcher check":
+        os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
+        and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
+        and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
+    "anonymous ubus cannot call session.login":
+        "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }
 for k, v in checks.items():
     (ok if v else fail)(k)

@@ -5,6 +5,9 @@ Every icon is the whole original file, only resized and given rounded corners
 (no cropping, no background removal, no colour change):
 - wiflow-mark.png (96 px) / wiflow-mark-256.png: sidebar tile, mobile top bar, login card
 - favicon.png, apple-touch-icon.png, /www/favicon.ico
+The full logo (mark + "Wiflow" wordmark, transparent PNG, rom/brand/wiflow-logo-source.png)
+is used as is on the gate and login pages: wiflow-logo.png, only the empty
+transparent margin trimmed and resized.
 
 usage: make-brand.py <rom/overlay dir>
 """
@@ -34,4 +37,7 @@ icon(256).save(os.path.join(media, "wiflow-mark-256.png"), optimize=True)
 icon(64).save(os.path.join(media, "favicon.png"), optimize=True)
 icon(180).save(os.path.join(media, "apple-touch-icon.png"), optimize=True)
 icon(256).save(os.path.join(overlay, "www/favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+logo = Image.open(os.path.join(os.path.dirname(__file__), "..", "rom/brand/wiflow-logo-source.png")).convert("RGBA")
+logo = logo.crop(logo.getchannel("A").getbbox())
+logo.resize((480, round(logo.height * 480 / logo.width)), Image.LANCZOS).save(os.path.join(media, "wiflow-logo.png"), optimize=True)
 print("brand assets written")
