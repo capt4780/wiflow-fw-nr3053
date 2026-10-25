@@ -1,0 +1,2 @@
+export function striptags(s) { return replace(`${s ?? ''}`, /<[^>]*>/g, ''); };
+export function entityencode(s, q) { s = `${s ?? ''}`; s = replace(s, '&', '&amp;'); s = replace(s, '<', '&lt;'); s = replace(s, '>', '&gt;'); if (q) s = replace(s, '"', '&#34;'); return s; };

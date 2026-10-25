@@ -12,6 +12,7 @@
 
 import { readfile, writefile, mkdir, unlink, glob } from 'fs';
 import { cursor } from 'uci';
+import { rand } from 'math';
 
 const DIR = '/tmp/wiflow-gate';
 const TTL = 12 * 3600;
@@ -31,44 +32,40 @@ function codes() {
 		list = [ 'WIFDIDNR3053' ];
 
 	return map(list, (x) => uc(trim(x)));
-}
-
+};
 function new_token() {
 	const raw = readfile('/dev/urandom', 16);
 	let s = '';
-	for (let i = 0; i < length(raw); i++)
+	for (let i = 0; i < length(raw ?? ''); i++)
 		s += sprintf('%02x', ord(raw, i));
-	return s;
-}
-
+	while (length(s) < 32)
+		s += sprintf('%02x', rand() % 256);
+	return substr(s, 0, 32);
+};
 function valid_token(t) {
 	if (type(t) != 'string' || !match(t, /^[0-9a-f]{32}$/))
 		return false;
 
 	const born = +(readfile(`${DIR}/t-${t}`) ?? 0);
 	return born > 0 && time() - born < TTL;
-}
-
+};
 function fail_file(ip) {
 	return `${DIR}/f-${replace(ip ?? 'unknown', /[^0-9A-Fa-f.:]/g, '_')}`;
-}
-
+};
 function cleanup() {
 	for (let f in glob(`${DIR}/t-*`)) {
 		const born = +(readfile(f) ?? 0);
 		if (time() - born >= TTL)
 			unlink(f);
 	}
-}
-
+};
 // true when the request carries a valid gate cookie (or the gate is off)
 export function passed(http) {
 	if (codes() == null)
 		return true;
 
 	return valid_token(http.getcookie(COOKIE));
-}
-
+};
 // handles a submitted access code (form field wf_gate_code)
 // returns null when no code was submitted, otherwise
 // { ok: true, cookie } or { ok: false, error: 'invalid'|'locked', left, wait }
@@ -110,4 +107,4 @@ export function attempt(http) {
 		return { ok: false, error: 'locked', wait: LOCK };
 
 	return { ok: false, error: 'invalid', left: MAX_FAIL - count };
-}
+};

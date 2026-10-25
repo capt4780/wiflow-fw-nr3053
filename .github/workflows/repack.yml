@@ -14,6 +14,8 @@ on:
       - "tools/fit-rootfs.py"
       - "tools/fitx.py"
       - "tools/rom-check.py"
+      - "tools/cgi-smoke.sh"
+      - "tools/ucode-stubs/**"
       - "tools/nr3053-golden.json"
       - "scripts/repack.sh"
       - ".github/workflows/repack.yml"
@@ -28,6 +30,8 @@ concurrency:
 
 env:
   FWTOOL_COMMIT: 04cd252e4e9394ffacd51f56f1f124abc534f715
+  # ucode exactly as on the router (apk db: ucode 2026.01.16~85922056)
+  UCODE_COMMIT: 85922056
 
 jobs:
   repack:
@@ -40,15 +44,27 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -q
-          sudo apt-get install -y -q squashfs-tools
+          sudo apt-get install -y -q squashfs-tools libjson-c-dev cmake
           git clone -q https://github.com/openwrt/fwtool /tmp/fwtool
           git -C /tmp/fwtool checkout -q "$FWTOOL_COMMIT"
           gcc -O2 -o /tmp/fwtool/fwtool /tmp/fwtool/fwtool.c
           sudo install -m 0755 /tmp/fwtool/fwtool /usr/local/bin/fwtool
           mksquashfs -version | head -n1
+          git clone -q https://github.com/jow-/ucode /tmp/ucode
+          git -C /tmp/ucode checkout -q "$UCODE_COMMIT"
+          cmake -S /tmp/ucode -B /tmp/ucode/b -DUBUS_SUPPORT=OFF -DUCI_SUPPORT=OFF -DULOOP_SUPPORT=OFF \
+            -DRTNL_SUPPORT=OFF -DNL80211_SUPPORT=OFF -DDEBUG_SUPPORT=OFF -DDIGEST_SUPPORT=OFF -DSOCKET_SUPPORT=OFF \
+            -DZLIB_SUPPORT=OFF -DFS_SUPPORT=ON -DMATH_SUPPORT=ON -DLOG_SUPPORT=ON > /dev/null
+          make -C /tmp/ucode/b -j"$(nproc)" > /dev/null
+          ls /tmp/ucode/b/ucode /tmp/ucode/b/fs.so
 
       - name: Repack
-        run: sudo -E bash scripts/repack.sh dist
+        run: sudo -E SAVE_ROOT=/tmp/romroot bash scripts/repack.sh dist
+
+      - name: Run the ROM's LuCI with the router's ucode
+        run: |
+          set -o pipefail
+          sudo bash tools/cgi-smoke.sh /tmp/romroot /tmp/ucode/b | tee /tmp/cgi-smoke.txt
 
       - name: Verify the image
         run: |
@@ -70,6 +86,8 @@ jobs:
           PY
           sudo unsquashfs -s /tmp/fit/_images_rootfs-1.bin | head -n 12
           cat dist/report/rom-check.txt
+          cp /tmp/cgi-smoke.txt dist/report/cgi-smoke.txt
+          cat dist/report/cgi-smoke.txt >> dist/report/rom-check.txt
           {
             echo "### Wiflow OS NR3053"
             echo '```'; cat dist/report/rom-check.txt; echo '```'
