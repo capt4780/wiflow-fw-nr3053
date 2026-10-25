@@ -37,8 +37,11 @@ function boot() {
 		W.core_set({ activated: W.uci_get('wireless', 'wiflow_guest_2g') == 'wifi-iface' ? '1' : '0' });
 	const active = W.core('activated') == '1';
 
+	if (P.ensure_timezone())
+		W.run('/etc/init.d/system reload');
 	P.ensure_networks();
-	let wl = false;
+	// 5 GHz channels 100-140 (country VN, region 7), activated or not
+	let wl = P.ensure_region();
 	if (active) {
 		wl = P.ensure_wireless(false);
 		wl = P.plan_radios() || wl;

@@ -1,6 +1,6 @@
 # Wiflow Setup trên Viettel NR3053
 
-Wiflow Setup là gói `.apk` cài lên Wiflow OS. Giao diện giống Wiflow Setup trên CR6609, gồm bốn trang: **Trạng thái**, **Internet**, **WiFi khách** và **Hệ thống**. Wiflow Setup mở ở `http://10.0.0.1/wiflow/` và dùng chung phiên đăng nhập với LuCI. Sau khi đăng nhập, router mở thẳng Wiflow Setup. Nút **Nâng cao (LuCI)** mở trang quản trị LuCI (tiếng Anh).
+Wiflow Setup là gói `.apk` cài lên Wiflow OS. Khung giao diện (sidebar trắng, logo, menu, font) giống firmware; nội dung các trang theo bản CR6609, gồm bốn trang: **Trạng thái**, **Internet**, **WiFi khách** và **Hệ thống**. Wiflow Setup mở ở `http://10.0.0.1/wiflow/` và dùng chung phiên đăng nhập với LuCI. Sau khi đăng nhập, router mở thẳng Wiflow Setup. Nút **Nâng cao (LuCI)** mở trang quản trị LuCI (tiếng Anh).
 
 ## Cài đặt
 
@@ -48,6 +48,10 @@ Cách bắt WiFi nguồn: chạm một mạng trong thẻ **WiFi nguồn**, nh�
 
 - Router chỉ lưu cấu hình mới khi đã ra được Internet qua mạng vừa chọn.
 - Nếu sai mật khẩu, không thấy mạng, hoặc modem nguồn dùng dải `10.0.0.x` / `10.10.10.x`, router quay về cấu hình cũ và báo lý do.
+
+Router dùng quốc gia Việt Nam: băng 5 GHz quét và bắt được modem ở mọi kênh 36–64, 100–140, 149–165. Các bản trước dùng mã CN nên không thấy modem phát ở kênh 100–140. Múi giờ mặc định UTC+7 (Hồ Chí Minh / Hà Nội); nếu bạn đổi múi giờ trong LuCI, Wiflow giữ lựa chọn của bạn.
+
+Nếu bấm Kết nối mà không vào được WiFi nguồn, bấm **Kiểm tra chi tiết**. Router quét lại, thử kết nối theo mọi cách (ghi cấu hình rồi khởi động lại WiFi; đổi trực tiếp trong driver; các kiểu bảo mật khác) và ghi lại phản hồi của chip WiFi mỗi 2 giây, khoảng 3 phút. Cách nào kết nối được thì router giữ luôn. Bấm **Tải kết quả** và gửi file cho Wiflow (mật khẩu đã được che).
 
 ### Cách router bắt và phát WiFi
 

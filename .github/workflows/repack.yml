@@ -115,6 +115,7 @@ jobs:
             echo
             echo "- Router: \`http://10.0.0.1\`, Gate \`WIFDIDNR3053\`, LuCI \`wiflow\` / \`wiflow\` hoặc \`root\` / \`1234\`"
             echo "- WiFi: \`Wiflow 2.4G\`, \`Wiflow 5G\` (mở)"
+            echo "- Quốc gia Việt Nam (5 GHz dùng cả kênh 100–140), múi giờ UTC+7 (Hồ Chí Minh / Hà Nội)"
             echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
             echo "- Wiflow Setup (Internet nguồn, WiFi khách, kết nối Wiflow): cài gói \`wiflow-setup-*.apk\` ở LuCI → System → Software → Upload Package. Hướng dẫn: docs/HUONG-DAN-WIFLOW-SETUP.md"
             echo

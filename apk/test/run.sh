@@ -34,6 +34,7 @@ U(){ LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q "$@"; }
 expect "install: WiFi untouched until 'Bật Wiflow'" "$(U get wiflow.core.activated)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.wiflow_guest_2g)" '^0\|Wiflow 2.4G\|$'
 expect "install: guest network" "$(U get network.wiflow_guest.ipaddr) $(U get firewall.wiflow_guest.input) $(U get firewall.wiflow_guest_wan.dest)" '^10.10.10.1/24 REJECT wan$'
 expect "install: uplink in wan zone" "$(U show firewall | grep "network=.*wiflow_wwan")" 'wiflow_wwan'
+expect "install: Vietnam time and country" "$(U get system.@system[0].zonename) $(U get system.@system[0].timezone) $(U get wireless.MT7981_1_1.country)/$(U get wireless.MT7981_1_2.country)" '^Asia/Ho_Chi_Minh <\+07>-7 VN/VN$'
 cp -r /etc/config /tmp/cfg.before
 $B x /usr/libexec/wiflow/provision boot
 diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no config rewrite)" || fail "boot rewrote configs"

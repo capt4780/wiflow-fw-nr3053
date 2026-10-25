@@ -168,6 +168,29 @@ export function ensure_region() {
 	return changed;
 };
 
+// Vietnam time (UTC+7) by default, once: a zone the admin picks later stays.
+export function ensure_timezone() {
+	if (W.core('tz_set') == '1')
+		return false;
+	const c = cursor();
+	c.load('system');
+	let sec = null;
+	c.foreach('system', 'system', s => { if (!sec) sec = s['.name']; });
+	let changed = false;
+	if (sec) {
+		const z = c.get('system', sec, 'zonename'), t = c.get('system', sec, 'timezone');
+		if (!z || z == 'UTC' || !t || t == 'UTC0' || t == 'UTC') {
+			c.set('system', sec, 'zonename', 'Asia/Ho_Chi_Minh');
+			c.set('system', sec, 'timezone', '<+07>-7');
+			c.commit('system');
+			writefile('/tmp/TZ', '<+07>-7\n');
+			changed = true;
+		}
+	}
+	W.core_set({ tz_set: '1' });
+	return changed;
+};
+
 export function ensure_wireless(first) {
 	const c = cursor();
 	c.load('wireless');
