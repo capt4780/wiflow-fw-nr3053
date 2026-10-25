@@ -33,8 +33,6 @@ firewall4
 nftables-json
 dnsmasq-full
 dropbear
-ppp
-ppp-mod-pppoe
 mtk-smp
 ip-tiny                    # /sbin/ip
 gawk                       # awk (busybox here has none)
@@ -82,7 +80,7 @@ ucode-mod-rtnl
 ucode-mod-nl80211
 ucode-mod-iwinfo
 
-# --- web admin: lean LuCI, Vietnamese only ---
+# --- web admin: lean LuCI, English (no translations) ---
 uhttpd
 uhttpd-mod-ubus
 rpcd
@@ -101,11 +99,6 @@ luci-mod-system
 luci-app-firewall
 luci-app-mtwifi-cfg
 luci-app-package-manager
-luci-proto-ppp
-luci-i18n-base-vi
-luci-i18n-firewall-vi
-luci-i18n-mtwifi-cfg-vi
-luci-i18n-package-manager-vi
 
 # --- package manager, so the Wiflow .apk can be installed later ---
 apk-openssl

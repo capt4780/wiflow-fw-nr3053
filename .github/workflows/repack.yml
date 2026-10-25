@@ -96,13 +96,17 @@ jobs:
             echo "Wiflow OS $V cho Viettel NR3053: ImmortalWrt v2.3.6 làm gọn, kernel và driver WiFi giữ nguyên."
             echo
             echo "- Router: \`http://10.0.0.1\`, LuCI \`root\` / \`1234\`"
-            echo "- WiFi: \`Wiflow 2.4 GHz\`, \`Wiflow 5 GHz\` (mở)"
-            echo "- Nạp: LuCI → Hệ thống → Sao lưu / Nạp firmware, **bỏ chọn Giữ cấu hình**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
+            echo "- WiFi: \`Wiflow 2.4G\`, \`Wiflow 5G\` (mở)"
+            echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
           } > notes.md
-          gh release create "$TAG" --title "Wiflow OS $V — Viettel NR3053 (build ${{ github.run_number }})" \
+          # one release per Wiflow OS version: an earlier build of the same version is replaced
+          for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep "^nr3053-os-v$V-b" || true); do
+            gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Wiflow OS $V — Viettel NR3053 (build ${{ github.run_number }})" \
             --notes-file notes.md --target "$GITHUB_SHA" \
             dist/wiflow-os-*-sysupgrade.itb dist/SHA256SUMS \
             dist/report/rom-check.txt dist/report/packages-kept.txt dist/report/packages-removed.txt

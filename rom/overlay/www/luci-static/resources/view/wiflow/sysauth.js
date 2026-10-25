@@ -9,7 +9,7 @@ return view.extend({
 		    btn = document.querySelector('section > button');
 
 		var dlg = ui.showModal(
-			'Đăng nhập LuCI',
+			_('Authorization Required'),
 			[].slice.call(document.querySelectorAll('section > *')),
 			'login'
 		);
@@ -21,7 +21,7 @@ return view.extend({
 
 		btn.addEventListener('click', function() {
 			dlg.querySelectorAll('*').forEach(function(node) { node.style.display = 'none' });
-			dlg.appendChild(E('div', { 'class': 'spinning' }, 'Đang đăng nhập…'));
+			dlg.appendChild(E('div', { 'class': 'spinning' }, _('Logging in…')));
 
 			form.submit()
 		});

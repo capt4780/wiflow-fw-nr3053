@@ -15,9 +15,10 @@ add_list system.ntp.server='pool.ntp.org'
 commit system
 EOF
 
-# --- LuCI: Vietnamese, Wiflow theme as the only theme ---
+# --- LuCI: English, Wiflow theme as the only theme ---
 uci -q batch <<'EOF'
-set luci.main.lang='vi'
+set luci.main.lang='en'
+delete luci.languages
 set luci.main.mediaurlbase='/luci-static/wiflow'
 delete luci.themes
 set luci.themes='internal'
@@ -45,13 +46,13 @@ set dhcp.@dnsmasq[0].quietdhcp='1'
 commit dhcp
 EOF
 
-# --- WiFi: "Wiflow 2.4 GHz" / "Wiflow 5 GHz", open, on ---
+# --- WiFi: "Wiflow 2.4G" / "Wiflow 5G", open, on ---
 # (the MediaTek driver scripts stay identical to v2.3.6; only uci values change)
 uci -q show wireless | grep -q '=wifi-device$' || /sbin/wifi config
 for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
 	case "$(uci -q get wireless.$dev.band)" in
-		2g) ssid='Wiflow 2.4 GHz' ;;
-		5g) ssid='Wiflow 5 GHz' ;;
+		2g) ssid='Wiflow 2.4G' ;;
+		5g) ssid='Wiflow 5G' ;;
 		*) continue ;;
 	esac
 	uci -q delete wireless.$dev.disabled

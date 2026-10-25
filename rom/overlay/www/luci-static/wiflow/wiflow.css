@@ -151,7 +151,7 @@ code,pre{border-radius:10px;background:#EEF1F6;border:0;color:var(--wf-text)}
 body.wf-login{background:var(--wf-paper)}
 body.wf-login #modal_overlay{background:var(--wf-paper);-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal.login{max-width:400px;width:100%;margin:auto;padding:30px 26px 24px;border-radius:24px;box-shadow:0 1px 2px rgba(11,27,58,.04),0 18px 50px rgba(11,27,58,.08);border:1px solid var(--wf-line)}
-.modal.login::before{content:"";display:block;width:76px;height:76px;margin:0 auto 14px;background:url(logo.png) center/contain no-repeat}
+.modal.login::before{content:"";display:block;width:84px;height:84px;margin:0 auto 14px;background:url(wiflow-mark-256.png) center/contain no-repeat}
 .modal.login>h4{text-align:center;font-size:22px;margin:0 0 4px}
 .modal.login .wf-login-sub{text-align:center;margin:0 0 8px;font-size:13px;color:var(--wf-muted)}
 .modal.login .cbi-section{border:0;padding:6px 0 0;margin:0;box-shadow:none;background:none}
@@ -198,6 +198,8 @@ body.wf-login #modal_overlay{background:var(--wf-paper);-webkit-backdrop-filter:
 .wf-nav>li.open:hover>ul.dropdown-menu,.wf-nav>li.open>ul.dropdown-menu{display:block}
 [data-indicator]{text-transform:none!important;letter-spacing:0}
 .ifacebox .ifacebox-head,.ifacebox .ifacebox-head strong{color:var(--wf-text)!important;text-shadow:none}
+.ifacebox .ifacebox-head:not([style*=background]){background:#F3F5F9}
+.ifacebox .ifacebox-head.active,.ifacebox .ifacebox-head.active strong{background:var(--wf-blue)!important;color:#fff!important}
 .cbi-page-actions .cbi-button-save,.cbi-button-save{background:var(--wf-blue-soft)!important;color:var(--wf-blue)!important;border-color:#D6E3FF!important}
 .cbi-section-create>.cbi-button-add,.cbi-button-add{background:var(--wf-blue-soft)!important;color:var(--wf-blue)!important;border-color:#D6E3FF!important}
 .modal>h4,.modal h4{color:var(--wf-text)}
@@ -243,9 +245,42 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
 .cbi-section-actions .cbi-button,.cbi-section-actions .btn{overflow:visible!important;text-overflow:clip!important}
 .cbi-button,.btn{text-overflow:clip}
 .cbi-page-actions{flex-wrap:wrap;gap:8px}.cbi-page-actions>.cbi-button,.cbi-page-actions>.btn{min-width:max-content;overflow:visible;text-overflow:clip}
-/* v1.0.25: LuCI lives inside Wiflow (10.0.0.1/luci) — a way back to the Wiflow home. */
-.wf-back{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.08);color:#fff!important;font-weight:600;font-size:14px;text-decoration:none!important}
-.wf-back:hover{background:rgba(255,255,255,.14)}
-.wf-back svg,.wf-back-m svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.wf-back-m{display:none;align-items:center;gap:6px;height:38px;padding:0 14px 0 10px;border-radius:999px;background:var(--wf-blue-soft,#EEF4FF);color:var(--wf-blue,#1263FF)!important;font-weight:600;font-size:14px;text-decoration:none!important;white-space:nowrap}
-@media(max-width:900px){.wf-back-m{display:inline-flex}}
+/* Wiflow OS 1.0.0 (standalone LuCI, no Setup app) */
+/* a form row that holds a whole section (Backup / Flash "Actions", etc.) or has no
+   title uses the full width instead of being squeezed into the 220px title column */
+.cbi-value>.cbi-section,.cbi-value>.cbi-section-node,.cbi-value:not(:has(>.cbi-value-title))>*{grid-column:1/-1}
+.cbi-value>.cbi-section{margin:0;padding:0;border:0;box-shadow:none;background:none}
+.cbi-value>.cbi-section .cbi-section-descr{max-width:72ch}
+.cbi-value-field{grid-column:2}
+.cbi-value:not(:has(>.cbi-value-title))>.cbi-value-field{grid-column:1/-1}
+.cbi-value-description{max-width:72ch;overflow-wrap:break-word}
+.cbi-section-descr,.cbi-map-descr{max-width:90ch}
+.cbi-value>.cbi-value-description{grid-column:2}
+@media(max-width:900px){.cbi-value-field,.cbi-value>.cbi-value-description{grid-column:1}}
+.wf-tile img{width:38px;height:38px}
+.modal.login::before{background-image:url(wiflow-mark-256.png)}
+/* row actions stay on one line on wide screens (Startup, Processes, Interfaces,
+   Wireless, Firewall rules, LEDs) instead of one button per line */
+.cbi-map{container-type:inline-size}
+@container (min-width:800px){
+ .td.cbi-section-actions{width:1%;white-space:nowrap}
+ .td.cbi-section-actions>div{flex-wrap:nowrap;align-items:center}
+}
+/* list inputs with an add button (SSH-Keys, DNS addresses, …): the button keeps its label */
+.cbi-dynlist{display:flex;flex-direction:column;gap:6px;max-width:100%}
+.cbi-dynlist>.add-item{display:flex;gap:8px;align-items:center;width:100%;max-width:560px}
+.cbi-dynlist>.add-item>input,.cbi-dynlist>.add-item>.cbi-dropdown{flex:1 1 auto;min-width:0;width:auto}
+.cbi-dynlist>.add-item>.cbi-button{flex:none;width:auto;min-width:40px;padding:0 14px;white-space:nowrap}
+/* tables that a page renders without a card (Processes, Startup, SSH-Keys, Software) */
+#maincontent .table:not(.cbi-section .table):not(.modal .table):not(.ifacebox .table){background:#fff;border:1px solid var(--wf-line);border-radius:18px;border-collapse:separate;border-spacing:0;overflow:hidden;margin-bottom:16px}
+/* firewall zone hints ("REJECT all others") readable */
+.zonebadge-empty,.zonebadge-empty strong{color:var(--wf-muted)!important;border-color:var(--wf-line2)!important;background:#fff}
+@media(min-width:600px) and (max-width:900px){.cbi-page-actions{justify-content:flex-end}.cbi-page-actions>*{flex:0 0 auto}}
+/* selects inside table rows (Firewall zones, …) keep a readable width */
+.table .td select,.table .td .cbi-dropdown:not(.btn):not(.cbi-button){min-width:104px!important;width:100%}
+/* narrower content: row actions wrap two per line instead of one per line */
+@container (min-width:600px) and (max-width:799px){
+ .td.cbi-section-actions>div{min-width:184px;justify-content:flex-end}
+ /* a wide settings table scrolls inside its card instead of pushing the page sideways */
+ .cbi-section-node:has(>.cbi-section-table){overflow-x:auto;-webkit-overflow-scrolling:touch}
+}

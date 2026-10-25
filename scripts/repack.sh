@@ -44,10 +44,16 @@ cp -a "$ROOT/rom/overlay/." "$F/"
 chmod 0755 "$F/etc/init.d/wiflow-hnat-off" "$F/etc/uci-defaults/98-wiflow-base"
 ln -sf ../init.d/wiflow-hnat-off "$F/etc/rc.d/S21wiflow-hnat-off"
 sed -i "s/@VERSION@/$VERSION/" "$F/etc/banner"
+echo "$VERSION" > "$F/etc/wiflow_release"
 
 # LAN 10.0.0.1 also for configs generated after a reset
 grep -q 'ipad=${ipaddr:-"192.168.1.1"}' "$F/bin/config_generate" || die "config_generate: LAN default not found"
 sed -i 's/ipad=${ipaddr:-"192.168.1.1"}/ipad=${ipaddr:-"10.0.0.1"}/' "$F/bin/config_generate"
+
+# Status overview: no DHCPv6 lease table (IPv6 DHCP/RA is off in Wiflow OS)
+D="$F/www/luci-static/resources/view/status/include/40_dhcp.js"
+grep -qF "table,E('h3',_('Active DHCPv6 Leases')),table6]" "$D" || die "40_dhcp.js: DHCPv6 lease table not found"
+sed -i "s/table,E('h3',_('Active DHCPv6 Leases')),table6\]/table]/" "$D"
 
 # root password 1234
 hash="$(openssl passwd -1 1234)"
@@ -72,6 +78,8 @@ sed -i "s/hostname='ImmortalWrt'/hostname='Wiflow'/" "$F/bin/config_generate"
 
 step "check rootfs"
 python3 "$ROOT/tools/rom-check.py" "$F" "$W/fit/_images_rootfs-1.bin" "$UNSQUASHFS" | tee "$OUT/report/rom-check.txt"
+
+[ -n "${SAVE_ROOT:-}" ] && { rm -rf "$SAVE_ROOT"; cp -a "$F" "$SAVE_ROOT"; }
 
 step "squashfs"
 "$MKSQUASHFS" "$F" "$W/rootfs.sqfs" -comp xz -b 256k -no-xattrs -all-root -noappend -quiet -no-progress > /dev/null

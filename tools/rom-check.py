@@ -179,9 +179,9 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/usr/share/ucode/luci/template/themes/wiflow/footer.ut",
         "/usr/share/ucode/luci/template/themes/wiflow/sysauth.ut",
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
-        "/www/luci-static/wiflow/logo.png", "/www/luci-static/wiflow/fonts/inter-400.woff2",
+        "/www/luci-static/wiflow/wiflow-mark.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
-        "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear", "/usr/sbin/pppd",
+        "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
         "/usr/sbin/hostapd", "/usr/sbin/iwpriv", "/usr/bin/curl", "/bin/uclient-fetch", "/usr/bin/jsonfilter",
         "/sbin/ip", "/usr/bin/awk", "/usr/bin/sort", "/usr/bin/apk", "/sbin/sysupgrade",
         "/www/luci-static/resources/view/package-manager.js",
@@ -210,14 +210,14 @@ deny = ["/usr/sbin/tailscaled", "/etc/init.d/adblock", "/etc/init.d/ddns", "/etc
         "/etc/init.d/turboacc", "/etc/init.d/eqos", "/etc/init.d/mtkhqos", "/usr/bin/wg", "/etc/init.d/zram",
         "/usr/sbin/odhcpd", "/usr/sbin/odhcp6c", "/usr/sbin/tcpdump", "/usr/bin/htop", "/usr/bin/nano",
         "/www/luci-static/aurora", "/www/luci-static/bootstrap", "/etc/hotplug.d/iface/99-hnat-detect",
-        "/etc/init.d/viettel-apk-mirror", "/usr/sbin/iptables", "/etc/init.d/blockd"]
+        "/etc/init.d/viettel-apk-mirror", "/usr/sbin/iptables", "/etc/init.d/blockd",
+        "/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh"]
 left = [p for p in deny if os.path.lexists(F + p)]
-zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*zh*") + glob.glob(F + "/usr/share/luci/i18n/*zh*") \
-    + glob.glob(F + "/www/luci-static/resources/i18n/*zh*")
+zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*.lmo") + glob.glob(F + "/usr/share/luci/i18n/*")
 if left or zh:
     fail("removed features still present: " + ", ".join(left + zh))
 else:
     ok("removed: Tailscale, WireGuard, Adblock, DDNS, UPnP, TurboACC/HNAT tools, EQoS, IPv6 DHCP/RA, "
-       "zram, iptables, debug tools, Aurora/Bootstrap themes, Chinese UI")
+       "PPPoE, zram, iptables, debug tools, Aurora/Bootstrap themes, translations (English only)")
 
 sys.exit(bad)

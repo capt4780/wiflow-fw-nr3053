@@ -1,5 +1,5 @@
 {#
- Wiflow theme for LuCI — derived from luci-theme-bootstrap (openwrt-24.10)
+ Wiflow theme for LuCI — derived from luci-theme-bootstrap (openwrt-25.12)
  Copyright 2022 Jo-Philipp Wich
  Licensed to the public under the Apache License 2.0.
 -#}
@@ -7,18 +7,18 @@
 {% include('header', { blank_page: true, wf_login: true }) %}
 
 <section hidden>
-	<p class="wf-login-sub">Quản trị router Wiflow</p>
+	<p class="wf-login-sub">Wiflow router administration</p>
 	<form method="post" class="cbi-map">
 		<div class="cbi-section">
 			<div class="cbi-section-node">
 				<div class="cbi-value">
-					<label class="cbi-value-title" for="luci_username">Tên đăng nhập</label>
+					<label class="cbi-value-title" for="luci_username">{{ _('Username') }}</label>
 					<div class="cbi-value-field">
 						<input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(duser, true) }}">
 					</div>
 				</div>
 				<div class="cbi-value">
-					<label class="cbi-value-title" for="luci_password">Mật khẩu</label>
+					<label class="cbi-value-title" for="luci_password">{{ _('Password') }}</label>
 					<div class="cbi-value-field">
 						<input name="luci_password" id="luci_password" type="password" autocomplete="current-password">
 					</div>
@@ -31,17 +31,17 @@
 
 	{% if (fuser): %}
 	<div class="alert-message error">
-		Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại.
+		{{ _('Invalid username and/or password! Please try again.') }}
 	</div>
 	{% endif %}
 
-	<button class="btn cbi-button-positive important">Đăng nhập</button>
+	<button class="btn cbi-button-positive important">{{ _('Log in') }}</button>
 </section>
 
-<div class="wf-login-foot">Hỗ trợ <b>0833 880 100</b> · wiflow@projifylab.com</div>
+<div class="wf-login-foot">Support <b>0833 880 100</b> · wiflow@projifylab.com</div>
 
 <div id="view">
-	<div class="spinning">Đang tải…</div>
+	<div class="spinning">{{ _('Loading view…') }}</div>
 	<script>
 		L.require('ui').then(function(ui) {
 			ui.instantiateView('wiflow.sysauth');

@@ -1,22 +1,22 @@
 {#
- Wiflow theme for LuCI — derived from luci-theme-bootstrap (openwrt-24.10)
+ Wiflow theme for LuCI — derived from luci-theme-bootstrap (openwrt-25.12)
  Copyright 2008 Steven Barth, 2012 David Menting, 2008-2022 Jo-Philipp Wich
  Licensed to the public under the Apache License 2.0.
 -#}
+
+{%
+	import { readfile } from 'fs';
+
+	const wiflow_os = trim(readfile('/etc/wiflow_release') ?? '');
+-%}
 
 		{% if (!blank_page): %}
 		</div>
 		<footer>
 			<span>
-				Wiflow · Powered by
-				<a href="https://github.com/openwrt/luci" target="_blank" rel="noreferrer">
-					{{ version.luciname }} ({{ version.luciversion }})</a>
-				/
-				<a href="{{ entityencode(version.disturl ?? '#', true) }}" target="_blank" rel="noreferrer">
-					{{ version.distname }} {{ version.distversion }} ({{ version.distrevision }})</a>
-				{% if (lua_active): %}
-					/ {{ _('Lua compatibility mode active') }}
-				{% endif %}
+				Wiflow OS {{ wiflow_os }} · Powered by
+				<a href="https://github.com/openwrt/luci" target="_blank" rel="noreferrer">{{ version.luciname }} ({{ version.luciversion }})</a>
+				/ OpenWrt
 			</span>
 			<ul class="breadcrumb pull-right" id="modemenu" style="display:none"></ul>
 		</footer>
