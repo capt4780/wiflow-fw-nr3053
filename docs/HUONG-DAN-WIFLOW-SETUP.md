@@ -4,7 +4,7 @@ Wiflow Setup là gói `.apk` cài lên Wiflow OS. Gói thêm nhóm **Wiflow** �
 
 ## Cài đặt
 
-1. Router cần chạy Wiflow OS **1.0.0 build 14** trở lên. Từ build này, router nhận gói tải lên mà không đòi chữ ký của kho ImmortalWrt.
+1. Router cần chạy Wiflow OS **1.0.0 build 15** trở lên. Từ build này, router nhận gói tải lên mà không đòi chữ ký của kho ImmortalWrt.
 2. Tải file `wiflow-setup-<phiên bản>.apk` ở mục Releases của repo.
 3. Mở `http://10.0.0.1`, nhập Gate rồi đăng nhập (`wiflow` / `wiflow` hoặc `root` / `1234`).
 4. Vào **System → Software**, bấm **Upload Package…**, chọn file `.apk`, rồi bấm **Install**.
