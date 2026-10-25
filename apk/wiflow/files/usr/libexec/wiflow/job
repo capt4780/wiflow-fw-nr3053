@@ -10,7 +10,7 @@
 // also stored as the command result for the next heartbeat.
 'use strict';
 
-import { readfile, writefile, mkdir, access, unlink, readlink, rename } from 'fs';
+import { readfile, writefile, mkdir, access, unlink, readlink, rename, glob } from 'fs';
 import { cursor } from 'uci';
 import * as W from 'wiflow.setup';
 import * as P from 'wiflow.provision';
@@ -45,8 +45,8 @@ function done(ok, message, extra) {
 	exit(ok ? 0 : 1);
 }
 
-function step(message) {
-	job('running', message);
+function step(message, stage) {
+	job('running', message, stage ? { stage: stage } : null);
 	if (req.command_id)
 		W.core_set({ last_command_id: req.command_id, last_command_action: req.command_action ?? kind, last_command_status: 'running', last_command_message: message });
 }
@@ -103,6 +103,31 @@ function wait_online(secs) {
 	});
 }
 
+// What the driver saw during a failed join, for the diagnostics report
+// (keys masked). Written before the rollback reloads the WiFi.
+function join_capture(r, ssid, why) {
+	const sta = W.sta_if(r);
+	const L = [ `join "${ssid}" on ${r.name} (${r.band}, ${sta}) failed: ${why} at uptime ${W.uptime()}` ];
+	for (let f in glob('/etc/wireless/mediatek/*.dat') ?? []) {
+		push(L, `-- ${f}`);
+		for (let l in split(readfile(f) ?? '', '\n'))
+			if (match(l, /^(ApCli|Channel=|AutoChannelSelect|BssidNum|HT_BW|VHT_BW|WirelessMode)/))
+				push(L, replace(l, /^(ApCli[0-9]*WPAPSK[0-9]*=).*/, '$1***'));
+	}
+	push(L, '-- iwconfig', W.sh(`iwconfig ${W.q(sta)} 2>&1`));
+	push(L, '-- iwinfo', sprintf('%J', W.iw_info(sta)));
+	push(L, '-- connStatus', W.sh(`iwpriv ${W.q(sta)} show connStatus 2>&1`));
+	push(L, '-- ifstatus', sprintf('%J', W.ifstatus('wiflow_wwan')));
+	push(L, '-- kernel');
+	const k = filter(split(W.sh('dmesg'), '\n'), l => match(l, /apcli|ApCli|APCLI|Auth|Assoc|WPA|4-?way|PSK|Deauth|Disassoc|SAE|PMF|Sta|ProbeRsp/i)
+		&& !match(l, /AsicSwitchChannel|MtCmd|dpd_|scan_type|EDCCA|PrintSrCmd|BcnCheck/));
+	push(L, join('\n', slice(k, max(0, length(k) - 80))));
+	push(L, '-- log');
+	const g = filter(split(W.sh('logread'), '\n'), l => match(l, /apcli|wiflow_wwan|udhcpc|mtwifi/));
+	push(L, join('\n', slice(g, max(0, length(g) - 40))));
+	writefile(`${W.RUN}/join-fail.txt`, join('\n', L) + '\n');
+}
+
 function uplink() {
 	const mode = req.mode ?? 'auto';
 	if (index([ 'auto', 'lan', 'wifi' ], mode) < 0)
@@ -112,7 +137,7 @@ function uplink() {
 	if (!length(req.ssid)) {
 		if (mode != 'lan' && W.uci_get('wireless', 'wiflow_uplink') != 'wifi-iface' && mode == 'wifi')
 			done(false, 'Hãy chọn WiFi nguồn trước khi dùng chế độ Chỉ WiFi nguồn.');
-		step('Đang lưu chế độ kết nối…');
+		step('Đang lưu chế độ kết nối…', 'preparing');
 		const what = P.apply_mode(mode);
 		W.core_set({ internet_mode: mode });
 		if (W.core('activated') == '1' && P.plan_radios())
@@ -120,7 +145,11 @@ function uplink() {
 		P.reload(what);
 		W.st_set('override', null);
 		W.wlog('uplink', { auto: 'Internet tự động: cáp trước, WiFi nguồn dự phòng', lan: 'Internet chỉ qua cáp WAN', wifi: 'Internet chỉ qua WiFi nguồn' }[mode]);
-		step('Đang kiểm tra Internet…');
+		if (mode != 'wifi') {
+			step('Đang nhận địa chỉ qua cáp WAN…', 'dhcp');
+			wait_for(15, () => W.if_up('wan') || (mode == 'auto' && W.if_up('wiflow_wwan')));
+		}
+		step('Đang kiểm tra Internet…', 'internet_check');
 		if (wait_online(25))
 			done(true, 'Đã lưu chế độ kết nối. Router đang có Internet.');
 		done(true, mode == 'lan'
@@ -150,7 +179,8 @@ function uplink() {
 		done(false, 'WiFi nguồn trùng tên WiFi khách. Hãy đổi tên WiFi khách trước.');
 
 	const final_mode = mode == 'lan' ? 'auto' : mode;
-	step(`Đang chuẩn bị kết nối “${ssid}”…`);
+	step(`Đang chuẩn bị kết nối “${ssid}”…`, 'preparing');
+	unlink(`${W.RUN}/join-fail.txt`);
 	txn_begin();
 
 	// Same radio, station already running: switch the source in the driver
@@ -178,38 +208,45 @@ function uplink() {
 	const replanned = P.plan_radios();
 	W.st_set('override', null);
 
-	step(`Đang kết nối “${ssid}”…`);
+	step(`Đang kết nối “${ssid}”…`, 'associating');
+	// Joined = the driver reports the station on that SSID, or the source's
+	// DHCP already gave an address (some mt_wifi builds report no BSSID for
+	// apcli to libiwinfo / wext).
+	const linked = () => W.sta_associated(r, ssid) || W.if_up('wiflow_wwan');
 	let joined = false;
 	if (live && !replanned && !m.wireless) {
 		W.sta_join(r, ssid, enc, key);
 		if (m.network) P.reload({ network: true });
-		joined = wait_for(25, () => W.sta_associated(r, ssid));
+		joined = wait_for(30, linked);
 		if (joined)
 			W.run('ifup wiflow_wwan');
 		else
-			step(`Đang thử lại “${ssid}”…`);
+			step(`Đang thử lại “${ssid}”…`, 'associating');
 	}
 	if (!joined) {
 		P.reload({ network: true, wireless: true });
 		sleep(3000);
-		joined = wait_for(30, () => W.sta_associated(r, ssid));
+		joined = wait_for(45, linked);
 		if (!joined) {
-			step('Đang kiểm tra lại WiFi nguồn…');
+			step('Đang kiểm tra lại WiFi nguồn…', 'associating');
+			W.sta_kick(r);
 			W.run('ifup wiflow_wwan');
-			joined = wait_for(10, () => W.sta_associated(r, ssid));
+			joined = wait_for(20, linked);
 		}
 	}
 	if (!joined) {
+		join_capture(r, ssid, 'not associated');
 		txn_rollback();
-		const seen = length(filter(W.scan(), n => n.ssid == ssid && n.band == band)) > 0;
+		const seen = length(filter(W.scan(band), n => n.ssid == ssid)) > 0;
 		W.wlog('uplink', `Không kết nối được WiFi nguồn “${ssid}”`);
 		done(false, seen
 			? `Không vào được “${ssid}”. Kiểm tra lại mật khẩu.`
 			: `Không thấy “${ssid}”. Kiểm tra tên WiFi, khoảng cách hoặc băng tần.`);
 	}
 
-	step('Đang nhận địa chỉ mạng…');
-	if (!wait_for(25, () => W.if_up('wiflow_wwan'))) {
+	step('Đang nhận địa chỉ mạng…', 'dhcp');
+	if (!wait_for(30, () => W.if_up('wiflow_wwan'))) {
+		join_capture(r, ssid, 'no dhcp');
 		txn_rollback();
 		done(false, `Đã vào “${ssid}” nhưng modem nguồn không cấp địa chỉ mạng.`);
 	}
@@ -219,9 +256,10 @@ function uplink() {
 		done(false, `Mạng “${ssid}” dùng dải ${ip}, trùng mạng nội bộ Wiflow (10.0.0.x / 10.10.10.x). Hãy đổi dải mạng của modem nguồn.`);
 	}
 
-	step('Đang kiểm tra Internet…');
+	step('Đang kiểm tra Internet…', 'internet_check');
 	const dev = W.if_l3dev('wiflow_wwan');
-	if (!wait_for(12, () => W.probe(dev, 4))) {
+	if (!wait_for(15, () => W.probe(dev, 4))) {
+		join_capture(r, ssid, 'no internet');
 		txn_rollback();
 		done(false, `Đã kết nối “${ssid}” nhưng mạng này chưa ra được Internet.`);
 	}
@@ -247,6 +285,11 @@ function uplink() {
 function activate() {
 	if (W.core('activated') == '1')
 		done(true, 'Wiflow đã được bật.');
+	const name = req.ssid ?? '';
+	if (length(name) && (length(name) > 32 || name == W.uci_get('wireless', 'wiflow_uplink', 'ssid')))
+		done(false, 'Tên WiFi khách cần từ 1 đến 32 ký tự và khác WiFi nguồn.');
+	if (length(name))
+		W.core_set({ guest_ssid: name });
 	step('Đang quét kênh WiFi xung quanh…');
 	const nets = W.scan();
 	const ch = P.pick_channels(nets);
@@ -261,6 +304,35 @@ function activate() {
 	P.reload({ network: true, wireless: true, firewall: true, dhcp: true });
 	W.wlog('system', `Đã bật Wiflow: WiFi khách “${W.core('guest_ssid', 'Wiflow')}”, kênh 2.4G ${ch['2g']}, 5G ${ch['5g']}`);
 	done(true, `Đã bật Wiflow. WiFi khách “${W.core('guest_ssid', 'Wiflow')}” đang phát (2.4G kênh ${ch['2g']}, 5G kênh ${ch['5g']}).`);
+}
+
+/* ------------------------------------------------------------------- reset */
+// Back to a fresh install, package kept: no account, no source WiFi, guest
+// WiFi "Wiflow", automatic Internet, Setup login wiflow / wiflow.
+
+function reset() {
+	step('Đang đặt lại Wiflow…');
+	const a = W.auth();
+	if (a)
+		W.http('POST', '/devices/unpair', {}, a, 8);
+	W.clear_pairing();
+	const c = cursor();
+	c.load('wireless');
+	c.delete('wireless', 'wiflow_uplink');
+	c.commit('wireless');
+	W.core_set({ internet_mode: 'auto', source_ssid: null, guest_ssid: 'Wiflow' });
+	P.apply_mode('auto');
+	if (W.core('activated') == '1') {
+		P.ensure_wireless(false);
+		P.plan_radios();
+	}
+	W.st_set('override', null);
+	W.st_set('scan', null);
+	unlink(`${W.RUN}/join-fail.txt`);
+	const e = W.setup_set_login('wiflow', 'wiflow');
+	P.reload({ network: true, wireless: true });
+	W.wlog('system', 'Đã reset Wiflow');
+	done(true, e ? `Đã reset Wiflow (${e})` : 'Đã reset Wiflow. Đăng nhập Wiflow Setup: wiflow / wiflow.');
 }
 
 /* -------------------------------------------------------------------- diag */
@@ -286,9 +358,14 @@ function diag() {
 /* -------------------------------------------------------------------- scan */
 
 function scan() {
-	step('Đang quét WiFi xung quanh…');
-	const nets = W.scan();
-	done(true, length(nets) ? `Tìm thấy ${length(nets)} mạng WiFi.` : 'Không tìm thấy WiFi nào.', { networks: nets });
+	const band = index([ '2g', '5g' ], req.band) >= 0 ? req.band : null;
+	step(band ? `Đang quét WiFi ${band == '5g' ? '5 GHz' : '2.4 GHz'}…` : 'Đang quét WiFi xung quanh…');
+	const nets = W.scan(band);
+	// Last result per band, for the page and the report.
+	const keep = filter(W.st_get('scan', { networks: [] }).networks ?? [], n => band && n.band != band);
+	for (let n in nets) push(keep, n);
+	W.st_set('scan', { at: W.uptime(), networks: sort(keep, (a, b) => b.signal - a.signal) });
+	done(true, length(nets) ? `Tìm thấy ${length(nets)} mạng WiFi.` : 'Không tìm thấy WiFi nào.', { networks: nets, band: band });
 }
 
 /* ------------------------------------------------------------------- guest */
@@ -411,6 +488,7 @@ case 'guest': guest(); break;
 case 'scan': scan(); break;
 case 'activate': activate(); break;
 case 'diag': diag(); break;
+case 'reset': reset(); break;
 case 'reconnect': reconnect(); break;
 case 'pair': pair(); break;
 case 'unpair': unpair(); break;

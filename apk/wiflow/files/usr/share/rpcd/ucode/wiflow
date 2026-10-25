@@ -19,8 +19,10 @@ const methods = {
 	// Scanning takes several seconds and needs rpcd's own iwinfo object, so
 	// it runs as a job; the networks arrive in status().job.networks.
 	scan: {
-		call: function() {
-			return W.job_start('scan', {});
+		args: { band: '' },
+		call: function(req) {
+			const b = str(req.args.band);
+			return W.job_start('scan', index([ '2g', '5g' ], b) >= 0 ? { band: b } : {});
 		}
 	},
 
@@ -78,8 +80,68 @@ const methods = {
 	},
 
 	activate: {
+		args: { ssid: '' },
+		call: function(req) {
+			const s = str(req.args.ssid);
+			if (length(s) > 32)
+				return { ok: false, error: 'Tên WiFi khách cần từ 1 đến 32 ký tự.' };
+			return W.job_start('activate', length(s) ? { ssid: s } : {});
+		}
+	},
+
+	// Wiflow Setup page data (files and netifd only; quick)
+	overview: {
 		call: function() {
-			return W.job_start('activate', {});
+			return W.overview();
+		}
+	},
+
+	inet: {
+		call: function() {
+			return W.inet();
+		}
+	},
+
+	log: {
+		call: function() {
+			return { ok: true, log: W.wlog_list(250) };
+		}
+	},
+
+	// About 3 s (five pings)
+	netcheck: {
+		call: function() {
+			return W.netcheck();
+		}
+	},
+
+	reboot: {
+		call: function() {
+			if (W.job_busy())
+				return { ok: false, error: 'Một thay đổi khác đang được xử lý, vui lòng đợi.' };
+			W.wlog('system', 'Khởi động lại từ Wiflow Setup');
+			W.run('setsid sh -c "sleep 2; reboot" </dev/null >/dev/null 2>&1 &');
+			return { ok: true };
+		}
+	},
+
+	change_login: {
+		args: { username: '', password: '' },
+		call: function(req) {
+			const p = str(req.args.password);
+			if (length(p) < 8)
+				return { ok: false, error: 'Mật khẩu mới tối thiểu 8 ký tự.' };
+			const e = W.setup_set_login(str(req.args.username), p);
+			if (e)
+				return { ok: false, error: e };
+			W.wlog('security', 'Đã đổi tài khoản đăng nhập Wiflow Setup');
+			return { ok: true, session: true };
+		}
+	},
+
+	reset: {
+		call: function() {
+			return W.job_start('reset', {});
 		}
 	},
 

@@ -1,6 +1,6 @@
 # Wiflow Setup trên Viettel NR3053
 
-Wiflow Setup là gói `.apk` cài lên Wiflow OS. Gói thêm nhóm **Wiflow** ở đầu thanh bên của trang quản trị, gồm bốn trang: Tổng quan, Internet nguồn, WiFi khách và Kết nối Wiflow. Các trang Wiflow viết bằng tiếng Việt; phần còn lại của LuCI giữ tiếng Anh.
+Wiflow Setup là gói `.apk` cài lên Wiflow OS. Giao diện giống Wiflow Setup trên CR6609, gồm bốn trang: **Trạng thái**, **Internet**, **WiFi khách** và **Hệ thống**. Wiflow Setup mở ở `http://10.0.0.1/wiflow/` và dùng chung phiên đăng nhập với LuCI. Sau khi đăng nhập, router mở thẳng Wiflow Setup. Nút **Nâng cao (LuCI)** mở trang quản trị LuCI (tiếng Anh).
 
 ## Cài đặt
 
@@ -8,8 +8,13 @@ Wiflow Setup là gói `.apk` cài lên Wiflow OS. Gói thêm nhóm **Wiflow** �
 2. Tải file `wiflow-setup-<phiên bản>.apk` ở mục Releases của repo.
 3. Mở `http://10.0.0.1`, nhập Gate rồi đăng nhập (`wiflow` / `wiflow` hoặc `root` / `1234`).
 4. Vào **System → Software**, bấm **Upload Package…**, chọn file `.apk`, rồi bấm **Install**.
-5. Tải lại trang. Menu **Wiflow** hiện ở đầu thanh bên. Lúc này WiFi của router chưa thay đổi.
-6. Vào **Wiflow → Tổng quan**, bấm **Bật Wiflow**. WiFi `Wiflow 2.4G` / `Wiflow 5G` đổi thành WiFi khách **Wiflow** (mở) trên mạng `10.10.10.x`, mỗi băng một kênh cố định ít nhiễu. Nếu bạn đang dùng WiFi của router, sau khoảng 30 giây hãy kết nối vào WiFi **Wiflow** rồi mở lại `http://10.0.0.1`.
+5. Tải lại trang, bấm **Wiflow Setup** ở đầu thanh bên. Lúc này WiFi của router chưa thay đổi. Trang cài đặt hiện 4 bước:
+   1. **WiFi khách**: đặt tên rồi bấm **Bật Wiflow**. WiFi `Wiflow 2.4G` / `Wiflow 5G` đổi thành WiFi khách (mở) trên mạng `10.10.10.x`, mỗi băng một kênh cố định ít nhiễu. Nếu bạn đang dùng WiFi của router, sau khoảng 30 giây hãy kết nối vào WiFi khách rồi mở lại `http://10.0.0.1`.
+   2. **Internet nguồn**: chọn **Dây LAN** (bấm Kiểm tra dây LAN) hoặc **WiFi của modem** (chọn mạng, nhập mật khẩu).
+   3. **Liên kết tài khoản**: nhập mã 12 ký tự từ app Wiflow, hoặc bấm Để sau.
+   4. **Hoàn tất**.
+
+Bản 1.2.x đã bật Wiflow thì bỏ qua bước 1.
 
 Nếu router đang chạy bản cũ (trước build 15), cài qua SSH:
 
@@ -29,15 +34,17 @@ ssh root@10.0.0.1 apk add --allow-untrusted /tmp/wiflow-setup-*.apk
 Mã Gate của router có hai dạng:
 
 - `WIFDIDNR3053`, dùng chung cho mọi router NR3053;
-- 6 số cuối của mã thiết bị (`WIFDID-NR3053-xxxxxx`), xem ở trang Tổng quan.
+- 6 số cuối của mã thiết bị (`WIFDID-NR3053-xxxxxx`), xem ở trang Hệ thống.
 
-## Internet nguồn
+## Internet
+
+Thẻ xanh ở đầu trang Internet chọn cách router lấy Internet và vẽ đường đang dùng (dây LAN hay WiFi nguồn), điểm chất lượng, độ trễ, dao động và mất gói. Bên dưới là thẻ **Dây LAN** (địa chỉ, cổng mặc định, DNS, tốc độ cổng) và thẻ **WiFi nguồn** (danh sách mạng quét được).
 
 - **Tự động**: dùng cáp WAN trước, WiFi nguồn làm dự phòng. Khi cáp vẫn cắm nhưng modem phía trước mất Internet, router chuyển sang WiFi nguồn. Khi cáp có Internet trở lại, router tự quay về cáp.
-- **Chỉ cáp WAN**: tắt WiFi nguồn.
-- **Chỉ WiFi nguồn**: tắt cổng WAN.
+- **Chỉ dây**: tắt WiFi nguồn (cấu hình vẫn giữ).
+- **Chỉ WiFi**: tắt cổng WAN.
 
-Cách bắt WiFi nguồn: bấm **Quét WiFi**, chọn mạng, nhập mật khẩu, rồi bấm **Kết nối**.
+Cách bắt WiFi nguồn: chạm một mạng trong thẻ **WiFi nguồn**, nhập mật khẩu, rồi bấm **Kết nối**. Router quét 5 GHz trước (khoảng 15 giây) rồi 2.4 GHz. Khi kết nối, trang hiện từng bước: Chuẩn bị, Kết nối WiFi nguồn, Nhận địa chỉ mạng, Kiểm tra Internet.
 
 - Router chỉ lưu cấu hình mới khi đã ra được Internet qua mạng vừa chọn.
 - Nếu sai mật khẩu, không thấy mạng, hoặc modem nguồn dùng dải `10.0.0.x` / `10.10.10.x`, router quay về cấu hình cũ và báo lý do.
@@ -58,17 +65,23 @@ Danh sách WiFi nguồn có nhãn:
 - **Kênh DFS** (5G kênh 52–144): router có thể phải chờ 1 phút hoặc đổi kênh khi gặp radar, WiFi khách băng 5G ngắt theo. Router hỏi lại trước khi kết nối.
 - **Sóng yếu** (dưới −75 dBm): dễ chập chờn. Nên đặt router gần nguồn hơn, từ −65 dBm trở lên là tốt.
 
-## Chẩn đoán
+## WiFi khách
 
-Ở trang Tổng quan, thẻ **Chẩn đoán**:
+Đổi tên WiFi khách, xem mã QR và số khách đang dùng. Giới hạn tốc độ, thời gian mỗi lượt, số khách tối đa và giờ phục vụ cần trang chào Wiflow: các thẻ này hiện mờ, sẽ dùng được ở bản cập nhật sau.
 
-- **Tải báo cáo**: tải file văn bản gồm trạng thái sóng, kênh, kết nối và nhật ký (không có mật khẩu) để gửi cho kỹ thuật.
-- **Gửi cho Wiflow**: gửi báo cáo lên máy chủ Wiflow khi router đã kết nối tài khoản.
+## Hệ thống
+
+- Mã thiết bị, bộ nhớ flash, RAM 24 giờ.
+- **Cập nhật Wiflow**: kéo thả file `.apk` mới, router cài ngay và giữ cấu hình.
+- **Ghép nối**: nhập mã 12 ký tự lấy trong app Wiflow (**Thiết bị → Thêm thiết bị**), hoặc **Rời tài khoản**.
+- **Khởi động lại** (bấm giữ 2 giây), **Gửi chẩn đoán**, **Tải báo cáo**, **Nâng cao (LuCI)**, **Đổi mật khẩu**, **Reset Wiflow**, **Đăng xuất**.
+- Nhật ký hệ thống.
+
+Báo cáo chẩn đoán là file văn bản gồm trạng thái sóng, kênh, kết nối, lần quét WiFi gần nhất, ghi chép của driver khi bắt WiFi nguồn lỗi và nhật ký. Báo cáo không có mật khẩu.
+
+**Reset Wiflow** xoá WiFi nguồn và ghép nối, đưa WiFi khách về tên "Wiflow", Internet về tự động, tài khoản Wiflow Setup về `wiflow` / `wiflow`. Gói vẫn giữ.
 
 ## Kết nối Wiflow
-
-1. Trong ứng dụng Wiflow, vào **Thiết bị → Thêm thiết bị** để lấy mã kết nối 12 ký tự.
-2. Nhập mã ở trang **Kết nối Wiflow**.
 
 Sau khi kết nối, router liên lạc máy chủ Wiflow khoảng 20 giây một lần. Router nhận các lệnh sau từ ứng dụng:
 

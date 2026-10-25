@@ -48,8 +48,14 @@ expect "activate: fixed quiet channels, 20/80 MHz" "$(U get wireless.MT7981_1_1.
 r="$(job scan)"; expect "scan job" "$r" '^success\|Tìm thấy 5 mạng'
 expect "scan: enterprise hidden, mixed WPA2/3 as psk2" "$(st "sorted((n['ssid'],n['band'],n['encryption']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', '5g', 'psk2'\).*\('Free WiFi Lobby', '2g', 'none'\)"
 expect "scan: advice (5G non-DFS good signal, DFS flagged)" "$(st "sorted((n['ssid'], bool(n.get('recommended')), n['dfs'], n['weak']) for n in s['job']['networks'])")" "\('Cafe Sua Da 5G', True, False, False\).*\('Office 5G', False, True, False\)"
+$B world 'w["iwinfo_empty"]=["5g"]'
+r="$(job scan '{"band":"5g"}')"
+expect "scan 5G when libiwinfo sees nothing: driver survey" "$r|$(st "sorted((n['ssid'],n['band'],n['channel'],n['encryption']) for n in s['job']['networks'])")" "^success\|.*\('Cafe Sua Da 5G', '5g', 1?[0-9]+, 'psk2'\).*\('Office 5G', '5g', (5[2-9]|[6-9][0-9]|1[0-4][0-9]), 'psk2'\)"
+expect "scan cache keeps the other band" "$(st "sorted(set(n['band'] for n in s['scan']['networks']))")" "^\['2g', '5g'\]$"
+$B world 'w["iwinfo_empty"]=[]'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"wrongpass","encryption":"psk2"}')"
 expect "wrong password fails and rolls back" "$r|$(U -q get wireless.wiflow_uplink.ssid)" '^failed\|Không vào được.*mật khẩu\.\|$'
+expect "failed join leaves driver notes for the report" "$(head -1 /tmp/wiflow/join-fail.txt)|$(grep -c wrongpass /tmp/wiflow/join-fail.txt)" '^join "Cafe Sua Da" on MT7981_1_1 .*failed: not associated.*\|0$'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 expect "join 2.4G source" "$r" '^success\|Đã kết nối “Cafe Sua Da”'
 wait_for 15 "s['internet']['source'].get('connected') and s['internet']['online']" && pass "status: source connected, online" || fail "status after join: $(st "s['internet']")"
@@ -59,7 +65,11 @@ expect "source radio follows the source, other radio fixed" "$(U get wireless.MT
 r="$(job set_uplink '{"mode":"auto","ssid":"Nha Ben Canh","band":"2g","key":"bencanh123","encryption":"psk2"}')"
 expect "switch source on the same band" "$r" '^success\|Đã kết nối “Nha Ben Canh”'
 grep -q "iwpriv apcli0 set ApCliSsid=Nha Ben Canh" /tmp/mock/calls.log && ! grep -q "^wifi reload" /tmp/mock/calls.log && pass "same-band switch without reloading the WiFi" || fail "same-band switch reloaded WiFi: $(grep -E '^wifi|ApCliSsid' /tmp/mock/calls.log | tr '\n' ';')"
+$B world 'w["iw_blind"]=True'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
+expect "join when the driver hides the BSSID (DHCP is the proof)" "$r" '^success\|Đã kết nối “Cafe Sua Da”'
+wait_for 15 "s['internet']['source'].get('connected')" && pass "status: connected without BSSID" || fail "blind status: $(st "s['internet']['source']")"
+$B world 'w["iw_blind"]=False'
 r="$(job set_uplink '{"mode":"wifi","ssid":"Free WiFi Lobby","band":"2g","key":"","encryption":"none"}')"
 expect "source on 10.0.0.x refused" "$r|$(U get wireless.wiflow_uplink.ssid)" '^failed\|.*trùng mạng nội bộ.*\|Cafe Sua Da$'
 r="$(job set_uplink '{"mode":"wifi","ssid":"Cafe Sua Da 5G","band":"5g","key":"cafe1234","encryption":"psk2"}')"
@@ -126,6 +136,14 @@ wp "s['codes']['QWER5678TYUI']={'account':'WIFUID555111'}; s['commands']=[]"
 r="$(job pair '{"code":"QWER5678TYUI"}')"; expect "pair again" "$r" 'WIFUID555111'
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
 r="$(job diag)"; expect "diagnostic report" "$r|$(grep -c '== radios' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234\|bencanh123' /tmp/wiflow/diag.txt)" '^success\|.*\|1\|0$'
+
+ov="$(call overview | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['ok'], len(o['minutes'])>0, len(o['day']['runs'])>0, o['health']['mem_total_kb']>0, isinstance(o['hours'],list))")"
+expect "overview: page charts from the agent's samples" "$ov" '^True True True True True$'
+expect "inet: both uplinks" "$(call inet | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['ok'], o['wan']['up'], o['wan']['addr'], o['wifi_ssid'])")" '^True True 192.168.1.10 '
+expect "log for the page" "$(call log | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['ok'], len(o['log'])>3)")" '^True True$'
+expect "change_login rejects a short password" "$(call change_login '{"username":"chuquan","password":"123"}')" 'tối thiểu 8'
+r="$(job reset)"
+expect "reset Wiflow (package kept)" "$r|$(U get wiflow.core.paired)|$(U -q get wireless.wiflow_uplink)|$(U get wiflow.core.guest_ssid)|$(U get wireless.wiflow_guest_2g.ssid)|$(U get wiflow.core.setup_username)" '^success\|.*\|0\|\|Wiflow\|Wiflow\|wiflow$'
 
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 pgrep -f '^/usr/bin/ucode /usr/libexec/wiflow/agen[t]' >/dev/null && fail "agent ignores SIGTERM" || pass "agent stops on SIGTERM"

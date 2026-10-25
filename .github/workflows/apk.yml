@@ -44,7 +44,7 @@ jobs:
             LD_LIBRARY_PATH=$PFX/lib $PFX/ucode/ucode -L "$PFX/ucode/*.so" -L "$PWD/$F/usr/share/ucode/*.uc" -c -o /tmp/x.bin "$f"
             echo "ok $f"
           done
-          for f in $F/www/luci-static/resources/wiflow/*.js $F/www/luci-static/resources/view/wiflow/*.js; do
+          for f in $F/www/wiflow/assets/*.js $F/www/luci-static/resources/view/wiflow/*.js; do
             { echo '(function(){'; cat "$f"; echo '})'; } > /tmp/check.js
             node --check /tmp/check.js && echo "ok $f"
           done
@@ -83,11 +83,11 @@ jobs:
           V="$(sed -n "s/^export const VERSION = '\(.*\)';/\1/p" apk/wiflow/files/usr/share/ucode/wiflow/setup.uc)"
           TAG="wiflow-setup-v$V-b${{ github.run_number }}"
           {
-            echo "Wiflow Setup $V cho Wiflow OS trên Viettel NR3053: Internet nguồn (cáp WAN / WiFi nguồn / tự động), WiFi khách, kết nối tài khoản Wiflow."
+            echo "Wiflow Setup $V cho Wiflow OS trên Viettel NR3053: giao diện Wiflow Setup như CR6609 (Trạng thái, Internet, WiFi khách, Hệ thống), Internet nguồn (dây LAN / WiFi nguồn / tự động), WiFi khách, tài khoản Wiflow."
             echo
             echo "- Nạp Wiflow OS mới nhất (mục Releases, nr3053-os-v1.0.0-…) trước: bản này cài được gói tải lên và không còn hiện lỗi giả khi cài."
             echo "- Cài: LuCI → System → Software → **Upload Package…** → chọn file \`.apk\` → Install."
-            echo "- Sau khi cài, WiFi chưa đổi. Vào **Wiflow → Tổng quan**, bấm **Bật Wiflow**: WiFi của router đổi thành WiFi khách **Wiflow** (mạng 10.10.10.x), trang quản trị vẫn là \`http://10.0.0.1\`."
+            echo "- Sau khi cài, WiFi chưa đổi. Tải lại trang, bấm **Wiflow Setup** ở đầu thanh bên: bước 1 bấm **Bật Wiflow** (WiFi của router thành WiFi khách, mạng 10.10.10.x), bước 2 chọn dây LAN hoặc WiFi nguồn."
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/tests.txt; echo '```'; echo '</details>'

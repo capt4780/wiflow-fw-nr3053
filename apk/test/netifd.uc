@@ -31,11 +31,15 @@ const ENC = {
 conn.publish('iwinfo', {
 	info: { args: { device: '' }, call: function(req) {
 		const i = json(readfile('/tmp/mock/iw.json') ?? '{}')[req.args.device] ?? {};
+		if (world().iw_blind && substr(req.args.device, 0, 5) == 'apcli')
+			return { bssid: '00:00:00:00:00:00', mode: 'Client' };
 		return i.ssid ? { ssid: i.ssid, bssid: i.bssid, signal: i.signal, channel: i.channel, mode: 'Client' }
 			: { bssid: '00:00:00:00:00:00', mode: 'Client' };
 	} },
 	scan: { args: { device: '' }, call: function(req) {
 		const band = req.args.device == 'rax0' ? '5g' : '2g';
+		if (index(world().iwinfo_empty ?? [], band) >= 0)
+			return { results: [] };
 		return { results: map(filter(world().aps, a => a.band == band), a => ({ ssid: a.ssid, bssid: a.bssid, channel: a.channel, signal: a.signal, mode: 'Master', encryption: ENC[a.enc] })) };
 	} },
 	assoclist: { args: { device: '' }, call: function(req) {

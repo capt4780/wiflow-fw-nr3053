@@ -246,6 +246,73 @@ function clients_tick() {
 	W.st_set('clients_now', length(keys(seen)));
 }
 
+/* ------------------------------------------------------- page charts */
+// Once a minute (3 ticks): latency, guests, uplink, RAM and load for the
+// Setup charts, guest traffic per hour, distinct guests today. RAM only.
+
+const STAT_EVERY = 3 * TICK;
+let next_stat = 0;
+
+function ping_ms() {
+	for (let t in [ '1.1.1.1', '8.8.8.8' ]) {
+		const m = match(W.sh(`ping -c 1 -W 2 -q ${t} 2>/dev/null`), /= [0-9.]+\/([0-9.]+)\//);
+		if (m) return int(+m[1] + 0.5);
+	}
+	return null;
+}
+
+function stats_tick(online) {
+	const up = W.uptime();
+	if (up < next_stat)
+		return;
+	next_stat = up + STAT_EVERY;
+	const now = W.now();
+	const p = online ? ping_ms() : null;
+	const g = W.st_get('clients_now', 0);
+	const u = online ? W.uplink_active() : 'none';
+	const mt = W.meminfo('MemTotal'), ma = W.meminfo('MemAvailable');
+	const mp = mt ? int((mt - ma) * 100 / mt) : 0;
+	const ld = min(100, int(+(split(readfile('/proc/loadavg') ?? '0', ' ')[0]) * 25));
+
+	let lines = filter(split(readfile(`${W.RUN}/minutes`) ?? '', '\n'), l => length(l));
+	push(lines, sprintf('%d|%s|%d|%s|%d|%d', now, p == null ? '' : p, g, u, mp, ld));
+	if (length(lines) > 1440)
+		lines = slice(lines, length(lines) - 1440);
+	writefile(`${W.RUN}/minutes.tmp`, join('\n', lines) + '\n');
+	W.run(`mv -f ${W.RUN}/minutes.tmp ${W.RUN}/minutes`);
+
+	// guest traffic: the guest bridge receives what guests send, sends what they get
+	const rd = (f) => +(trim(readfile(`/sys/class/net/br-wiflow/statistics/${f}`) ?? '0')) || 0;
+	const rx = rd('rx_bytes'), tx = rd('tx_bytes');
+	const prev = W.st_get('stat_bytes');
+	const drx = prev && rx >= prev.rx ? rx - prev.rx : 0, dtx = prev && tx >= prev.tx ? tx - prev.tx : 0;
+	W.st_set('stat_bytes', { rx: rx, tx: tx });
+	const hour = int(now / 3600) * 3600;
+	let hours = json(readfile(`${W.RUN}/hours.json`) ?? '[]') ?? [];
+	let h = length(hours) ? hours[length(hours) - 1] : null;
+	if (!h || h.hour != hour) {
+		h = { hour: hour, peak: 0, rx: 0, tx: 0 };
+		push(hours, h);
+	}
+	h.peak = max(h.peak, g);
+	h.rx += dtx;	// shown as "downloaded by guests"
+	h.tx += drx;
+	if (length(hours) > 48)
+		hours = slice(hours, length(hours) - 48);
+	writefile(`${W.RUN}/hours.json`, sprintf('%J', hours));
+
+	// distinct guests since local midnight (hashed ids only)
+	const lt = localtime(now);
+	const day = sprintf('%04d-%02d-%02d', lt.year, lt.mon, lt.mday);
+	let today = W.st_get('today');
+	if (!today || today.day != day)
+		today = { day: day, ids: {}, n: 0 };
+	for (let mac, k in json(readfile(`${W.RUN}/clients.json`) ?? '{}') ?? {})
+		today.ids[k.cid] = 1;
+	today.n = length(keys(today.ids));
+	W.st_set('today', today);
+}
+
 /* ------------------------------------------------------------ WordPress */
 
 function mem_kb(k) {
@@ -451,6 +518,7 @@ while (true) {
 	try { online = internet_tick(); } catch (e) { W.wlog('system', `internet: ${e}`); }
 	try { clients_tick(); } catch (e) { W.wlog('system', `clients: ${e}`); }
 	try { W.wifi_snapshot(); } catch (e) { W.wlog('system', `wifi: ${e}`); }
+	try { stats_tick(online); } catch (e) { W.wlog('system', `stats: ${e}`); }
 
 	const kicked = access(`${W.RUN}/kick`);
 	if (kicked) unlink(`${W.RUN}/kick`);

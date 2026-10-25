@@ -5,7 +5,11 @@
 			"ubus": {
 				"wiflow": [
 					"status",
-					"scan"
+					"scan",
+					"overview",
+					"inet",
+					"log",
+					"netcheck"
 				]
 			},
 			"file": {
@@ -24,7 +28,10 @@
 					"unpair",
 					"job_clear",
 					"activate",
-					"diag"
+					"diag",
+					"reboot",
+					"change_login",
+					"reset"
 				]
 			}
 		}

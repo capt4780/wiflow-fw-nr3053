@@ -10,7 +10,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -414,50 +414,93 @@ function scan_iwinfo(r) {
 	return out;
 };
 
-// mt_wifi site survey table (fallback): fixed columns, signal in percent.
-function scan_site_survey(r) {
-	if (!access('/usr/sbin/iwpriv'))
-		return [];
-	run(`iwpriv ${q(r.phy)} set SiteSurvey=1; sleep 4`);
+// mt_wifi site survey (iwpriv). The table looks like
+//   No  Ch  SSID                              BSSID               Security    Siganl(%)W-Mode ...
+//   0   36  Cafe 5G                           aa:bb:cc:dd:ee:ff   WPA2PSK/AES 81       11a/n/ac ...
+// Columns are found from the header; the SSID is everything between its
+// column and the BSSID (it may hold spaces). A 5 GHz survey takes 4-8 s:
+// the table is read until it stops growing.
+function sec_enc(sec) {
+	sec = uc(sec ?? '');
+	if (match(sec, /OWE|WEP|EAP|1X|ENT/)) return null;
+	if (match(sec, /WPA/) && !match(sec, /PSK|SAE/)) return null;	// WPA2/AES = enterprise
+	if (match(sec, /WPA3/) && !match(sec, /WPA2|WPAPSK/)) return 'sae';
+	if (match(sec, /WPA2|WPA3/)) return 'psk2';
+	if (match(sec, /WPA/)) return 'psk';
+	return 'none';
+};
+
+export function parse_survey(text) {
 	const out = [];
-	let s0 = -1;
-	for (let l in split(sh(`iwpriv ${q(r.phy)} get_site_survey`), '\n')) {
-		if (index(l, 'SSID') >= 0 && index(l, 'BSSID') >= 0 && index(l, 'Security') >= 0) {
+	let s0 = -1, has_no = false;
+	for (let l in split(text ?? '', '\n')) {
+		l = replace(l, /\r/g, '');
+		if (index(l, 'SSID') >= 0 && index(l, 'BSSID') >= 0) {
 			s0 = index(l, 'SSID');
+			has_no = !!match(l, /^\s*No\b/);
 			continue;
 		}
 		const m = match(l, /([0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5})/);
 		if (s0 < 0 || !m)
 			continue;
 		const at = index(l, m[1]);
+		const head = split(trim(replace(substr(l, 0, min(s0, at)), /\s+/g, ' ')), ' ');
+		const ch = num(has_no ? head[1] : head[length(head) - 1], 0);
 		const ssid = trim(substr(l, s0, at - s0));
 		const rest = split(trim(replace(substr(l, at + 17), /\s+/g, ' ')), ' ');
-		const sec = uc(rest[0] ?? '');
-		let enc = 'none';
-		if (match(sec, /OWE|WEP|EAP|1X/)) continue;
-		if (match(sec, /WPA3/) && !match(sec, /WPA2/)) enc = 'sae';
-		else if (match(sec, /WPA2|WPA3/)) enc = 'psk2';
-		else if (match(sec, /WPA/)) enc = 'psk';
-		const pct = num(rest[1], 0);
-		if (length(ssid))
-			push(out, { ssid: ssid, bssid: uc(m[1]), encryption: enc, channel: num(trim(substr(l, 0, 4)), 0),
-				signal: pct > 0 ? int(pct / 2) - 100 : -95 });
+		const enc = sec_enc(rest[0]);
+		if (!enc || !length(ssid) || !bssid_ok(m[1]) || match(ssid, /^0x[0-9a-fA-F]*$/))
+			continue;
+		const sv = num(rest[1], 0);
+		// percent in most builds, dBm (negative) in some
+		const sig = sv < 0 ? sv : (sv > 0 ? int(sv / 2) - 100 : -95);
+		push(out, { ssid: ssid, bssid: uc(m[1]), encryption: enc, channel: ch, signal: sig });
 	}
 	return out;
 };
 
-// Both radios; the radio that heard a network is the radio that joins it.
-export function scan() {
+function scan_site_survey(r, secs) {
+	if (!access('/usr/sbin/iwpriv') && !access('/usr/bin/iwpriv') && !length(sh('command -v iwpriv')))
+		return [];
+	run(`iwpriv ${q(r.phy)} set SiteSurvey=1`);
+	let best = [], same = 0, raw = '';
+	const t0 = uptime();
+	sleep(2500);
+	while (true) {
+		raw = sh(`iwpriv ${q(r.phy)} get_site_survey`);
+		const got = parse_survey(raw);
+		if (length(got) > 0 && length(got) == length(best)) same++;
+		else same = 0;
+		if (length(got) >= length(best)) best = got;
+		if (same >= 1 || uptime() - t0 >= secs)
+			break;
+		sleep(1500);
+	}
+	mkdir(RUN, 0700);
+	writefile(`${RUN}/survey-${r.band}.txt`, `uptime ${uptime()} ${r.phy}\n${raw}`);
+	return best;
+};
+
+// Networks heard by one radio: libiwinfo first, then the driver survey;
+// the two lists are merged by BSSID (either may miss entries on mt_wifi).
+export function scan_radio(r) {
+	let found = scan_iwinfo(r);
+	const n_iw = length(found);
+	const seen = {};
+	for (let n in found) seen[n.bssid] = true;
+	for (let n in scan_site_survey(r, r.band == '5g' ? 14 : 9))
+		if (!seen[n.bssid]) { seen[n.bssid] = true; push(found, n); }
+	st_set(`scan_${r.band}`, { at: uptime(), iwinfo: n_iw, total: length(found) });
+	return found;
+};
+
+// Both radios (or one band); the radio that heard a network joins it.
+export function scan(band) {
 	let nets = [];
 	for (let r in radios()) {
-		let found = scan_iwinfo(r);
-		if (!length(found)) {
-			sleep(1500);
-			found = scan_iwinfo(r);
-		}
-		if (!length(found))
-			found = scan_site_survey(r);
-		for (let n in found) {
+		if (band && r.band != band)
+			continue;
+		for (let n in scan_radio(r)) {
 			n.band = r.band;
 			push(nets, n);
 		}
@@ -559,10 +602,12 @@ export function status() {
 	let source = {};
 	if (src_ssid) {
 		const i = st_get('wifi')?.sta;
-		const conn = !!(i && i.up && i.bssid && i.ssid == src_ssid) && if_up('wiflow_wwan');
+		// DHCP on the station is the proof; libiwinfo may not report a BSSID.
+		const same = !!(i && i.bssid && i.ssid == src_ssid);
+		const conn = if_up('wiflow_wwan') && (same || !(i && i.bssid));
 		source = {
 			ssid: src_ssid, band: src_radio?.band, connected: conn,
-			signal: conn ? i.signal : null,
+			signal: conn && same ? i.signal : null, channel: conn && same ? i.channel : null,
 			enabled: uci_get('wireless', 'wiflow_uplink', 'disabled') != '1'
 		};
 	}
@@ -585,11 +630,13 @@ export function status() {
 		},
 		guest: {
 			ssid: core('guest_ssid', 'Wiflow'), bands: gbands, clients: st_get('clients_now', 0),
+			clients_today: st_get('today', {}).n ?? 0,
 			up: length(gbands) > 0, subnet: `${GUEST_NET}.0/24`,
 			follows: src_ssid && source.enabled ? src_radio?.band : null,
 			channels: guest_channels()
 		},
 		activated: core('activated', '0') == '1',
+		login: core('setup_username', 'wiflow'),
 		wp: {
 			paired: core('paired', '0') == '1' && !!core('device_token'),
 			account: core('account_public_id'),
@@ -597,7 +644,106 @@ export function status() {
 			last_ok: st_get('wp_last_ok', 0),
 			error: wp_error_text(st_get('wp_error'))
 		},
-		job: st_get('job')
+		job: st_get('job'),
+		scan: st_get('scan')
+	};
+};
+
+/* ------------------------------------------------------ Setup page data */
+// Charts come from the agent's once-a-minute samples (RAM only):
+//   minutes  time|ping ms|guests|uplink|ram %|load %   (24 h)
+//   hours    [ { hour, peak, rx, tx } ]                (48 h, guest bytes)
+
+export function meminfo(k) {
+	const m = match(readfile('/proc/meminfo') ?? '', regexp(`${k}:\\s+([0-9]+)`));
+	return m ? +m[1] : 0;
+};
+
+function minute_rows() {
+	const out = [];
+	for (let l in split(readfile(`${RUN}/minutes`) ?? '', '\n')) {
+		const p = split(l, '|');
+		if (length(p) < 6) continue;
+		push(out, { t: +p[0], p: length(p[1]) ? +p[1] : null, g: +p[2], u: p[3], m: +p[4], c: +p[5] });
+	}
+	return out;
+};
+
+export function overview() {
+	const rows = minute_rows();
+	// uplink runs and 15-minute latency / RAM averages for the 24 h charts
+	const runs = [], q = [];
+	let b = null;
+	for (let r in rows) {
+		const last = runs[length(runs) - 1];
+		if (!last || last.u != r.u) {
+			if (last) last.to = r.t;
+			push(runs, { u: r.u, from: r.t, to: r.t });
+		}
+		else last.to = r.t;
+		const k = int(r.t / 900);
+		if (!b || b.k != k) {
+			b = { k: k, ps: 0, pn: 0, ms: 0, mn: 0 };
+			push(q, b);
+		}
+		if (r.p != null) { b.ps += r.p; b.pn++; }
+		b.ms += r.m; b.mn++;
+	}
+	const qq = map(q, x => ({ t: x.k * 900, p: x.pn ? int(x.ps / x.pn + 0.5) : null, m: x.mn ? int(x.ms / x.mn) : 0 }));
+	let ping = null;
+	for (let r in rows) if (r.p != null) ping = r.p;
+	const df = split(trim(replace(split(sh('df -k /overlay 2>/dev/null'), '\n')[1] ?? '', /\s+/g, ' ')), ' ');
+	return {
+		ok: true, now: time(),
+		health: {
+			ping_ms: length(rows) && rows[length(rows) - 1].p != null ? rows[length(rows) - 1].p : ping,
+			mem_total_kb: meminfo('MemTotal'), mem_free_kb: meminfo('MemAvailable'),
+			load: +(split(readfile('/proc/loadavg') ?? '0', ' ')[0]),
+			watchdog_restarts: st_get('watchdog_restarts', 0)
+		},
+		minutes: slice(rows, max(0, length(rows) - 60)),
+		hours: json(readfile(`${RUN}/hours.json`) ?? '[]') ?? [],
+		day: { runs: runs, q: qq },
+		storage: { total: num(df[1], 0) * 1024, free: num(df[3], 0) * 1024, media: 0, budget: 0 },
+		log: wlog_list(40),
+		guest: { max: 0, down_kbps: 0, session_min: 0 },
+		wp_last_ok: st_get('wp_last_ok', 0)
+	};
+};
+
+function if_detail(name) {
+	const s = ifstatus(name);
+	const d = s?.l3_device ?? s?.device;
+	let sp = d ? num(trim(readfile(`/sys/class/net/${d}/speed`) ?? ''), 0) : 0;
+	if (sp < 0) sp = 0;
+	return { up: !!s?.up, dev: d, addr: if_ipv4(s), gw: if_gateway(name), dns: s?.['dns-server']?.[0], speed: sp };
+};
+
+export function inet() {
+	const r = radio_named(uci_get('wireless', 'wiflow_uplink', 'device'));
+	const sta = st_get('wifi')?.sta;
+	return {
+		ok: true, mode: core('internet_mode', 'auto'), active: uplink_active(), override: !!st_get('override', false),
+		wan: if_detail('wan'), wwan: if_detail('wiflow_wwan'),
+		wifi_ssid: uci_get('wireless', 'wiflow_uplink', 'ssid') ?? '', wifi_band: r?.band ?? '',
+		wifi_enabled: uci_get('wireless', 'wiflow_uplink', 'disabled') != '1',
+		wifi_signal: sta && sta.bssid && sta.signal ? sta.signal : null
+	};
+};
+
+// Live check for the page: Internet (HTTPS 204), DNS, 5 pings.
+export function netcheck() {
+	const ok = probe(null, 4);
+	const dns = run('nslookup connectivitycheck.gstatic.com 127.0.0.1').code == 0;
+	let out = sh('ping -c 5 -W 1 -i 0.3 -q 1.1.1.1 2>/dev/null');
+	if (!match(out, /packet loss/))
+		out = sh('ping -c 5 -W 1 -q 1.1.1.1 2>/dev/null');
+	const loss = match(out, /([0-9]+)% packet loss/);
+	const rtt = match(out, /= ([0-9.]+)\/([0-9.]+)\/([0-9.]+)/);
+	return {
+		ok: true, internet: ok, dns: dns, active: uplink_active(),
+		ping: rtt ? int(+rtt[2] + 0.5) : null, jitter: rtt ? int((+rtt[3] - +rtt[1]) / 2) : null,
+		loss: loss ? +loss[1] : 100
 	};
 };
 
@@ -637,11 +783,20 @@ export function diag_text() {
 	add(readfile('/proc/net/route') ?? '');
 	add('== wiflow log');
 	add(readfile(`${RUN}/log`) ?? '');
-	add('== system log (wifi, network, wiflow)');
+	add('== last join failure');
+	add(readfile(`${RUN}/join-fail.txt`) ?? '(none)');
+	add('== last scan');
+	for (let b in [ '2g', '5g' ])
+		add(sprintf('%s %J', b, st_get(`scan_${b}`)));
+	for (let b in [ '2g', '5g' ])
+		add(readfile(`${RUN}/survey-${b}.txt`) ?? '');
+	// mt_wifi logs every scanned channel at notice level: keep it out.
+	const noise = /AsicSwitchChannel|MtCmd|dpd_flatness|scan_type|EDCCA|PrintSrCmd|BcnCheck|TakeChannelOpCharge|ReleaseChannelOpCharge|ChannelInfo|SYNC - |MlmeEnqueue|wdev_do_|HcUpdate|Ch(Switch|annel)Op/;
 	const tail = (a, n) => slice(a, max(0, length(a) - n));
-	add(join('\n', tail(filter(split(sh('logread'), '\n'), l => match(l, /wiflow|mtwifi|apcli|netifd|hostapd|kernel/)), 200)));
+	add('== system log (wifi, network, wiflow)');
+	add(join('\n', tail(filter(split(sh('logread'), '\n'), l => match(l, /wiflow|mtwifi|apcli|netifd|hostapd|udhcpc|kernel/) && !match(l, noise)), 200)));
 	add('== kernel');
-	add(join('\n', tail(split(sh('dmesg'), '\n'), 80)));
+	add(join('\n', tail(filter(split(sh('dmesg'), '\n'), l => !match(l, noise)), 80)));
 	return join('\n', lines) + '\n';
 };
 
