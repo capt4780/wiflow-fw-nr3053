@@ -10,7 +10,7 @@ Wiflow Setup là gói `.apk` cài lên Wiflow OS. Gói thêm nhóm **Wiflow** �
 4. Vào **System → Software**, bấm **Upload Package…**, chọn file `.apk`, rồi bấm **Install**.
 5. Vài giây sau khi cài, router tự cấu hình. WiFi `Wiflow 2.4G` / `Wiflow 5G` đổi thành WiFi khách **Wiflow** (mở) trên mạng `10.10.10.x`. Kết nối lại vào WiFi **Wiflow** rồi mở `http://10.0.0.1`.
 
-Nếu router đang chạy bản cũ hơn build 14, cài qua SSH:
+Nếu router đang chạy bản cũ hơn build 15, cài qua SSH:
 
 ```
 scp wiflow-setup-*.apk root@10.0.0.1:/tmp/

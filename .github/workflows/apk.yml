@@ -85,7 +85,7 @@ jobs:
           {
             echo "Wiflow Setup $V cho Wiflow OS trên Viettel NR3053: Internet nguồn (cáp WAN / WiFi nguồn / tự động), WiFi khách, kết nối tài khoản Wiflow."
             echo
-            echo "- Cần Wiflow OS bản có hỗ trợ cài gói tải lên (từ build nr3053-os-v1.0.0-b14)."
+            echo "- Cần Wiflow OS bản có hỗ trợ cài gói tải lên (từ build nr3053-os-v1.0.0-b15)."
             echo "- Cài: LuCI → System → Software → **Upload Package…** → chọn file \`.apk\` → Install."
             echo "- Sau khi cài, WiFi của router đổi thành WiFi khách **Wiflow** (mạng 10.10.10.x). Trang quản trị vẫn là \`http://10.0.0.1\`, menu **Wiflow** ở đầu thanh bên."
             echo
