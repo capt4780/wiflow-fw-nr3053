@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "ifup $*" >> /tmp/mock/calls.log
+$WFT/netsim.py "ifup $*"

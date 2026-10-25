@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "iwpriv $*" >> /tmp/mock/calls.log

@@ -1,0 +1,344 @@
+#!/usr/bin/ucode
+// Wiflow Setup background job: job <kind> <request.json>
+//   uplink    join a source WiFi and/or change the Internet mode
+//   guest     rename the guest WiFi
+//   pair      connect the router to a Wiflow account
+//   unpair    disconnect it
+//   reconnect re-run the uplinks
+// Progress and the result go to /tmp/wiflow/st/job (read by status()).
+// A request from a WordPress command carries command_id: the result is
+// also stored as the command result for the next heartbeat.
+'use strict';
+
+import { readfile, writefile, mkdir, access, unlink, readlink, rename } from 'fs';
+import { cursor } from 'uci';
+import * as W from 'wiflow.setup';
+import * as P from 'wiflow.provision';
+
+const kind = ARGV[0];
+const reqfile = ARGV[1];
+const req = json(readfile(reqfile) ?? '{}') ?? {};
+unlink(reqfile);
+
+const PID = +(readlink('/proc/self') ?? 0);
+const TXN = `${W.ROOT}/txn`;
+
+function job(state, message, extra) {
+	const j = { kind: kind, state: state, message: message, at: W.uptime(), pid: PID };
+	for (let k, v in extra ?? {}) j[k] = v;
+	W.st_set('job', j);
+}
+
+function command_result(status, message) {
+	if (!req.command_id)
+		return;
+	W.core_set({
+		last_command_id: req.command_id, last_command_action: req.command_action ?? kind,
+		last_command_status: status, last_command_message: message
+	});
+	W.kick_agent();
+}
+
+function done(ok, message, extra) {
+	job(ok ? 'success' : 'failed', message, extra);
+	command_result(ok ? 'success' : 'failed', message);
+	exit(ok ? 0 : 1);
+}
+
+function step(message) {
+	job('running', message);
+	if (req.command_id)
+		W.core_set({ last_command_id: req.command_id, last_command_action: req.command_action ?? kind, last_command_status: 'running', last_command_message: message });
+}
+
+function wait_for(secs, fn) {
+	for (let i = 0; i < secs; i++) {
+		if (fn())
+			return true;
+		sleep(1000);
+	}
+	return fn();
+}
+
+/* --------------------------------------------- config transaction (flash) */
+// Saved before a source-WiFi change; a power cut in the middle is undone at
+// the next boot (bootstrap), a failed join is undone right away.
+
+function txn_begin() {
+	mkdir(W.ROOT, 0700);
+	mkdir(TXN, 0700);
+	for (let f in [ 'wireless', 'network', 'wiflow' ])
+		writefile(`${TXN}/${f}`, readfile(`/etc/config/${f}`) ?? '');
+	writefile(`${TXN}/.pending`, req.command_id ?? '');
+}
+
+function txn_end() {
+	for (let f in [ 'wireless', 'network', 'wiflow', '.pending' ])
+		unlink(`${TXN}/${f}`);
+}
+
+function txn_rollback() {
+	for (let f in [ 'wireless', 'network', 'wiflow' ])
+		if (access(`${TXN}/${f}`))
+			writefile(`/etc/config/${f}`, readfile(`${TXN}/${f}`));
+	W.run('chmod 600 /etc/config/wireless /etc/config/wiflow');
+	txn_end();
+	P.reload({ network: true, wireless: true });
+}
+
+/* ------------------------------------------------------------------ uplink */
+
+function enc_ok(e) {
+	return index([ 'none', 'psk', 'psk2', 'sae', 'psk-mixed', 'sae-mixed' ], e) >= 0;
+}
+
+function conflict(ip) {
+	return ip && (match(ip, /^10\.0\.0\./) || match(ip, /^10\.10\.10\./));
+}
+
+function wait_online(secs) {
+	return wait_for(secs, () => {
+		const u = W.uplink_active();
+		return u != 'none' && W.probe(null, 3);
+	});
+}
+
+function uplink() {
+	const mode = req.mode ?? 'auto';
+	if (index([ 'auto', 'lan', 'wifi' ], mode) < 0)
+		done(false, 'Chế độ kết nối không hợp lệ.');
+
+	/* mode only */
+	if (!length(req.ssid)) {
+		if (mode != 'lan' && W.uci_get('wireless', 'wiflow_uplink') != 'wifi-iface' && mode == 'wifi')
+			done(false, 'Hãy chọn WiFi nguồn trước khi dùng chế độ Chỉ WiFi nguồn.');
+		step('Đang lưu chế độ kết nối…');
+		const what = P.apply_mode(mode);
+		W.core_set({ internet_mode: mode });
+		P.reload(what);
+		W.st_set('override', null);
+		W.wlog('uplink', { auto: 'Internet tự động: cáp trước, WiFi nguồn dự phòng', lan: 'Internet chỉ qua cáp WAN', wifi: 'Internet chỉ qua WiFi nguồn' }[mode]);
+		step('Đang kiểm tra Internet…');
+		if (wait_online(25))
+			done(true, 'Đã lưu chế độ kết nối. Router đang có Internet.');
+		done(true, mode == 'lan'
+			? 'Đã lưu chế độ. Chưa có Internet qua cáp WAN: kiểm tra dây cáp và modem.'
+			: 'Đã lưu chế độ. Router chưa có Internet, Wiflow sẽ tự thử lại.');
+	}
+
+	/* join a source WiFi */
+	const ssid = req.ssid;
+	const band = req.band ?? '2g';
+	let enc = req.encryption ?? (length(req.key) ? 'psk2' : 'none');
+	const key = req.key ?? '';
+	const r = W.radio_for(band);
+
+	if (length(ssid) > 32)
+		done(false, 'Tên WiFi nguồn quá dài.');
+	if (!r)
+		done(false, 'Không tìm thấy radio ở băng tần này.');
+	if (!enc_ok(enc))
+		done(false, 'Kiểu bảo mật của WiFi nguồn không được hỗ trợ.');
+	if (enc == 'sae-mixed') enc = 'psk2';
+	if (enc != 'none' && (length(key) < 8 || length(key) > 64))
+		done(false, 'Mật khẩu WiFi nguồn cần từ 8 đến 63 ký tự.');
+	if (ssid == W.core('guest_ssid', 'Wiflow'))
+		done(false, 'WiFi nguồn trùng tên WiFi khách. Hãy đổi tên WiFi khách trước.');
+
+	const final_mode = mode == 'lan' ? 'auto' : mode;
+	step(`Đang chuẩn bị kết nối “${ssid}”…`);
+	txn_begin();
+
+	const c = cursor();
+	c.load('wireless');
+	c.delete('wireless', 'wiflow_uplink');
+	c.set('wireless', 'wiflow_uplink', 'wifi-iface');
+	c.set('wireless', 'wiflow_uplink', 'device', r.name);
+	c.set('wireless', 'wiflow_uplink', 'mode', 'sta');
+	c.set('wireless', 'wiflow_uplink', 'network', 'wiflow_wwan');
+	c.set('wireless', 'wiflow_uplink', 'ssid', ssid);
+	c.set('wireless', 'wiflow_uplink', 'encryption', enc);
+	if (enc != 'none')
+		c.set('wireless', 'wiflow_uplink', 'key', key);
+	c.commit('wireless');
+	W.run('chmod 600 /etc/config/wireless');
+	P.apply_mode(final_mode);
+	W.st_set('override', null);
+
+	step(`Đang kết nối “${ssid}”…`);
+	P.reload({ network: true, wireless: true });
+	sleep(3000);
+
+	if (!wait_for(30, () => W.sta_associated(r, ssid))) {
+		step('Đang kiểm tra lại WiFi nguồn…');
+		W.run('ifup wiflow_wwan');
+		if (!wait_for(10, () => W.sta_associated(r, ssid))) {
+			txn_rollback();
+			const seen = length(filter(W.scan(), n => n.ssid == ssid && n.band == band)) > 0;
+			W.wlog('uplink', `Không kết nối được WiFi nguồn “${ssid}”`);
+			done(false, seen
+				? `Không vào được “${ssid}”. Kiểm tra lại mật khẩu.`
+				: `Không thấy “${ssid}”. Kiểm tra tên WiFi, khoảng cách hoặc băng tần.`);
+		}
+	}
+
+	step('Đang nhận địa chỉ mạng…');
+	if (!wait_for(25, () => W.if_up('wiflow_wwan'))) {
+		txn_rollback();
+		done(false, `Đã vào “${ssid}” nhưng modem nguồn không cấp địa chỉ mạng.`);
+	}
+	const ip = W.if_ipv4(W.ifstatus('wiflow_wwan'));
+	if (conflict(ip)) {
+		txn_rollback();
+		done(false, `Mạng “${ssid}” dùng dải ${ip}, trùng mạng nội bộ Wiflow (10.0.0.x / 10.10.10.x). Hãy đổi dải mạng của modem nguồn.`);
+	}
+
+	step('Đang kiểm tra Internet…');
+	const dev = W.if_l3dev('wiflow_wwan');
+	if (!wait_for(12, () => W.probe(dev, 4))) {
+		txn_rollback();
+		done(false, `Đã kết nối “${ssid}” nhưng mạng này chưa ra được Internet.`);
+	}
+
+	txn_end();
+	W.wifi_snapshot();
+	W.core_set({ internet_mode: final_mode, source_ssid: ssid });
+	W.st_set('online', true);
+	W.st_set('online_since', W.uptime());
+	W.wlog('uplink', final_mode == 'auto'
+		? `Internet tự động: cáp trước, WiFi “${ssid}” dự phòng`
+		: `Internet qua WiFi nguồn “${ssid}”`);
+	done(true, final_mode == 'auto'
+		? `Đã kết nối “${ssid}”. Cáp WAN được ưu tiên, WiFi nguồn làm dự phòng.`
+		: `Đã kết nối Internet qua “${ssid}”.`);
+}
+
+/* -------------------------------------------------------------------- scan */
+
+function scan() {
+	step('Đang quét WiFi xung quanh…');
+	const nets = W.scan();
+	done(true, length(nets) ? `Tìm thấy ${length(nets)} mạng WiFi.` : 'Không tìm thấy WiFi nào.', { networks: nets });
+}
+
+/* ------------------------------------------------------------------- guest */
+
+function guest() {
+	const ssid = req.ssid ?? '';
+	if (length(ssid) < 1 || length(ssid) > 32)
+		done(false, 'Tên WiFi khách cần từ 1 đến 32 ký tự.');
+	const src = W.uci_get('wireless', 'wiflow_uplink', 'ssid');
+	if (src && src == ssid)
+		done(false, 'Tên WiFi khách phải khác WiFi nguồn.');
+	step('Đang đổi tên WiFi khách…');
+	W.core_set({ guest_ssid: ssid });
+	if (P.ensure_wireless(false))
+		W.run('wifi reload');
+	W.wlog('guest', `Tên WiFi khách: “${ssid}”`);
+	done(true, `Đã đổi tên WiFi khách thành “${ssid}”.`);
+}
+
+/* -------------------------------------------------------------- reconnect */
+
+function reconnect() {
+	step('Đang kết nối Internet lại…');
+	W.st_set('override', null);
+	W.run('ip route del default metric 1');
+	const mode = W.core('internet_mode', 'auto');
+	if (mode != 'wifi') W.run('ifup wan');
+	if (mode != 'lan' && W.uci_get('wireless', 'wiflow_uplink') == 'wifi-iface') {
+		W.run('wifi reload');
+		W.run('ifup wiflow_wwan');
+	}
+	sleep(3000);
+	if (wait_online(40))
+		done(true, 'Đã kết nối Internet lại.');
+	done(false, 'Chưa khôi phục được Internet.');
+}
+
+/* ---------------------------------------------------------------- account */
+
+const PAIR_ERRORS = {
+	PAIR_CODE_NOT_FOUND: 'Mã kết nối không đúng. Kiểm tra lại mã trong ứng dụng Wiflow.',
+	PAIR_CODE_ALREADY_USED: 'Mã kết nối này đã được dùng. Hãy tạo mã mới trong ứng dụng.',
+	PAIR_CODE_EXPIRED: 'Mã kết nối đã hết hạn. Hãy tạo mã mới trong ứng dụng.',
+	PAIR_CODE_FORMAT: 'Mã kết nối gồm 12 chữ và số.',
+	PAIR_ACCOUNT_INACTIVE: 'Tài khoản Wiflow này đang bị khóa.',
+	PAIR_RATE_LIMIT: 'Thử quá nhiều lần. Đợi một lúc rồi thử lại.',
+	PAIR_GENERATION_MISMATCH: 'Máy chủ Wiflow và router khác phiên bản dữ liệu.'
+};
+
+function pair() {
+	const code = replace(uc(req.code ?? ''), /[^A-Z0-9]/g, '');
+	if (!match(code, /^[A-Z0-9]{12}$/))
+		done(false, PAIR_ERRORS.PAIR_CODE_FORMAT);
+	const id = W.device_id();
+	if (!id)
+		done(false, 'Không đọc được mã thiết bị.');
+
+	step('Đang liên lạc máy chủ Wiflow…');
+	const h = W.http('GET', '/devices/health', null, null, 10);
+	if (!h.ok)
+		done(false, h.http ? `Máy chủ Wiflow trả lỗi HTTP ${h.http}.` : 'Không liên lạc được máy chủ Wiflow. Kiểm tra Internet của router.');
+	const hb = h.body;
+	if (!hb.ok || +hb.api_version != 1 || `${hb.data_generation}` != W.GEN || (hb.rest_root && hb.rest_root != W.REST))
+		done(false, 'Máy chủ Wiflow và router khác phiên bản. Hãy cập nhật Wiflow Setup.');
+
+	step('Đang kết nối tài khoản…');
+	const r = W.http('POST', '/devices/pair', {
+		pairing_code: code, device_id: id, model: W.MODEL, agent_version: W.VERSION, data_generation: +W.GEN
+	}, null, 20);
+	if (!r.body)
+		done(false, r.http ? `Máy chủ Wiflow trả lỗi HTTP ${r.http}.` : 'Không gửi được yêu cầu kết nối.');
+	const b = r.body;
+	if (!b.ok)
+		done(false, PAIR_ERRORS[b.code] ?? b.message ?? 'Máy chủ từ chối kết nối.');
+	if (`${b.data_generation}` != W.GEN)
+		done(false, PAIR_ERRORS.PAIR_GENERATION_MISMATCH);
+	if (type(b.device_token) != 'string' || !match(b.device_token, /^[A-Za-z0-9_-]{40,160}$/))
+		done(false, 'Máy chủ chưa cấp khóa thiết bị hợp lệ.');
+
+	const acct = (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)) ? b.account_public_id : null;
+	W.core_set({
+		paired: '1', device_token: b.device_token, account_public_id: acct,
+		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
+	});
+	W.st_set('wp_error', null);
+	W.st_set('wp_online', true);
+	W.st_set('wp_last_ok', W.now());
+	W.st_set('unpair_n', null);
+	W.wlog('system', `Đã kết nối tài khoản Wiflow ${acct ?? ''}`);
+	W.kick_agent();
+	done(true, acct ? `Đã kết nối tài khoản ${acct}.` : 'Đã kết nối tài khoản Wiflow.', { account: acct });
+}
+
+function unpair() {
+	const clear_pairing = W.clear_pairing;
+	const a = W.auth();
+	if (!a) {
+		clear_pairing();
+		done(true, 'Router đã rời tài khoản Wiflow.');
+	}
+	step('Đang ngắt kết nối…');
+	const r = W.http('POST', '/devices/unpair', {}, a, 15);
+	const code = r.body?.code;
+	if (r.body?.ok || code == 'DEVICE_UNPAIRED' || code == 'DEVICE_AUTH_INVALID' || req.force) {
+		clear_pairing();
+		W.wlog('system', 'Router đã rời tài khoản Wiflow');
+		done(true, 'Router đã rời tài khoản Wiflow.');
+	}
+	done(false, r.body?.message ?? 'Không liên lạc được máy chủ Wiflow, chưa ngắt được. Thử lại khi router có Internet.');
+}
+
+/* ------------------------------------------------------------------- main */
+
+job('running', 'Đang bắt đầu…');
+switch (kind) {
+case 'uplink': uplink(); break;
+case 'guest': guest(); break;
+case 'scan': scan(); break;
+case 'reconnect': reconnect(); break;
+case 'pair': pair(); break;
+case 'unpair': unpair(); break;
+default: done(false, 'Việc không hợp lệ.');
+}

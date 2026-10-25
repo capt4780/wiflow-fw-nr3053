@@ -1,0 +1,89 @@
+// ubus object "wiflow" for the Wiflow pages in LuCI (luci-app-wiflow ACL).
+// Quick calls answer directly; joining a WiFi, renaming the guest WiFi and
+// account changes run as a background job followed through status().job.
+'use strict';
+
+import * as W from 'wiflow.setup';
+
+function str(v) {
+	return type(v) == 'string' ? v : '';
+}
+
+const methods = {
+	status: {
+		call: function() {
+			return W.status();
+		}
+	},
+
+	// Scanning takes several seconds and needs rpcd's own iwinfo object, so
+	// it runs as a job; the networks arrive in status().job.networks.
+	scan: {
+		call: function() {
+			return W.job_start('scan', {});
+		}
+	},
+
+	set_uplink: {
+		args: { mode: 'auto', ssid: '', bssid: '', band: '', key: '', encryption: '' },
+		call: function(req) {
+			const a = req.args;
+			const mode = str(a.mode) || 'auto';
+			if (index([ 'auto', 'lan', 'wifi' ], mode) < 0)
+				return { ok: false, error: 'Chế độ kết nối không hợp lệ.' };
+			const r = { mode: mode };
+			if (length(str(a.ssid))) {
+				if (index([ '2g', '5g' ], a.band) < 0)
+					return { ok: false, error: 'Băng tần không hợp lệ.' };
+				r.ssid = a.ssid;
+				r.band = a.band;
+				r.key = str(a.key);
+				r.encryption = str(a.encryption) || (length(r.key) ? 'psk2' : 'none');
+			}
+			return W.job_start('uplink', r);
+		}
+	},
+
+	set_guest: {
+		args: { ssid: '' },
+		call: function(req) {
+			const s = str(req.args.ssid);
+			if (length(s) < 1 || length(s) > 32)
+				return { ok: false, error: 'Tên WiFi khách cần từ 1 đến 32 ký tự.' };
+			return W.job_start('guest', { ssid: s });
+		}
+	},
+
+	reconnect: {
+		call: function() {
+			return W.job_start('reconnect', {});
+		}
+	},
+
+	pair: {
+		args: { code: '' },
+		call: function(req) {
+			const code = replace(uc(str(req.args.code)), /[^A-Z0-9]/g, '');
+			if (!match(code, /^[A-Z0-9]{12}$/))
+				return { ok: false, error: 'Mã kết nối gồm 12 chữ và số.' };
+			return W.job_start('pair', { code: code });
+		}
+	},
+
+	unpair: {
+		args: { force: false },
+		call: function(req) {
+			return W.job_start('unpair', { force: !!req.args.force });
+		}
+	},
+
+	job_clear: {
+		call: function() {
+			if (!W.job_busy())
+				W.st_set('job', null);
+			return { ok: true };
+		}
+	}
+};
+
+return { wiflow: methods };

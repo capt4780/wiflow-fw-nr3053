@@ -81,6 +81,24 @@ d["unauthenticated"]["read"]["ubus"]["session"] = [x for x in sess if x != "logi
 open(p, "w").write(json.dumps(d, indent="\t") + "\n")
 PY
 
+# LuCI > System > Software, "Upload package": a package file chosen by the
+# admin (e.g. the Wiflow Setup .apk) installs without the ImmortalWrt feed
+# signature; packages from the online feeds are still verified.
+P="$F/usr/libexec/package-manager-call"
+grep -qF 'if flock -x 200; then' "$P" || die "package-manager-call: install anchor not found"
+python3 - "$P" <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+add = ('\t\t\t# Wiflow OS: a local package file uploaded by the admin is not signed\n'
+       '\t\t\t# by the feed key; allow it (online feed packages stay verified).\n'
+       '\t\t\tif [ $ipkg_bin = "apk" ] && [ "$action" = "add" ]; then\n'
+       '\t\t\t\tfor a in "$@"; do [ -f "$a" ] && { cmd="$cmd --allow-untrusted"; break; }; done\n'
+       '\t\t\tfi\n\n')
+assert s.count('\t\t\tif flock -x 200; then') == 1
+s = s.replace('\t\t\tif flock -x 200; then', add + '\t\t\tif flock -x 200; then', 1)
+open(p, 'w').write(s)
+PY
+
 # second web admin account wiflow / wiflow (root / 1234 stays for deep access)
 grep -q "option username 'root'" "$F/etc/config/rpcd" || die "rpcd: root login not found"
 whash="$(openssl passwd -1 wiflow)"

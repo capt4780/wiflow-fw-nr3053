@@ -1,0 +1,62 @@
+#!/usr/bin/ucode
+// provision boot    every start of the wiflow service (idempotent)
+// provision remove  package removal: back to the router as it was
+'use strict';
+
+import { readfile, writefile, access, unlink, mkdir } from 'fs';
+import * as W from 'wiflow.setup';
+import * as P from 'wiflow.provision';
+
+const MARK = `${W.ROOT}/.provisioned`;
+const TXN = `${W.ROOT}/txn`;
+
+function boot() {
+	mkdir(W.ROOT, 0700);
+	P.ensure_core();
+	W.ensure_device_id();
+	P.ensure_gate_code();
+
+	// A source-WiFi change cut by a power loss: back to the previous settings.
+	if (access(`${TXN}/.pending`)) {
+		const cid = trim(readfile(`${TXN}/.pending`) ?? '');
+		for (let f in [ 'wireless', 'network', 'wiflow' ])
+			if (access(`${TXN}/${f}`) && length(readfile(`${TXN}/${f}`) ?? ''))
+				writefile(`/etc/config/${f}`, readfile(`${TXN}/${f}`));
+		for (let f in [ 'wireless', 'network', 'wiflow', '.pending' ])
+			unlink(`${TXN}/${f}`);
+		if (length(cid))
+			W.core_set({ last_command_id: cid, last_command_status: 'failed', last_command_message: 'Thay đổi bị gián đoạn, cấu hình trước đó đã được khôi phục' });
+		W.wlog('uplink', 'Thay đổi WiFi nguồn bị gián đoạn: đã khôi phục cấu hình trước');
+	}
+	if (W.core('last_command_status') == 'rebooting')
+		W.core_set({ last_command_status: 'success', last_command_message: 'Thiết bị đã khởi động lại' });
+
+	const first = !access(MARK);
+	if (first)
+		P.backup_stock();
+	P.ensure_networks();
+	const wl = P.ensure_wireless(first);
+	const m = P.apply_mode(W.core('internet_mode', 'auto'));
+	writefile(MARK, W.VERSION);
+
+	P.reload({ network: true, wireless: wl || m.wireless, firewall: true, dhcp: true });
+	if (first)
+		W.wlog('system', `Wiflow ${W.VERSION} đã được cài: WiFi khách “${W.core('guest_ssid', 'Wiflow')}”, mạng khách ${W.GUEST_NET}.0/24`);
+}
+
+function remove() {
+	W.run('ip route del default metric 1');
+	P.remove_gate_code();
+	P.remove_ours();
+	unlink(MARK);
+	P.reload({ network: true, wireless: true, firewall: true, dhcp: true });
+	W.run(`rm -rf ${W.RUN}`);
+}
+
+switch (ARGV[0]) {
+case 'boot': boot(); break;
+case 'remove': remove(); break;
+default:
+	warn('usage: provision boot|remove\n');
+	exit(1);
+}

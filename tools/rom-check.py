@@ -208,6 +208,8 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
+    "LuCI package upload accepts the unsigned Wiflow Setup apk":
+        '--allow-untrusted' in open(F + "/usr/libexec/package-manager-call").read(),
     "anonymous ubus cannot call session.login":
         "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }

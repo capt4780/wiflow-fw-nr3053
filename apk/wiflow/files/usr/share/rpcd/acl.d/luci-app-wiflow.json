@@ -1,0 +1,25 @@
+{
+	"luci-app-wiflow": {
+		"description": "Wiflow Setup",
+		"read": {
+			"ubus": {
+				"wiflow": [
+					"status",
+					"scan"
+				]
+			}
+		},
+		"write": {
+			"ubus": {
+				"wiflow": [
+					"set_uplink",
+					"set_guest",
+					"reconnect",
+					"pair",
+					"unpair",
+					"job_clear"
+				]
+			}
+		}
+	}
+}

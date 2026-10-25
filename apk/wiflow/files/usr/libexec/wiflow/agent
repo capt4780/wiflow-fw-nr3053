@@ -1,0 +1,466 @@
+#!/usr/bin/ucode
+// Wiflow agent (procd service "wiflow"): every 20 s
+//  - checks the Internet (HTTPS 204) and keeps the uplinks healthy:
+//    auto mode = cable first; when the cable has link but no Internet the
+//    source WiFi takes over (route metric 1) until the cable answers again;
+//    an uplink down for 3 minutes is nudged, at most every 5 minutes;
+//  - follows guest WiFi clients (connected / disconnected events);
+//  - talks to WordPress: heartbeat, commands, command results, unpair.
+// Everything it keeps is in RAM (/tmp/wiflow); nothing is written to flash
+// except the pairing / settings a command changes.
+'use strict';
+
+import { readfile, writefile, unlink, access } from 'fs';
+import * as W from 'wiflow.setup';
+
+// 20 s on the router; the test bench runs the same loop faster.
+const TICK = +(getenv('WIFLOW_TICK') ?? 20) || 20;
+const DOWN_KICK_AFTER = 9 * TICK;	// 3 minutes
+const KICK_EVERY = 15 * TICK;		// 5 minutes
+const OVR = 1;	// metric of the backup route through the source WiFi
+
+let hb_delay = TICK;
+let next_hb = 0;
+let lan_fail = 0, wan_ok = 0;
+let ev_seq = 0;
+
+/* -------------------------------------------------------------- helpers */
+
+function ping_dev(dev) {
+	if (!dev) return false;
+	for (let t in [ '1.1.1.1', '8.8.8.8' ])
+		if (W.run(`ping -I ${W.q(dev)} -c 1 -W 2 -q ${t}`).code == 0)
+			return true;
+	return false;
+}
+
+function override_on() {
+	for (let r in W.default_routes())
+		if (r.metric == OVR)
+			return true;
+	return false;
+}
+
+function override_clear(why) {
+	let n = 0;
+	while (override_on() && n++ < 4)
+		W.run(`ip route del default metric ${OVR}`);
+	if (W.st_get('override', false)) {
+		W.st_set('override', null);
+		if (why) W.wlog('uplink', why);
+	}
+}
+
+function override_set() {
+	const dev = W.if_l3dev('wiflow_wwan');
+	const gw = W.if_gateway('wiflow_wwan');
+	if (!dev || !gw)
+		return false;
+	if (W.run(`ip route replace default via ${W.q(gw)} dev ${W.q(dev)} metric ${OVR}`).code != 0)
+		return false;
+	W.st_set('override', true);
+	W.st_set('override_since', W.uptime());
+	return true;
+}
+
+function note_switch(via) {
+	const old = W.st_get('uplink_last', '');
+	if (old == via)
+		return;
+	W.st_set('uplink_last', via);
+	const msg = {
+		'lan/wifi': 'Internet chuyển sang WiFi nguồn',
+		'wifi/lan': 'Internet chuyển về cáp WAN'
+	}[`${old}/${via}`];
+	if (msg) {
+		W.wlog('uplink', msg);
+		W.st_set('uplink_switches', W.st_get('uplink_switches', 0) + 1);
+	}
+	else if (via == 'none' && old != '')
+		W.wlog('uplink', 'Mất đường Internet');
+	else if (old == 'none')
+		W.wlog('uplink', `Có lại đường Internet (${via == 'lan' ? 'cáp WAN' : 'WiFi nguồn'})`);
+}
+
+/* ------------------------------------------------------------- Internet */
+
+function auto_tick(mode, online, via) {
+	if (!override_on() && W.st_get('override', false))
+		W.st_set('override', null);	// netifd rebuilt the routes
+	if (mode != 'auto') {
+		if (override_on()) override_clear();
+		return;
+	}
+	if (override_on()) {
+		// Back to the cable once it answers twice; the cable modem may block
+		// ping, so the cable is also tried again every 30 minutes.
+		if (W.if_up('wan') && (ping_dev(W.if_l3dev('wan')) || W.probe(W.if_l3dev('wan'), 3))) {
+			if (++wan_ok >= 2) {
+				wan_ok = 0;
+				override_clear('Cáp WAN có Internet trở lại');
+			}
+		}
+		else {
+			wan_ok = 0;
+			if (W.uptime() - W.st_get('override_since', 0) >= 90 * TICK && W.if_up('wan'))
+				override_clear('Thử lại cáp WAN');
+		}
+		return;
+	}
+	if (via == 'lan' && !online && W.if_up('wiflow_wwan')) {
+		if (++lan_fail >= 2 && !ping_dev(W.if_l3dev('wan')) && W.probe(W.if_l3dev('wiflow_wwan'), 4)) {
+			lan_fail = 0;
+			if (override_set())
+				W.wlog('uplink', 'Cáp WAN không có Internet: dùng WiFi nguồn dự phòng');
+		}
+	}
+	else
+		lan_fail = 0;
+}
+
+function watchdog(mode) {
+	const up = W.uptime();
+	const want_wifi = mode != 'lan' && W.uci_get('wireless', 'wiflow_uplink') == 'wifi-iface'
+		&& W.uci_get('wireless', 'wiflow_uplink', 'disabled') != '1';
+	const want_wan = mode != 'wifi' && W.wan_carrier();
+
+	if (W.job_busy())
+		return;
+
+	const checks = [];
+	if (want_wifi) push(checks, [ 'wifi', W.if_up('wiflow_wwan') ]);
+	if (want_wan) push(checks, [ 'wan', W.if_up('wan') ]);
+
+	for (let c in checks) {
+		const key = `down_${c[0]}`;
+		if (c[1]) {
+			W.st_set(key, null);
+			W.st_set(`kicks_${c[0]}`, null);
+			continue;
+		}
+		const since = W.st_get(key) ?? up;
+		W.st_set(key, since);
+		if (up - since < DOWN_KICK_AFTER)
+			continue;
+		const last = W.st_get(`kick_at_${c[0]}`, 0);
+		if (last && up - last < KICK_EVERY)
+			continue;
+		W.st_set(`kick_at_${c[0]}`, up);
+		const n = W.st_get(`kicks_${c[0]}`, 0) + 1;
+		W.st_set(`kicks_${c[0]}`, n);
+		W.st_set('watchdog_restarts', W.st_get('watchdog_restarts', 0) + 1);
+
+		if (c[0] == 'wifi') {
+			const r = W.radio_named(W.uci_get('wireless', 'wiflow_uplink', 'device'));
+			if (n % 3 == 0) {
+				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: khởi động lại WiFi`);
+				W.run('wifi reload');
+			}
+			else {
+				W.wlog('watchdog', `WiFi nguồn mất ${up - since} giây: kết nối lại`);
+				const sta = W.sta_if(r);
+				W.run(`iwpriv ${W.q(sta)} set ApCliEnable=1; iwpriv ${W.q(sta)} set ApCliAutoConnect=3`);
+			}
+			W.run('ifup wiflow_wwan');
+		}
+		else {
+			W.wlog('watchdog', `Cáp WAN mất ${up - since} giây: xin lại địa chỉ mạng`);
+			W.run('ifup wan');
+		}
+	}
+}
+
+function internet_tick() {
+	const mode = W.core('internet_mode', 'auto');
+	let via = W.uplink_active();
+	let online = via != 'none' && W.probe(null, 4);
+	auto_tick(mode, online, via);
+	const via2 = W.uplink_active();
+	if (via2 != via) {
+		via = via2;
+		online = via != 'none' && W.probe(null, 4);
+	}
+	const prev = W.st_get('online', false);
+	if (online && !prev) W.st_set('online_since', W.uptime());
+	W.st_set('online', online);
+	note_switch(online ? via : 'none');
+	watchdog(mode);
+	return online;
+}
+
+/* ------------------------------------------------------- guest clients */
+// MACs never leave the router: WordPress gets a per-router hash.
+
+function client_id(mac) {
+	const h = split(W.sh(`printf %s ${W.q(W.device_id() + '|' + lc(mac))} | sha256sum`), ' ')[0];
+	return substr(h, 0, 32);
+}
+
+function events_load() {
+	return json(readfile(`${W.RUN}/events.json`) ?? '[]') ?? [];
+}
+
+function events_save(ev) {
+	if (length(ev) > 500)
+		ev = slice(ev, length(ev) - 500);
+	writefile(`${W.RUN}/events.json.tmp`, sprintf('%J', ev));
+	W.run(`mv -f ${W.RUN}/events.json.tmp ${W.RUN}/events.json`);
+}
+
+function new_id(p) {
+	return sprintf('%s-%s-%d-%d', p, substr(W.device_id() ?? 'x', -6), W.now(), ++ev_seq);
+}
+
+function clients_tick() {
+	const now = W.now();
+	const seen = {};
+	for (let mac in W.guest_macs())
+		seen[mac] = true;
+
+	const known = json(readfile(`${W.RUN}/clients.json`) ?? '{}') ?? {};
+	const ev = events_load();
+	let changed = false;
+	for (let mac in seen) {
+		if (known[mac]) {
+			known[mac].last = now;
+			continue;
+		}
+		known[mac] = { sid: new_id('S'), cid: client_id(mac), first: now, last: now };
+		push(ev, { event_id: new_id('E'), client_id: known[mac].cid, session_id: known[mac].sid, event_type: 'connected', occurred_at: now });
+		changed = true;
+	}
+	for (let mac, k in known) {
+		if (seen[mac] || now - k.last < 4 * TICK + 10)
+			continue;
+		push(ev, { event_id: new_id('E'), client_id: k.cid, session_id: k.sid, event_type: 'disconnected', occurred_at: k.last });
+		delete known[mac];
+		changed = true;
+	}
+	writefile(`${W.RUN}/clients.json`, sprintf('%J', known));
+	if (changed && W.core('paired', '0') == '1')
+		events_save(ev);
+	W.st_set('clients_now', length(keys(seen)));
+}
+
+/* ------------------------------------------------------------ WordPress */
+
+function mem_kb(k) {
+	const m = match(readfile('/proc/meminfo') ?? '', regexp(`${k}:\\s+([0-9]+)`));
+	return m ? +m[1] : 0;
+}
+
+function health() {
+	const load = split(readfile('/proc/loadavg') ?? '0', ' ')[0];
+	return {
+		uptime: W.uptime(), mem_total_kb: mem_kb('MemTotal'), mem_free_kb: mem_kb('MemAvailable'),
+		clients_now: W.st_get('clients_now', 0), clients_connected: W.st_get('clients_now', 0),
+		load: +load, wan_link: W.wan_carrier(), wwan_link: W.if_up('wiflow_wwan'),
+		uplink_active: W.st_get('online', false) ? W.uplink_active() : 'none',
+		uplink_switches: W.st_get('uplink_switches', 0), watchdog_restarts: W.st_get('watchdog_restarts', 0),
+		time_ok: W.st_get('time_ok', false)
+	};
+}
+
+function command_result() {
+	const id = W.core('last_command_id');
+	if (!id)
+		return null;
+	return {
+		id: id, action: W.core('last_command_action', ''),
+		status: W.core('last_command_status', 'failed'), message: W.core('last_command_message', '')
+	};
+}
+
+function result(id, action, status, message) {
+	W.core_set({ last_command_id: id, last_command_action: action, last_command_status: status, last_command_message: message });
+}
+
+function df_total() {
+	const o = W.sh('df -k /overlay');
+	const l = split(trim(o), '\n');
+	const f = split(trim(replace(l[length(l) - 1] ?? '', /\s+/g, ' ')), ' ');
+	return W.num(f[1], 0) * 1024;
+}
+
+function diag_send(id) {
+	const text = sprintf('Wiflow %s, Wiflow OS %s, %s\nmode=%s via=%s online=%s\nwan=%s wwan=%s\n',
+		W.VERSION, W.os_version(), W.MODEL, W.core('internet_mode', 'auto'), W.uplink_active(),
+		W.st_get('online', false), W.if_ipv4(W.ifstatus('wan')) ?? '-', W.if_ipv4(W.ifstatus('wiflow_wwan')) ?? '-');
+	const r = W.http('POST', '/devices/diag', { command_id: id, health: health(), text: text, log: W.wlog_list(150) }, W.auth(), 20);
+	return !!r.body?.ok;
+}
+
+function run_command(cmd) {
+	const id = cmd?.id, action = cmd?.action, p = cmd?.payload ?? {};
+	if (type(id) != 'string' || !match(id, /^[A-Za-z0-9._:-]{1,80}$/) || type(action) != 'string')
+		return;
+	if (id == W.core('last_command_id'))
+		return;
+
+	const job = (kind, req) => {
+		req.command_id = id;
+		req.command_action = action;
+		const r = W.job_start(kind, req);
+		if (r.ok) result(id, action, 'running', 'Đang xử lý');
+		else result(id, action, 'failed', r.error);
+	};
+
+	W.wlog('system', `Lệnh từ ứng dụng: ${action}`);
+	switch (action) {
+	case 'reboot':
+		result(id, action, 'rebooting', 'Đang khởi động lại thiết bị');
+		W.run('sync');
+		W.run('(sleep 5; reboot) </dev/null >/dev/null 2>&1 &');
+		break;
+	case 'reconnect':
+		job('reconnect', {});
+		break;
+	case 'change_wifi':
+		job('uplink', {
+			mode: p.mode == 'auto' ? 'auto' : 'wifi', ssid: `${p.ssid ?? ''}`, band: p.band == '2g' ? '2g' : '5g',
+			key: `${p.password ?? ''}`, encryption: `${p.enc ?? ''}` || (length(p.password) ? 'psk2' : 'none')
+		});
+		break;
+	case 'set_internet_mode':
+		if (p.mode != 'auto' && p.mode != 'lan')
+			result(id, action, 'failed', 'Kiểu kết nối không hợp lệ');
+		else
+			job('uplink', { mode: p.mode });
+		break;
+	case 'change_guest_ssid':
+		job('guest', { ssid: `${p.guest_ssid ?? ''}` });
+		break;
+	case 'change_setup_login': {
+		const err = W.setup_set_login(p.username, p.password);
+		result(id, action, err ? 'failed' : 'success', err ?? 'Đã đổi tài khoản Wiflow Setup');
+		if (!err) W.wlog('security', 'Tài khoản Wiflow Setup đã được đổi từ ứng dụng');
+		break;
+	}
+	case 'diag': {
+		result(id, action, 'running', 'Đang gửi báo cáo chẩn đoán');
+		const ok = diag_send(id);
+		result(id, action, ok ? 'success' : 'failed', ok ? 'Đã gửi báo cáo chẩn đoán' : 'Không gửi được báo cáo chẩn đoán');
+		break;
+	}
+	case 'guest_settings':
+		result(id, action, 'failed', 'Giới hạn tốc độ, thời gian và giờ mở cửa sẽ có ở bản cập nhật cổng chào cho NR3053.');
+		break;
+	default:
+		result(id, action, 'failed', 'Lệnh không được hỗ trợ');
+	}
+}
+
+function heartbeat(online) {
+	const a = W.auth();
+	if (!a || W.core('paired', '0') != '1') {
+		W.st_set('wp_online', false);
+		return TICK;
+	}
+	if (!online) {
+		W.st_set('wp_online', false);
+		W.st_set('wp_error', 'no_internet');
+		return TICK;
+	}
+
+	const mode = W.core('internet_mode', 'auto');
+	const ev = events_load();
+	const batch = slice(ev, 0, 30);
+	const src = mode != 'lan' ? (W.uci_get('wireless', 'wiflow_uplink', 'ssid') ?? '') : '';
+	const r = W.http('POST', '/devices/heartbeat', {
+		agent_version: W.VERSION, data_generation: +W.GEN, internet: online, connection: mode,
+		wifi_ssid: src, guest_ssid: W.core('guest_ssid', 'Wiflow'),
+		active_portal_revision: 0, storage_total_bytes: df_total(), media_budget_bytes: 0,
+		portal_sync_status: 'idle', portal_sync_error: '',
+		events: batch, command_result: command_result(), health: health(),
+		stats: [], ad_stats: [], log: W.wlog_list(15)
+	}, a, 15);
+
+	const b = r.body;
+	if (b?.ok) {
+		if (`${b.data_generation}` != W.GEN) {
+			W.st_set('wp_online', false);
+			W.st_set('wp_error', 'generation_mismatch');
+			return 15 * TICK;
+		}
+		W.st_set('wp_online', true);
+		W.st_set('wp_error', null);
+		W.st_set('wp_last_ok', W.now());
+		W.st_set('unpair_n', null);
+		if (length(batch)) {
+			// Only what was sent goes; new events stay queued.
+			const cur = events_load();
+			const sent = {};
+			for (let e in batch) sent[e.event_id] = true;
+			events_save(filter(cur, e => !sent[e.event_id]));
+		}
+		if (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)
+		    && b.account_public_id != W.core('account_public_id'))
+			W.core_set({ account_public_id: b.account_public_id });
+		const st = +b.server_time;
+		if (st > 1600000000) {
+			if (W.now() - st <= 300 && st - W.now() <= 300) W.st_set('time_ok', true);
+			else if (W.run(`date -s @${st}`).code == 0) {
+				W.st_set('time_ok', true);
+				W.wlog('system', 'Đồng hồ router được chỉnh theo máy chủ Wiflow');
+			}
+		}
+		if (b.command)
+			run_command(b.command);
+		return TICK;
+	}
+
+	W.st_set('wp_online', false);
+	const code = b?.code;
+	W.st_set('wp_error', code ?? 'transport');
+	if (code == 'DEVICE_UNPAIRED') {
+		// Confirmed three times over at least two minutes before the router
+		// forgets its account.
+		let u = W.st_get('unpair_n') ?? { n: 0, first: W.uptime() };
+		u.n++;
+		W.st_set('unpair_n', u);
+		if (u.n >= 3 && W.uptime() - u.first >= 6 * TICK) {
+			W.clear_pairing();
+			W.wlog('system', 'Router đã được gỡ khỏi tài khoản Wiflow trong ứng dụng');
+			unlink(`${W.RUN}/events.json`);
+		}
+		return 3 * TICK;
+	}
+	W.st_set('unpair_n', null);
+	if (code == 'DEVICE_AUTH_INVALID' || code == 'DEVICE_AUTH_MISSING')
+		return min(30 * TICK, max(3 * TICK, hb_delay * 2));
+	if (code == 'DEVICE_GENERATION_MISMATCH')
+		return 15 * TICK;
+	return min(9 * TICK, hb_delay * 2);
+}
+
+/* -------------------------------------------------------------- main */
+
+// libubox installs its own SIGTERM/SIGINT handlers on the first ubus
+// connection; this loop does not run uloop, so procd's stop must kill it.
+W.bus();
+signal('SIGTERM', 'default');
+signal('SIGINT', 'default');
+
+W.wlog('system', `Wiflow ${W.VERSION} khởi động`);
+while (true) {
+	const t0 = W.uptime();
+	let online = false;
+	try { online = internet_tick(); } catch (e) { W.wlog('system', `internet: ${e}`); }
+	try { clients_tick(); } catch (e) { W.wlog('system', `clients: ${e}`); }
+	try { W.wifi_snapshot(); } catch (e) { W.wlog('system', `wifi: ${e}`); }
+
+	const kicked = access(`${W.RUN}/kick`);
+	if (kicked) unlink(`${W.RUN}/kick`);
+	if (kicked || t0 >= next_hb) {
+		try { hb_delay = heartbeat(online); } catch (e) { hb_delay = 60; W.wlog('system', `heartbeat: ${e}`); }
+		next_hb = W.uptime() + hb_delay;
+	}
+
+	// Sleep until the next tick; a kick file (pairing, command result) wakes
+	// the loop early.
+	for (let i = 0; i < TICK; i++) {
+		if (access(`${W.RUN}/kick`))
+			break;
+		sleep(1000);
+	}
+}
