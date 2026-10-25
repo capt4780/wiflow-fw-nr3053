@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+# Keep MediaTek hardware NAT (and WiFi offload through it) switched off so
+# every guest packet passes the firewall. The mtkhnat module itself stays,
+# because the mt_wifi driver needs it loaded.
+
+START=21
+
+boot() {
+	start
+}
+
+start() {
+	[ -w /sys/kernel/debug/hnat/hook_toggle ] && echo 0 > /sys/kernel/debug/hnat/hook_toggle
+	return 0
+}

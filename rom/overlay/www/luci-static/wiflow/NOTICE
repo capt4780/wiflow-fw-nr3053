@@ -1,0 +1,7 @@
+Wiflow theme for LuCI.
+cascade.css and mobile.css are unmodified copies of luci-theme-bootstrap
+(ImmortalWrt luci openwrt-25.12, 287f6c8): Copyright 2012 Nut & Bolt / David Menting, based on Bootstrap
+v1.4.0 (Copyright 2011 Twitter, Inc). Licensed under the Apache License 2.0,
+http://www.apache.org/licenses/LICENSE-2.0
+Templates are derived from luci-theme-bootstrap (Apache License 2.0).
+wiflow.css, menu-wiflow.js and the Wiflow logo: Wiflow.

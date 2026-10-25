@@ -1,0 +1,108 @@
+name: Wiflow OS NR3053 (lean repack)
+
+# Builds Wiflow OS by repacking the stable stock v2.3.6 image (base/):
+# kernel, device tree and WiFi driver stay byte-identical, only the rootfs is
+# slimmed and branded. Takes a few minutes; no compile.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "base/**"
+      - "rom/**"
+      - "tools/lean-*"
+      - "tools/fit-rootfs.py"
+      - "tools/fitx.py"
+      - "tools/rom-check.py"
+      - "tools/nr3053-golden.json"
+      - "scripts/repack.sh"
+      - ".github/workflows/repack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repack-nr3053-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FWTOOL_COMMIT: 04cd252e4e9394ffacd51f56f1f124abc534f715
+
+jobs:
+  repack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q squashfs-tools
+          git clone -q https://github.com/openwrt/fwtool /tmp/fwtool
+          git -C /tmp/fwtool checkout -q "$FWTOOL_COMMIT"
+          gcc -O2 -o /tmp/fwtool/fwtool /tmp/fwtool/fwtool.c
+          sudo install -m 0755 /tmp/fwtool/fwtool /usr/local/bin/fwtool
+          mksquashfs -version | head -n1
+
+      - name: Repack
+        run: sudo -E bash scripts/repack.sh dist
+
+      - name: Verify the image
+        run: |
+          set -euo pipefail
+          sudo chown -R "$(id -u):$(id -g)" dist
+          itb="$(ls dist/wiflow-os-*-sysupgrade.itb)"
+          cp "$itb" /tmp/check.itb
+          fwtool -q -i /tmp/meta.json /tmp/check.itb
+          python3 -c 'import json; d=json.load(open("/tmp/meta.json")); assert d["supported_devices"]==["viettel,nr3053"], d'
+          python3 tools/fitx.py "$itb" /tmp/fit > dist/report/fit.txt
+          python3 - "$itb" <<'PY'
+          import hashlib, json, struct, sys, zlib
+          g = json.load(open("tools/nr3053-golden.json"))
+          d = open(sys.argv[1], "rb").read()
+          h = lambda p: hashlib.sha256(open(p, "rb").read()).hexdigest()
+          assert h("/tmp/fit/_images_kernel-1.bin") == g["kernel_sha256"], "kernel differs from v2.3.6"
+          assert h("/tmp/fit/_images_fdt-1.bin") == g["fdt_sha256"], "device tree differs from v2.3.6"
+          print("PASS kernel and device tree identical to v2.3.6")
+          PY
+          sudo unsquashfs -s /tmp/fit/_images_rootfs-1.bin | head -n 12
+          cat dist/report/rom-check.txt
+          {
+            echo "### Wiflow OS NR3053"
+            echo '```'; cat dist/report/rom-check.txt; echo '```'
+            echo "Kept $(wc -l < dist/report/packages-kept.txt) packages, removed $(wc -l < dist/report/packages-removed.txt)."
+            echo '```'; cat dist/SHA256SUMS; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          while read -r line; do echo "::notice title=rom-check::$line"; done < dist/report/rom-check.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wiflow-os-nr3053
+          path: dist/
+          retention-days: 30
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V="$(tr -d ' \n' < rom/VERSION)"
+          TAG="nr3053-os-v$V-b${{ github.run_number }}"
+          {
+            echo "Wiflow OS $V cho Viettel NR3053: ImmortalWrt v2.3.6 làm gọn, kernel và driver WiFi giữ nguyên."
+            echo
+            echo "- Router: \`http://10.0.0.1\`, LuCI \`root\` / \`1234\`"
+            echo "- WiFi: \`Wiflow 2.4 GHz\`, \`Wiflow 5 GHz\` (mở)"
+            echo "- Nạp: LuCI → Hệ thống → Sao lưu / Nạp firmware, **bỏ chọn Giữ cấu hình**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
+            echo
+            echo '```'; cat dist/SHA256SUMS; echo '```'
+            echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
+          } > notes.md
+          gh release create "$TAG" --title "Wiflow OS $V — Viettel NR3053 (build ${{ github.run_number }})" \
+            --notes-file notes.md --target "$GITHUB_SHA" \
+            dist/wiflow-os-*-sysupgrade.itb dist/SHA256SUMS \
+            dist/report/rom-check.txt dist/report/packages-kept.txt dist/report/packages-removed.txt

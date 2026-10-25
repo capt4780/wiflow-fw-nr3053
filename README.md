@@ -1,17 +1,14 @@
-# Wiflow firmware — Viettel NR3053
+# Wiflow OS — Viettel NR3053
 
-Firmware thương mại Wiflow cho router Viettel NR3053 (MediaTek MT7981B, 512 MB RAM, 128 MB NAND).
+Firmware nền cho router Wiflow trên Viettel NR3053 (MediaTek MT7981B, 512 MB RAM, 128 MB NAND).
 
-- **Nền:** ImmortalWrt bản v2.3.6 đang chạy ổn định ([quytttb/immortalwrt-mt798x-rebase](https://github.com/quytttb/immortalwrt-mt798x-rebase) `495af17`).
-  - Feed `packages` và `luci` khoá đúng commit của bản đó.
-- **Giữ nguyên v2.3.6:**
-  - Kernel và cấu hình kernel.
-  - Driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng.
-  - Device tree, phân vùng NAND.
-  - Firmware không chứa và không ghi bootloader, preloader, dữ liệu hiệu chỉnh.
-- **Có trong ROM:** Wiflow (cổng bảo mật, quản trị, captive portal, đồng bộ app), LuCI tối giản, công cụ WiFi MediaTek.
-  - Reset router không mất Wiflow.
-- **Đã bỏ:** IPv6, PPPoE, VPN, chặn quảng cáo, UPnP, DDNS, tăng tốc phần cứng (HNAT), giao diện Aurora, tiếng Trung, công cụ dòng lệnh dư.
+Wiflow OS là bản ImmortalWrt v2.3.6 đang chạy ổn định, được **đóng gói lại** chứ không biên dịch lại:
+- **Giữ nguyên từng byte v2.3.6:** kernel, device tree, driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng, script nâng cấp. Bootloader và dữ liệu hiệu chỉnh không bị đụng tới.
+- **Rootfs làm gọn:** chỉ giữ gói Wiflow cần (`tools/lean-keep.txt` cùng các gói phụ thuộc), gỡ hết phần còn lại.
+- **Thương hiệu Wiflow:** theme LuCI Wiflow (duy nhất), tên máy, banner.
+- **Mặc định:** `10.0.0.1`, `root` / `1234`, WiFi mở `Wiflow 2.4 GHz` / `Wiflow 5 GHz`, HNAT tắt.
+
+Ứng dụng Wiflow (Setup, portal, kết nối WordPress) là gói `.apk` riêng, cài sau qua LuCI → Hệ thống → Phần mềm.
 
 Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File firmware ở **Releases**.
 
@@ -19,24 +16,25 @@ Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File fir
 
 | Đường dẫn | Nội dung |
 |---|---|
-| `package/wiflow-setup/` | Gói Wiflow (sinh từ mã nguồn Wiflow, cùng mã với CR6609) và phần riêng của ROM NR3053 |
-| `config/nr3053.config` | Cấu hình build tối giản |
-| `scripts/prepare.sh` | Lấy nguồn v2.3.6, khoá feed, thêm Wiflow, tạo và kiểm tra cấu hình |
-| `scripts/check-config.sh` | Kiểm tra cấu hình: chỉ NR3053, đủ gói cần, không còn gói đã bỏ, driver và kernel giống v2.3.6 |
-| `scripts/audit-image.sh` | Kiểm tra file `.itb` đã build: device tree, file WiFi so với v2.3.6, file Wiflow, gói đã bỏ |
-| `tools/nr3053-golden.json` | Mã băm từ bản v2.3.6 dùng để so sánh |
-| `.github/workflows/build.yml` | Build trên GitHub Actions, kiểm tra image, phát hành |
+| `base/` | Bản v2.3.6 gốc (`.itb`), SHA-256 khớp `tools/nr3053-golden.json` |
+| `tools/lean-keep.txt` | Danh sách gói giữ lại |
+| `tools/lean-rootfs.py` | Tính gói cần giữ theo phụ thuộc trong cơ sở dữ liệu apk, gỡ phần còn lại (file, liên kết, bản ghi apk) |
+| `rom/overlay/` | File thêm vào rootfs: theme LuCI Wiflow, cài đặt lần đầu `98-wiflow-base`, tắt HNAT, banner |
+| `rom/VERSION` | Phiên bản Wiflow OS |
+| `scripts/repack.sh` | Giải nén → làm gọn → thêm Wiflow → kiểm tra → đóng gói `.itb` |
+| `tools/rom-check.py` | Kiểm tra rootfs: WiFi giống v2.3.6, đủ thư viện, đủ module kernel, liên kết, mặc định, gói đã bỏ |
+| `tools/fit-rootfs.py` | Thay rootfs trong file FIT, giữ nguyên kernel và device tree |
+| `.github/workflows/repack.yml` | Build trên GitHub Actions (vài phút), phát hành khi đẩy lên `main` |
+| `package/`, `config/`, `scripts/prepare.sh`, `build.yml` | Bản build từ mã nguồn trước đây (1.0.x), chỉ để tham khảo |
 
 ## Build
 
-Tự chạy khi đẩy thay đổi lên `main`, hoặc chạy tay ở **Actions → Build NR3053 firmware → Run workflow**.
+Tự chạy khi đẩy thay đổi; chạy tay ở **Actions → Wiflow OS NR3053 → Run workflow**.
 
-Build trên máy Ubuntu 24.04:
+Trên Ubuntu (cần `squashfs-tools`, `fwtool`, `python3`, `openssl`):
 
 ```sh
-bash scripts/prepare.sh openwrt
-cd openwrt && make download -j8 && make -j"$(nproc)"
-bash ../scripts/audit-image.sh bin/targets/mediatek/filogic/*nr3053*sysupgrade.itb ../out/audit
+sudo bash scripts/repack.sh dist
 ```
 
-Không đưa vào repo: dữ liệu tài khoản, token API/thiết bị, file firmware, bản sao lưu.
+Không đưa vào repo: dữ liệu tài khoản, token API/thiết bị, file firmware đã build, bản sao lưu.

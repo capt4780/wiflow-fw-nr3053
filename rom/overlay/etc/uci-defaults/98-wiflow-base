@@ -1,0 +1,73 @@
+#!/bin/sh
+# Wiflow ROM base settings for Viettel NR3053.
+# Runs once after flashing and after every factory reset.
+# Only the base router: the Wiflow app (.apk) adds its own settings on top.
+
+# --- system ---
+uci -q batch <<'EOF'
+set system.@system[0].hostname='Wiflow'
+set system.@system[0].timezone='<+07>-7'
+set system.@system[0].zonename='Asia/Ho_Chi_Minh'
+delete system.ntp.server
+add_list system.ntp.server='vn.pool.ntp.org'
+add_list system.ntp.server='time.google.com'
+add_list system.ntp.server='pool.ntp.org'
+commit system
+EOF
+
+# --- LuCI: Vietnamese, Wiflow theme as the only theme ---
+uci -q batch <<'EOF'
+set luci.main.lang='vi'
+set luci.main.mediaurlbase='/luci-static/wiflow'
+delete luci.themes
+set luci.themes='internal'
+set luci.themes.Wiflow='/luci-static/wiflow'
+commit luci
+EOF
+
+# --- LAN 10.0.0.1/24, IPv4 only ---
+uci -q delete network.lan.ipaddr
+uci -q delete network.lan.netmask
+uci -q add_list network.lan.ipaddr='10.0.0.1/24'
+uci -q delete network.lan.ip6assign
+uci -q delete network.wan6
+uci -q delete network.globals.ula_prefix
+uci -q commit network
+
+uci -q batch <<'EOF'
+delete dhcp.lan.dhcpv6
+delete dhcp.lan.ra
+delete dhcp.lan.ra_slaac
+delete dhcp.lan.ra_flags
+delete dhcp.lan.ndp
+delete dhcp.odhcpd
+set dhcp.@dnsmasq[0].quietdhcp='1'
+commit dhcp
+EOF
+
+# --- WiFi: "Wiflow 2.4 GHz" / "Wiflow 5 GHz", open, on ---
+# (the MediaTek driver scripts stay identical to v2.3.6; only uci values change)
+uci -q show wireless | grep -q '=wifi-device$' || /sbin/wifi config
+for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+	case "$(uci -q get wireless.$dev.band)" in
+		2g) ssid='Wiflow 2.4 GHz' ;;
+		5g) ssid='Wiflow 5 GHz' ;;
+		*) continue ;;
+	esac
+	uci -q delete wireless.$dev.disabled
+	for ifc in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.device='$dev'$/\1/p"); do
+		[ "$(uci -q get wireless.$ifc.mode)" = ap ] || continue
+		uci -q set wireless.$ifc.ssid="$ssid"
+		uci -q set wireless.$ifc.encryption='none'
+		uci -q delete wireless.$ifc.key
+		uci -q delete wireless.$ifc.disabled
+	done
+done
+uci -q commit wireless
+
+# --- no software/hardware flow offload: every packet goes through the firewall ---
+uci -q set firewall.@defaults[0].flow_offloading='0'
+uci -q set firewall.@defaults[0].flow_offloading_hw='0'
+uci -q commit firewall
+
+exit 0

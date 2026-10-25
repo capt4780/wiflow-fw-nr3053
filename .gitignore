@@ -31,3 +31,6 @@ private/
 secrets/
 backups/
 wp-content/
+
+# Stock v2.3.6 image: input of the lean repack (scripts/repack.sh)
+!base/*.itb

@@ -1,0 +1,113 @@
+# Packages of the stock v2.3.6 image kept in the lean Wiflow ROM.
+# Their dependencies are added automatically (tools/lean-packages.py);
+# every other package of the stock image is removed.
+
+# --- boot, flash, sysupgrade (must never be touched) ---
+base-files
+busybox
+procd
+procd-ujail
+procd-seccomp
+ubox
+ubus
+ubusd
+uci
+fstools
+fwtool
+fitblk
+fit-check-sign
+mtd
+ubi-utils
+uboot-envtools
+logd
+kmod-gpio-button-hotplug   # reset button
+kmod-leds-gpio
+autocore                   # CPU/temperature on the LuCI status page
+urandom-seed
+urngd
+kernel
+
+# --- network core ---
+netifd
+firewall4
+nftables-json
+dnsmasq-full
+dropbear
+ppp
+ppp-mod-pppoe
+mtk-smp
+ip-tiny                    # /sbin/ip
+gawk                       # awk (busybox here has none)
+coreutils-sort             # sort (busybox here has none)
+resolveip
+tc-tiny
+kmod-sched-core
+kmod-ifb
+
+# --- MediaTek WiFi stack, exactly as v2.3.6 ---
+kmod-mt_wifi
+kmod-warp
+kmod-conninfra
+kmod-mediatek_hnat
+wifi-dats
+wifi-scripts
+mtwifi-cfg-ucode
+wpad-openssl
+iw
+iwinfo-ucode
+wireless-tools
+wireless-regdb
+l1util
+datconf
+kvcedit
+
+# --- Wiflow runtime needs (WordPress API, scripts) ---
+curl
+uclient-fetch
+libustream-openssl20201210 # HTTPS for uclient-fetch / wget
+ca-bundle
+ca-certificates
+jsonfilter
+jshn
+ucode
+ucode-mod-fs
+ucode-mod-ubus
+ucode-mod-uci
+ucode-mod-uloop
+ucode-mod-digest
+ucode-mod-math
+ucode-mod-log
+ucode-mod-html
+ucode-mod-rtnl
+ucode-mod-nl80211
+ucode-mod-iwinfo
+
+# --- web admin: lean LuCI, Vietnamese only ---
+uhttpd
+uhttpd-mod-ubus
+rpcd
+rpcd-mod-file
+rpcd-mod-iwinfo
+rpcd-mod-luci
+rpcd-mod-rrdns
+rpcd-mod-ucode
+rpcd-mod-rpcsys            # LuCI reset/flash/package list
+cgi-io
+luci-base
+luci-mod-admin-full
+luci-mod-network
+luci-mod-status
+luci-mod-system
+luci-app-firewall
+luci-app-mtwifi-cfg
+luci-app-package-manager
+luci-proto-ppp
+luci-i18n-base-vi
+luci-i18n-firewall-vi
+luci-i18n-mtwifi-cfg-vi
+luci-i18n-package-manager-vi
+
+# --- package manager, so the Wiflow .apk can be installed later ---
+apk-openssl
+openwrt-keyring
+usign

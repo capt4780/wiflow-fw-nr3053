@@ -1,14 +1,8 @@
 name: Build NR3053 firmware
 
+# Old source build (P5x / 1.0.x). Superseded by repack.yml (Wiflow OS);
+# kept for reference, runs only when started by hand.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "package/**"
-      - "config/**"
-      - "scripts/**"
-      - "tools/**"
-      - ".github/workflows/build.yml"
   workflow_dispatch:
 
 permissions:
