@@ -284,3 +284,8 @@ header.wf-top a.wf-mlogo,header.wf-top a.wf-mlogo span{color:var(--wf-text)!impo
  /* a wide settings table scrolls inside its card instead of pushing the page sideways */
  .cbi-section-node:has(>.cbi-section-table){overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
+/* logo = the original Wiflow artwork, rounded; it fills its tile (no white frame) */
+.wf-tile{width:44px;height:44px;border-radius:12px;background:none;padding:0}
+.wf-tile img{width:44px!important;height:44px!important;border-radius:12px;object-fit:cover}
+.wf-mlogo img{width:32px;height:32px;border-radius:9px;object-fit:cover}
+.modal.login::before{width:96px;height:96px;border-radius:22px;background:url(wiflow-mark-256.png) center/cover no-repeat;box-shadow:0 6px 18px rgba(11,27,58,.12)}
