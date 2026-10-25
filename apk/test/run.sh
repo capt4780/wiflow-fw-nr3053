@@ -65,6 +65,10 @@ expect "source radio follows the source, other radio fixed" "$(U get wireless.MT
 r="$(job set_uplink '{"mode":"auto","ssid":"Nha Ben Canh","band":"2g","key":"bencanh123","encryption":"psk2"}')"
 expect "switch source on the same band" "$r" '^success\|Đã kết nối “Nha Ben Canh”'
 grep -q "iwpriv apcli0 set ApCliSsid=Nha Ben Canh" /tmp/mock/calls.log && ! grep -q "^wifi reload" /tmp/mock/calls.log && pass "same-band switch without reloading the WiFi" || fail "same-band switch reloaded WiFi: $(grep -E '^wifi|ApCliSsid' /tmp/mock/calls.log | tr '\n' ';')"
+call wifitest '{"ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}' >/dev/null
+for i in $(seq 1 120); do sleep 2; r="$(st "(s['job'] or {}).get('state','') + '|' + (s['job'] or {}).get('message','')")"; case "$r" in running*) ;; *) break;; esac; done
+expect "WiFi source test: joins, keeps it, writes the log (no key)" "$r|$(grep -c 'cách 1: KẾT NỐI ĐƯỢC' /tmp/wiflow/wifitest.txt)|$(grep -c cafe1234 /tmp/wiflow/wifitest.txt)|$(U get wireless.wiflow_uplink.ssid)" '^success\|.*giữ kết nối.*\|1\|0\|Cafe Sua Da$'
+expect "WiFi source test: scan and both paths recorded" "$(grep -c '<== chọn' /tmp/wiflow/wifitest.txt) $(grep -c '== cách 2' /tmp/wiflow/wifitest.txt)" '^[1-9][0-9]* 1$'
 $B world 'w["iw_blind"]=True'
 r="$(job set_uplink '{"mode":"auto","ssid":"Cafe Sua Da","band":"2g","key":"cafe1234","encryption":"psk2"}')"
 expect "join when the driver hides the BSSID (DHCP is the proof)" "$r" '^success\|Đã kết nối “Cafe Sua Da”'

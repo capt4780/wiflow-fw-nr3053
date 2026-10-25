@@ -139,6 +139,17 @@ const methods = {
 		}
 	},
 
+	// "Kiểm tra WiFi nguồn" (about 3 minutes)
+	wifitest: {
+		args: { ssid: '', band: '', key: '', encryption: '' },
+		call: function(req) {
+			const a = req.args;
+			if (!length(str(a.ssid)) || index([ '2g', '5g' ], a.band) < 0)
+				return { ok: false, error: 'Chọn WiFi nguồn cần kiểm tra.' };
+			return W.job_start('wifitest', { ssid: a.ssid, band: a.band, key: str(a.key), encryption: str(a.encryption) || (length(str(a.key)) ? 'psk2' : 'none') });
+		}
+	},
+
 	reset: {
 		call: function() {
 			return W.job_start('reset', {});

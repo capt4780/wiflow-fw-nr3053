@@ -215,6 +215,9 @@ checks = {
     "phone/tablet layout by viewport width (tables become cards up to 900 px)":
         "max-device-width" not in open(F + "/www/luci-static/wiflow/mobile.css").read()
         and "(max-width: 854px)" in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
+    "5 GHz scans and uses channels 100-140 (country VN, A-band region 7)":
+        json.load(open(F + "/usr/share/schema/mtwifi/dat-defs.json"))["COUNTRY_REGIONS"]["VN"] == [1, 7]
+        and "country='VN'" in open(F + "/etc/uci-defaults/98-wiflow-base").read(),
     "anonymous ubus cannot call session.login":
         "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }

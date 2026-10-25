@@ -438,3 +438,13 @@ body.wf-login,body.wf-login #modal_overlay{background:#fff!important}
 	}
 
 }
+/* long names (SSID, host, radio): wrap inside their badge, never stick out */
+.ifacebadge{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.ifacebadge .nowrap,.ifacebadge span{white-space:normal;overflow-wrap:anywhere}
+#maincontent [data-name="_badge"]{width:112px!important;max-width:112px!important;min-width:112px!important}
+#maincontent [data-name="_badge"] .ifacebadge{white-space:nowrap;overflow-wrap:normal;font-size:11px;padding:6px 4px;width:100%!important;max-width:100%!important;box-sizing:border-box;justify-content:center;text-align:center}
+#maincontent .td,#maincontent td{overflow-wrap:break-word}
+#maincontent .td .btn,#maincontent td .btn,#maincontent .td button{overflow-wrap:normal}
+#maincontent [data-name="_badge"] .ifacebadge *{white-space:nowrap;overflow-wrap:normal}
+#maincontent [data-name="_badge"] .ifacebadge{display:inline-flex!important;flex-direction:column;align-items:center;gap:3px}#maincontent [data-name="_badge"] .ifacebadge img{margin:0!important}
+#maincontent [data-signal] span,#maincontent [data-signal]{white-space:nowrap;overflow-wrap:normal}

@@ -9,7 +9,7 @@
 // the package is removed.
 'use strict';
 
-import { readfile, writefile, mkdir, access, unlink } from 'fs';
+import { readfile, writefile, mkdir, access, unlink, rename } from 'fs';
 import { cursor } from 'uci';
 import * as W from 'wiflow.setup';
 
@@ -143,6 +143,31 @@ export function ensure_networks() {
 // first = true on install: the stock / LuCI-made APs of the mt_wifi radios
 // are removed (kept in /etc/wiflow/stock) so each radio has one AP, the
 // guest AP, as its main interface.
+// 5 GHz channels 100-140: the mtwifi table maps CN and VN to A-band region
+// 0 (36-64, 149-165 only), so the radio never even scans a modem on 100-140.
+// Region 7 = 36-64, 100-140, 149-165. Country VN, table entry VN -> [1, 7].
+const DAT_DEFS = '/usr/share/schema/mtwifi/dat-defs.json';
+
+export function ensure_region() {
+	const d = json(readfile(DAT_DEFS) ?? 'null');
+	if (type(d?.COUNTRY_REGIONS) == 'object' && d.COUNTRY_REGIONS.VN?.[1] != 7) {
+		d.COUNTRY_REGIONS.VN = [ 1, 7 ];
+		if (writefile(`${DAT_DEFS}.tmp`, sprintf('%J', d)))
+			rename(`${DAT_DEFS}.tmp`, DAT_DEFS);
+	}
+	const c = cursor();
+	c.load('wireless');
+	let changed = false;
+	for (let r in W.radios())
+		if (c.get('wireless', r.name, 'country') != 'VN') {
+			c.set('wireless', r.name, 'country', 'VN');
+			changed = true;
+		}
+	if (changed)
+		c.commit('wireless');
+	return changed;
+};
+
 export function ensure_wireless(first) {
 	const c = cursor();
 	c.load('wireless');
@@ -178,6 +203,8 @@ export function ensure_wireless(first) {
 	}
 	if (changed)
 		c.commit('wireless');
+	if (ensure_region())
+		changed = true;
 	W.run('chmod 600 /etc/config/wireless');
 	return changed;
 };

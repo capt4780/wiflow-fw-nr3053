@@ -24,7 +24,7 @@ elif len(a) >= 2 and a[1] == 'get_site_survey':
     except Exception: t0 = 0
     w = json.load(open('/tmp/mock/world.json'))
     print('%-10sget_site_survey:' % a[0])
-    print('No  Ch  SSID                             BSSID               Security               Siganl(%%)W-Mode  ExtCH  NT WPS DPID BcnRept')
+    print('No  Ch  SSID                             BSSID               Security               Siganl(%)W-Mode  ExtCH  NT WPS DPID BcnRept')
     if t0 and time.time() - t0 >= 3:
         SEC = {'none': 'NONE', 'psk2': 'WPA2PSK/AES', 'psk': 'WPAPSK/TKIP', 'sae': 'WPA3PSK/AES', 'mixed': 'WPA2PSKWPA3PSK/AES', 'eap': 'WPA2/AES'}
         for i, ap in enumerate(x for x in w['aps'] if x['band'] == band):

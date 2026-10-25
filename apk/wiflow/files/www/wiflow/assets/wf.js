@@ -144,9 +144,9 @@ function topo(useWifi,opts={}){
   <text x="32" y="64" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.85)">Dây LAN</text><text x="32" y="128" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.85)">WiFi nguồn</text>
   <text x="258" y="98" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.85)">${esc(opts.guests??'Khách')}</text></svg>`;
 }
-function donut(val,max,label){const p=max>0?Math.min(1,val/max):Math.min(1,val/50);return `<svg width="112" height="112" viewBox="0 0 112 112" role="img" aria-label="${esc(label)}" style="flex:none"><circle cx="56" cy="56" r="46" fill="none" stroke="#EEF1FE" stroke-width="12"/><circle cx="56" cy="56" r="46" fill="none" stroke="#4360F5" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(289*p).toFixed(1)} 289" transform="rotate(-90 56 56)" style="transition:stroke-dasharray .6s ease"/><text x="56" y="58" text-anchor="middle" font-family="Lexend,sans-serif" font-size="28" font-weight="500" fill="#1B2036">${val}</text><text x="56" y="76" text-anchor="middle" font-size="11" fill="#6A7189">/ ${max>0?max:'∞'} khách</text></svg>`}
+function donut(val,max,label){const p=max>0?Math.min(1,val/max):Math.min(1,val/50);return `<svg width="112" height="112" viewBox="0 0 112 112" role="img" aria-label="${esc(label)}" style="flex:none"><circle cx="56" cy="56" r="46" fill="none" stroke="#EEF1FE" stroke-width="12"/><circle cx="56" cy="56" r="46" fill="none" stroke="#4360F5" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(289*p).toFixed(1)} 289" transform="rotate(-90 56 56)" style="transition:stroke-dasharray .6s ease"/><text x="56" y="58" text-anchor="middle" font-family="Inter,sans-serif" font-size="28" font-weight="500" fill="#1B2036">${val}</text><text x="56" y="76" text-anchor="middle" font-size="11" fill="#6A7189">/ ${max>0?max:'∞'} khách</text></svg>`}
 function gauge(pct,color,v,l,s,limit){const a=(214*Math.min(100,Math.max(0,pct))/100).toFixed(1);let ln='';if(limit){const ang=(-90+360*limit/100)*Math.PI/180;ln=`<line x1="${(42+27*Math.cos(ang)).toFixed(1)}" y1="${(42+27*Math.sin(ang)).toFixed(1)}" x2="${(42+41*Math.cos(ang)).toFixed(1)}" y2="${(42+41*Math.sin(ang)).toFixed(1)}" stroke="#1B2036" stroke-width="2" stroke-linecap="round"/>`}
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0"><svg width="84" height="84" viewBox="0 0 84 84" role="img" aria-label="${esc(l)} ${esc(v)}"><circle cx="42" cy="42" r="34" fill="none" stroke="#F2F4F8" stroke-width="9"/><circle cx="42" cy="42" r="34" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${a} 214" transform="rotate(-90 42 42)"/>${ln}<text x="42" y="47" text-anchor="middle" font-family="Lexend,sans-serif" font-size="17" font-weight="500" fill="#1B2036">${esc(v)}</text></svg><div style="font-size:12px;font-weight:500">${esc(l)}</div><div style="font-size:10px;color:var(--mute);text-align:center">${esc(s)}</div></div>`}
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0"><svg width="84" height="84" viewBox="0 0 84 84" role="img" aria-label="${esc(l)} ${esc(v)}"><circle cx="42" cy="42" r="34" fill="none" stroke="#F2F4F8" stroke-width="9"/><circle cx="42" cy="42" r="34" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${a} 214" transform="rotate(-90 42 42)"/>${ln}<text x="42" y="47" text-anchor="middle" font-family="Inter,sans-serif" font-size="17" font-weight="500" fill="#1B2036">${esc(v)}</text></svg><div style="font-size:12px;font-weight:500">${esc(l)}</div><div style="font-size:10px;color:var(--mute);text-align:center">${esc(s)}</div></div>`}
 function sigBars(dbm){if(dbm==null)return '<span class="sig"><i></i><i></i><i></i><i></i></span>';const l=dbm>=-58?4:dbm>=-67?3:dbm>=-76?2:1;return `<span class="sig l${l}" aria-label="Sóng ${l}/4"><i></i><i></i><i></i><i></i></span>`}
 
 /* ---------- toast, sheet ---------- */
@@ -161,30 +161,51 @@ function closeSheet(){const w=$('#sheet');if(w){const c=w._close;w.remove();if(c
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){const w=$('#sheet');if(w&&!w.dataset.lock)closeSheet()}});
 function confirmSheet(o){return new Promise(res=>{const c=sheet(`<span class="ic" style="width:52px;height:52px;background:${o.tint||'var(--accS)'};color:${o.ink||'var(--acc)'}">${ico(o.icon||'alert','width:24px;height:24px')}</span><div class="h" style="font-size:22px">${esc(o.title)}</div><div style="font-size:14px;color:var(--ink2);line-height:1.55">${esc(o.text)}</div><div class="two"><button class="btn" data-no>Huỷ</button><button class="btn ${o.danger?'danger':'pri'}" data-yes>${esc(o.ok||'Đồng ý')}</button></div>`,()=>res(false));$('[data-no]',c).onclick=()=>closeSheet();$('[data-yes]',c).onclick=()=>{const w=$('#sheet');w._close=null;w.remove();res(true)}})}
 
-/* ---------- shell ---------- */
+/* ---------- shell: the Wiflow OS sidebar (same look and menu as LuCI) ---------- */
+const MICON={wiflow:'<path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',status:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+ system:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',services:'<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+ network:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',vpn:'<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+ nas:'<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/>',statistics:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+ logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',_:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>'};
+const micon=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${MICON[n]||MICON._}</svg>`;
+const CHEV='<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+const kidsOf=n=>Object.entries((n&&n.children)||{}).filter(([k,v])=>v&&v.satisfied&&v.title!=null).map(([k,v])=>Object.assign({name:k},v)).sort((a,b)=>(a.order??9999)-(b.order??9999));
+/* LuCI's own menu (the same tree its sidebar shows), loaded once */
+async function loadMenu(){try{const r=await fetch('/cgi-bin/luci/admin/menu',{cache:'no-store',credentials:'same-origin'});const j=await r.json();S.menu=kidsOf(((j.children||{}).admin)||{});shell()}catch(e){S.menu=[]}}
 function shell(){
-  const nav=NAV.map(([id,l,i])=>`<button type="button" data-go="${id}"${S.page===id?' class="on" aria-current="page"':''}><span class="ib">${ico(i)}</span><span class="l">${l}</span></button>`).join('');
-  $('#sideNav').innerHTML=nav;
-  $('#tabbar').innerHTML=NAV.map(([id,l,i])=>`<button type="button" data-go="${id}" aria-label="${l}"${S.page===id?' class="on" aria-current="page"':''}>${ico(i,'width:21px;height:21px')}<span>${l}</span></button>`).join('');
-  $$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  const open=S.navOpen||(S.navOpen={wiflow:true});
+  let h=`<li class="dropdown active${open.wiflow?' open':''}"><a class="menu" href="#" data-grp="wiflow" aria-expanded="${!!open.wiflow}">${micon('wiflow')}<span>Wiflow Setup</span>${CHEV}</a><ul class="dropdown-menu">${NAV.map(([id,l])=>`<li class="${S.page===id&&!S.wiz?'active':''}"><a href="#${id}" data-go="${id}"${S.page===id?' aria-current="page"':''}>${l}</a></li>`).join('')}</ul></li>`;
+  for(const g of (S.menu||[])){
+    if(g.name==='wiflow')continue;const kids=kidsOf(g);
+    if(!kids.length){h+=`<li><a href="/cgi-bin/luci/admin/${encodeURIComponent(g.name)}"${g.name==='logout'?' data-logout':''}>${micon(g.name)}<span>${esc(g.title==='Log out'?'Đăng xuất':g.title)}</span></a></li>`;continue}
+    h+=`<li class="dropdown${open[g.name]?' open':''}"><a class="menu" href="#" data-grp="${esc(g.name)}" aria-expanded="${!!open[g.name]}">${micon(g.name)}<span>${esc(g.title)}</span>${CHEV}</a><ul class="dropdown-menu">${kids.map(k=>`<li><a href="/cgi-bin/luci/admin/${encodeURIComponent(g.name)}/${encodeURIComponent(k.name)}">${esc(k.title)}</a></li>`).join('')}</ul></li>`;
+  }
+  if(!S.menu||!S.menu.some(g=>g.name==='logout'))h+=`<li><a href="${LOGOUT}" data-logout>${micon('logout')}<span>Đăng xuất</span></a></li>`;
+  $('#sideNav').innerHTML=h;
+  $$('[data-grp]').forEach(a=>a.onclick=e=>{e.preventDefault();const g=a.dataset.grp;open[g]=!open[g];shell()});
+  $$('[data-go]').forEach(b=>b.onclick=e=>{e.preventDefault();menuClose();if(!S.wiz)go(b.dataset.go)});
+  $$('#sideNav [data-logout]').forEach(a=>a.onclick=e=>{e.preventDefault();try{sessionStorage.removeItem('wf-sid')}catch(x){}location.href=LOGOUT});
   head();
 }
+function menuClose(){document.body.classList.remove('wf-menu-open');const b=$('#wf-burger');if(b)b.setAttribute('aria-expanded','false')}
+(()=>{const b=$('#wf-burger');if(b)b.addEventListener('click',e=>{e.stopPropagation();const o=document.body.classList.toggle('wf-menu-open');b.setAttribute('aria-expanded',o?'true':'false')});
+  document.addEventListener('click',e=>{if(document.body.classList.contains('wf-menu-open')&&!e.target.closest('#wf-side'))menuClose()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')menuClose()})})();
 function livePill(){
-  const st=S.st||{},h=(S.ov||{}).health||{};
-  if(st.safe_mode)return ['Chế độ an toàn','warn'];
+  const st=S.st||{};
+  if(!S.st)return ['Đang tải','warn'];
+  if(!st.activated)return ['Chưa bật Wiflow','warn'];
   if(!+st.internet_live)return ['Mất Internet','bad'];
-  if(st.sched_closed)return ['Ngoài giờ phục vụ','warn'];
   if(st.internet_mode==='auto'&&st.uplink_active==='wifi')return ['Dự phòng',''];
   return ['Hoạt động',''];
 }
 function head(){
-  const st=S.st||{},t=TITLES[S.page]||['Wiflow',''],[pt,pc]=livePill();
-  let sub=t[1];if(S.page==='status'&&S.ov)sub=`Cập nhật trực tiếp · tự kiểm tra lúc ${hhmm(S.ov.now)}`;
+  const st=S.st||{},t=S.wiz?['Cài đặt Wiflow','Làm lần lượt 4 bước, có thể làm lại sau trong từng trang']:(TITLES[S.page]||['Wiflow','']),[pt,pc]=livePill();
+  let sub=t[1];if(!S.wiz&&S.page==='status'&&S.ov)sub=`Cập nhật trực tiếp · tự kiểm tra lúc ${hhmm(S.ov.now)}`;
   $('#dTitle').textContent=t[0];$('#dSub').textContent=sub;
-  $('#mTitle').textContent=S.page==='status'?'Wiflow':t[0];$('#mSub').textContent=devCode(st.device_id);
-  ['#dPill','#mPill'].forEach(s=>{const p=$(s);p.className='pill'+(pc?' '+pc:'');p.innerHTML=`<span class="dot${pc?' '+(pc==='bad'?'bad':'warn'):''}"></span><span>${pt}</span>`});
-  $('#devName').textContent=devCode(st.device_id);$('#devVer').textContent=`Wiflow ${st.version||''}${st.os?' · Wiflow OS '+st.os:''}`;
-  $('#devDot').className='dot'+(pc?' '+(pc==='bad'?'bad':'warn'):'');
+  $('#crumb').innerHTML=`Wiflow Setup › <b>${esc(t[0])}</b>`;
+  const p=$('#dPill');p.className='pill'+(pc?' '+pc:'');p.innerHTML=`<span class="dot${pc?' '+(pc==='bad'?'bad':'warn'):''}"></span><span>${pt}</span>`;
+  $('#devName').textContent=st.model||'Viettel NR3053';$('#devVer').textContent=st.os?`Wiflow OS ${st.os}`:'Wiflow Setup';
   document.title=t[0]+' · Wiflow';
 }
 function go(p,force){
@@ -198,7 +219,7 @@ function go(p,force){
 }
 function render(enter){
   if(S.wiz){renderWizard();return}
-  $('#shell').classList.remove('wizmode');
+  $('#shell').classList.remove('wizmode');head();
   const v=$('#view');const f={status:vStatus,internet:vInternet,guest:vGuest,system:vSystem}[S.page]||vStatus;
   const html=f();if(!enter&&html===S.lastRender)return;S.lastRender=html;
   const sc=$('#body').scrollTop,rail=$('.rail',v),rs=rail?rail.scrollLeft:0;
@@ -346,7 +367,7 @@ function vInternet(){
       <div style="font-size:13px;color:rgba(255,255,255,.85)">${m>=0?hints[m]:'Chọn cách router lấy Internet.'}${S.pend==='auto'&&!saved?' Chọn một WiFi nguồn bên dưới làm dự phòng.':''}</div>
       <div class="inet-row">
         <div style="flex:1;min-width:0;width:100%">${topo(useWifi,{online,h:window.innerWidth<720?130:180})}</div>
-        <div class="gauge"><svg width="200" height="116" viewBox="0 0 200 116" role="img" aria-label="Chất lượng kết nối ${score} trên 100"><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="16" stroke-linecap="round"/><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(252*score/100).toFixed(1)} 252" style="transition:stroke-dasharray .4s ease"/><text x="100" y="88" text-anchor="middle" font-family="Lexend,sans-serif" font-size="34" font-weight="500" fill="#fff">${online&&q.ping!=null?score:'—'}</text><text x="100" y="108" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.8)">chất lượng / 100</text></svg>
+        <div class="gauge"><svg width="200" height="116" viewBox="0 0 200 116" role="img" aria-label="Chất lượng kết nối ${score} trên 100"><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="16" stroke-linecap="round"/><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(252*score/100).toFixed(1)} 252" style="transition:stroke-dasharray .4s ease"/><text x="100" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-size="34" font-weight="500" fill="#fff">${online&&q.ping!=null?score:'—'}</text><text x="100" y="108" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.8)">chất lượng / 100</text></svg>
           <button type="button" class="wbtn" id="recheck">${ico('refresh','width:14px;height:14px')}Kiểm tra lại</button></div>
       </div>
       <div class="row3"><div class="stat"><b>${q.ping!=null&&online?q.ping+' ms':'—'}</b><span>Độ trễ</span></div><div class="stat"><b>${q.jitter!=null&&online?q.jitter+' ms':'—'}</b><span>Dao động</span></div><div class="stat"><b>${online?(q.loss||0)+'%':'—'}</b><span>Mất gói</span></div></div>
@@ -405,7 +426,9 @@ function wifiSheet(n){
    ${n&&n.weak&&!n.dfs?`<div class="msg warn">Sóng yếu (${n.signal} dBm), dễ chập chờn. Nên đặt router gần modem hơn.</div>`:''}
    ${n&&n.ssid===guest?`<div class="msg warn">Mạng này trùng tên WiFi khách. Wiflow sẽ đổi WiFi khách thành “${esc(guest)} Free”.</div>`:''}
    <div class="msg info" style="font-size:12.5px">${ico('alert','width:16px;height:16px')}<span>Lần đầu bắt WiFi nguồn, WiFi của router khởi động lại khoảng 30 giây. Nếu bạn đang dùng WiFi khách, hãy kết nối lại rồi mở 10.0.0.1.</span></div>
-   <div class="two"><button class="btn" data-no>Huỷ</button><button class="btn pri" data-yes>Kết nối</button></div>`);
+   <div class="two"><button class="btn" data-no>Huỷ</button><button class="btn pri" data-yes>Kết nối</button></div>
+   <button type="button" class="btn ghost" data-test style="height:32px;font-weight:500">Kiểm tra chi tiết thay vì kết nối</button>`);
+  $('[data-test]',c).onclick=()=>{const ssid=n?n.ssid:($('#wSsid',c).value||'').trim(),pass=open?'':($('#wPass',c)||{}).value||'';if(!ssid){$('#wSsid',c).focus();return}if(!open&&pass.length<8){toast('Mật khẩu WiFi tối thiểu 8 ký tự',true);return}runTest({ssid,band:n?n.band:'5g',key:pass,encryption:n?n.enc:'psk2'})};
   const eye=$('#wEye',c);if(eye)eye.onclick=()=>{const i=$('#wPass',c);i.type=i.type==='password'?'text':'password'};
   $('[data-no]',c).onclick=closeSheet;
   const go2=()=>{const ssid=n?n.ssid:($('#wSsid',c).value||'').trim(),pass=open?'':($('#wPass',c)||{}).value||'';
@@ -417,11 +440,30 @@ function wifiSheet(n){
 const PH={wifi:[['preparing','Chuẩn bị'],['associating','Kết nối WiFi nguồn'],['dhcp','Nhận địa chỉ mạng'],['internet_check','Kiểm tra Internet']],lan:[['preparing','Chuẩn bị'],['dhcp','Nhận địa chỉ qua dây'],['internet_check','Kiểm tra Internet']]};
 function stages(kind,phase,state){const list=PH[kind]||PH.wifi;let at=list.findIndex(p=>p[0]===phase);if(at<0)at=0;
   return `<ol class="stages">${list.map(([k,t],i)=>{let c='';if(state==='success'||i<at)c='done';else if(i===at)c=state==='failed'?'fail':'now';return `<li class="${c}"><span class="sd">${c==='done'?ico('check'):c==='fail'?ico('x'):c==='now'?'<span class="spin" style="width:14px;height:14px;border-width:2px"></span>':''}</span>${t}</li>`}).join('')}</ol>`}
+/* "Kiểm tra chi tiết": the router tries every way to join and logs the driver (about 3 minutes) */
+async function runTest(d){
+  const c=sheet(`<div class="hd"><span class="ic" style="width:48px;height:48px;background:var(--accS);color:var(--acc)">${ico('tool','width:22px;height:22px')}</span><div style="min-width:0"><b>${esc(d.ssid)}</b><span>Kiểm tra chi tiết WiFi nguồn</span></div></div><div class="msg info" id="tm"><span class="spin" style="width:16px;height:16px;border-width:2px"></span><span>Đang bắt đầu…</span></div><div class="note">Khoảng 3 phút. WiFi khách có thể ngắt vài lần trong lúc kiểm tra. Nếu mất kết nối, hãy kết nối lại WiFi rồi mở 10.0.0.1, kết quả vẫn được lưu trên router.</div><div id="tr"></div>`);
+  $('#sheet').dataset.lock='1';
+  const msg=(t,cls)=>{const m=$('#tm',c);if(m){m.className='msg '+(cls||'info');m.innerHTML=(cls?'':'<span class="spin" style="width:16px;height:16px;border-width:2px"></span>')+`<span>${esc(t)}</span>`}};
+  const end=(ok,t)=>{msg(t,ok?'ok':'err');delete $('#sheet').dataset.lock;$('#tr',c).innerHTML='<div class="two"><button class="btn" data-close>Đóng</button><button class="btn pri" data-dl>Tải kết quả</button></div>';$('[data-close]',c).onclick=()=>{closeSheet();refreshStatus().then(()=>{loadInet();render()})};$('[data-dl]',c).onclick=()=>dlFile('/tmp/wiflow/wifitest.txt','wiflow-wifi-test')};
+  try{const r=await ubus('wiflow','wifitest',{ssid:d.ssid,band:d.band||'2g',key:d.key||'',encryption:d.encryption||''});if(r.ok===false){end(false,r.error||'Không bắt đầu được');return}}catch(e){if(e.message!=='auth')end(false,'Không bắt đầu được');return}
+  const t0=Date.now();let miss=0;
+  for(;;){await sleep(2500);if(!$('#sheet'))return;
+    try{const s=await ubus('wiflow','status',{},10000);miss=0;const j=s.job||{};
+      if(j.kind!=='wifitest'){end(false,'Không thấy việc kiểm tra trên router.');return}
+      if(j.state==='running'){msg(j.message||'Đang kiểm tra…');continue}
+      end(!!j.ok,j.message||'Đã kiểm tra xong');return}
+    catch(e){if(e.message==='auth')return;if(++miss>40){end(false,'Mất kết nối tới router. Kết nối lại rồi tải kết quả ở Hệ thống → Tải báo cáo.');return}msg('Đang chờ router… (WiFi có thể vừa khởi động lại)')}
+    if(Date.now()-t0>420000){end(false,'Quá thời gian chờ.');return}}
+}
+async function dlFile(path,name){try{const f=await ubus('file','read',{path});const d=new Date(),n=`${name}-${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}${pad2(d.getHours())}${pad2(d.getMinutes())}.txt`,a=document.createElement('a');a.href=URL.createObjectURL(new Blob([f.data||''],{type:'text/plain'}));a.download=n;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast('Đã tải '+n)}catch(e){toast('Chưa có kết quả để tải',true)}}
 async function runConnect(data,kind,ssid){
   const c=sheet(`<div class="hd"><span class="ic" style="width:48px;height:48px;background:var(--accS);color:var(--acc)">${ico(kind==='lan'?'lan':'wifi','width:22px;height:22px')}</span><div style="min-width:0"><b>${kind==='lan'?'Kiểm tra dây LAN':ssid?esc(ssid):'Đổi kiểu kết nối'}</b><span>Đang kết nối Internet</span></div></div><div id="stg">${stages(kind,'preparing','running')}</div><div id="jm" class="note">Giữ trang này mở. Nếu mất kết nối, hãy kết nối lại WiFi rồi mở 10.0.0.1.</div>`);
   $('#sheet').dataset.lock='1';S.pend='';
   const fail=(msg,code)=>{const tips={wifi_auth_failed:'Kiểm tra lại mật khẩu (phân biệt chữ hoa, chữ thường).',wifi_not_found:'Đặt router gần modem hơn hoặc thử băng tần khác.',internet_failed:'Modem có thể đang mất Internet.',dhcp_failed:'Khởi động lại modem rồi thử lại.',source_subnet_conflict:'Đổi dải địa chỉ modem nguồn.',no_backup_wifi:'Chọn một WiFi nguồn trước.'};
-    $('#jm',c).outerHTML=`<div class="msg err">${esc(msg)}${tips[code]?' '+tips[code]:''}</div><div class="two"><button class="btn pri" data-close>Đóng</button></div>`;delete $('#sheet').dataset.lock;$('[data-close]',c).onclick=closeSheet};
+    const canTest=kind==='wifi'&&data.ssid;
+    $('#jm',c).outerHTML=`<div class="msg err">${esc(msg)}${tips[code]?' '+tips[code]:''}</div>${canTest?'<div class="note">Bấm Kiểm tra chi tiết: router thử mọi cách kết nối và ghi lại phản hồi của chip WiFi (khoảng 3 phút) để Wiflow tìm đúng nguyên nhân.</div>':''}<div class="two"><button class="btn" data-close>Đóng</button>${canTest?'<button class="btn pri" data-test>Kiểm tra chi tiết</button>':''}</div>`;delete $('#sheet').dataset.lock;$('[data-close]',c).onclick=closeSheet;
+    const tb=$('[data-test]',c);if(tb)tb.onclick=()=>runTest({ssid:data.ssid,band:data.band,key:data.password,encryption:data.enc})};
   try{const r=await api('connect',data,10000);if(r.ok===false){$('#stg',c).innerHTML=stages(kind,'preparing','failed');fail(r.error||'Không bắt đầu được');return}}catch(e){}
   const t0=Date.now();
   for(;;){
@@ -554,7 +596,7 @@ function vSystem(){
   return `
   <div class="grid">
     <div class="card" style="gap:14px">
-      <div style="display:flex;align-items:center;gap:12px"><img src="/wiflow/assets/wiflow-icon.png" alt="" style="width:46px;height:46px;border-radius:14px"><div style="min-width:0"><h3>${esc(st.model||'Viettel NR3053')}</h3><div class="note" style="padding:0">Wiflow ${esc(st.version||'')}${st.os?' · Wiflow OS '+esc(st.os):''}</div></div></div>
+      <div style="display:flex;align-items:center;gap:12px"><img src="/luci-static/wiflow/wiflow-logo.png" alt="Wiflow" style="width:56px;height:auto;flex:none"><div style="min-width:0"><h3>${esc(st.model||'Viettel NR3053')}</h3><div class="note" style="padding:0">Wiflow ${esc(st.version||'')}${st.os?' · Wiflow OS '+esc(st.os):''}</div></div></div>
       <div class="idrow"><div><span>Mã thiết bị</span><code id="devCode">${esc(st.device_id||'—')}</code></div><button type="button" class="btn sm" id="copyDev" aria-label="Chép mã thiết bị">${ico('copy','width:16px;height:16px')}<span>Chép</span></button></div>
       <div style="display:flex;flex-direction:column;gap:6px"><div class="axis" style="font-size:12px"><span>Bộ nhớ flash</span><span>${stg.total?bytes(stg.free)+' trống':''}</span></div>
         ${stg.total?`<div class="store"><span style="flex:${used||1};background:#1B2036"></span><span style="flex:${Math.max(.01,tot-used)};background:#EEF1FE"></span></div>
@@ -662,8 +704,7 @@ async function upload(f){
 /* ================= FIRST SETUP ================= */
 /* NR3053: 1 · WiFi khách (Bật Wiflow) → 2 · Internet nguồn → 3 · Liên kết → 4 · Hoàn tất */
 function renderWizard(){
-  const w=S.wiz,st=S.st||{},v=$('#view');$('#shell').classList.add('wizmode');
-  $('#dTitle').textContent='Cài đặt Wiflow';$('#dSub').textContent=`Bước ${w.step}/4`;$('#mTitle').textContent='Cài đặt Wiflow';
+  const w=S.wiz,st=S.st||{},v=$('#view');$('#shell').classList.add('wizmode');shell();
   const bar=`<div class="wiz-steps" aria-hidden="true">${[1,2,3,4].map(i=>`<span class="${i<=w.step?'on':''}"></span>`).join('')}</div><div class="note" id="stepLabel" style="padding:0">Bước ${w.step}/4 · ${['WiFi khách','Internet nguồn','Liên kết tài khoản','Hoàn tất'][w.step-1]}</div>`;
   let h='';
   if(w.step===1){
@@ -713,7 +754,7 @@ async function init(){
   else if(!+s.internet_verified&&!+s.paired)S.wiz={step:2,src:'',mode:'auto'};
   else if(!+s.paired&&!skip)S.wiz={step:3};
   const h=location.hash.slice(1);S.page=NAV.some(n=>n[0]===h)?h:'status';
-  shell();
+  shell();loadMenu();
   if(S.wiz){renderWizard()}else render(true);
   refreshOverview().then(()=>{if(!S.wiz&&!editing())render()});
   if(!S.wiz)go(S.page);

@@ -1,9 +1,5 @@
 /* Wiflow Setup 1.0.26 — swipe cards + charts, one light theme.
    Lexend (headings, numbers) + Be Vietnam Pro (text), bundled on the router. */
-@font-face{font-family:Lexend;src:url(fonts/lexend.woff) format('woff');font-weight:300 600;font-display:swap}
-@font-face{font-family:'Be Vietnam Pro';src:url(fonts/bvp-regular.woff) format('woff');font-weight:400;font-display:swap}
-@font-face{font-family:'Be Vietnam Pro';src:url(fonts/bvp-medium.woff) format('woff');font-weight:500;font-display:swap}
-@font-face{font-family:'Be Vietnam Pro';src:url(fonts/bvp-semibold.woff) format('woff');font-weight:600;font-display:swap}
 :root{--bg:#F2F4F8;--ink:#1B2036;--ink2:#4A5170;--mute:#6A7189;--line:#EEF0F4;--card:#FFFFFF;--acc:#4360F5;--acc2:#3550E8;--accS:#E9EEFF;--accT:#EEF1FE;
  --mint:#E3F6EE;--mintI:#127A55;--green:#1BAF7A;--greenD:#0F8F64;--peach:#FFEEE3;--peachI:#A3501A;--orange:#F2A15C;--lilac:#EFEAFF;--lilacI:#6046D9;--violet:#7B61FF;--red:#C2343F;--redS:#FDECEE;
  --sh:0 1px 2px rgba(27,32,54,.04),0 12px 32px rgba(27,32,54,.06);--shH:0 1px 2px rgba(27,32,54,.04),0 16px 40px rgba(27,32,54,.08);--ease:cubic-bezier(.2,.8,.2,1);
@@ -307,8 +303,125 @@ svg.chart{display:block;width:100%;overflow:visible}
 .gname .note{grid-column:1;align-self:center;text-align:left}
 .gname-qr{grid-column:2;display:flex;flex-direction:column;align-items:center;gap:6px}
 @media (min-width:600px){.gname-in{display:flex;flex-direction:column;gap:10px;min-width:0;grid-column:1;grid-row:1}.gname-qr{grid-column:2;grid-row:1}}
-/* NR3053 */
+/* ===================== NR3053: the Wiflow OS frame =====================
+   Same sidebar, top bar, logo, font and colours as the Wiflow OS LuCI theme
+   (/luci-static/wiflow/wiflow.css); the pages keep the CR6609 content. */
+@font-face{font-family:Inter;font-weight:400;font-display:swap;src:url(/luci-static/wiflow/fonts/inter-400.woff2) format("woff2")}
+@font-face{font-family:Inter;font-weight:500 600;font-display:swap;src:url(/luci-static/wiflow/fonts/inter-600.woff2) format("woff2")}
+:root{--bg:#F3F5F9;--ink:#08152D;--ink2:#33415C;--mute:#5D6880;--line:#E3E8F0;--card:#fff;--acc:#1263FF;--acc2:#0D53DA;--accS:#EEF4FF;--accT:#EEF4FF;
+ --mint:#E6F6F1;--mintI:#0B775C;--green:#0F9D7A;--greenD:#0D8A6B;--peach:#FFF4DE;--peachI:#8A5600;--red:#C2343F;--redS:#FDECEE;
+ --sh:0 1px 2px rgba(11,27,58,.03);--shH:0 1px 2px rgba(11,27,58,.04),0 12px 32px rgba(11,27,58,.08);
+ --fh:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--fb:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html,body{height:auto;min-height:100%}
+body{font-size:14px;line-height:1.5;background:var(--bg);color:var(--ink)}
+.h,.num,.card h3,.stat b,.wiz h1,.sheet-card .hd b{font-family:var(--fh);font-weight:600;letter-spacing:-.01em}
+a{color:var(--acc)}
+
+/* frame */
+.wf-shell{display:flex;min-height:100vh;min-height:100dvh}
+.wf-side{flex:none;width:260px;background:#fff;color:var(--ink);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;scrollbar-width:thin;z-index:850}
+.wf-side-brand{display:flex;align-items:center;gap:14px;padding:18px 18px 16px;margin:0 12px 10px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none}
+.wf-side-brand .wf-logo{display:block;width:56px;height:auto;flex:none}
+.wf-dev{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wf-dev .wf-model{font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-dev .wf-ver{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-nav{list-style:none;margin:0;padding:4px 10px 16px}
+.wf-nav>li{margin:2px 0}
+.wf-nav>li>a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;color:var(--ink);font-weight:600;font-size:14px;text-decoration:none;min-width:0}
+.wf-nav>li>a span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wf-nav>li>a svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.wf-nav>li>a .chev{margin-left:auto;width:16px;height:16px;transition:transform .2s}
+.wf-nav>li.open>a .chev{transform:rotate(90deg)}
+.wf-nav>li>a:hover{background:#F1F4F9}
+.wf-nav ul{list-style:none;margin:2px 0 6px;padding:0 0 0 44px;display:none}
+.wf-nav>li.open>ul{display:block}
+.wf-nav ul a{display:block;padding:7px 12px;border-radius:10px;color:var(--mute);font-size:13.5px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wf-nav ul a:hover{color:var(--ink);background:#F1F4F9}
+.wf-nav ul li.active>a{color:#fff;background:var(--acc);font-weight:600}
+.wf-side-foot{margin-top:auto;padding:16px 18px 20px;border-top:1px solid var(--line);font-size:12px;color:var(--mute);line-height:1.6;overflow-wrap:anywhere}
+.wf-side-foot b{color:var(--ink)}
+.wf-main{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;height:100dvh}
+.wf-top{flex:none;display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 28px;background:rgba(243,245,249,.86);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);z-index:800}
+.wf-crumb{flex:1;min-width:0;font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-crumb b{color:var(--ink)}
+.wf-burger,.wf-mlogo{display:none}
+.wf-top .pill{margin-left:auto;flex:none;font-size:12px;padding:6px 12px;background:#fff;border:1px solid var(--line);color:var(--ink)}
+.wf-top .pill.warn{background:var(--peach);border-color:transparent;color:var(--peachI)}
+.wf-top .pill.bad{background:var(--redS);border-color:transparent;color:#9B1C24}
+.body{flex:1;min-height:0;overflow-y:auto;padding:4px 28px 40px}
+.dhead{display:block;padding:6px 0 16px;max-width:1120px}
+.dhead h1{margin:0;font-family:var(--fh);font-size:24px;font-weight:600;line-height:1.25;letter-spacing:-.02em;overflow-wrap:anywhere}
+.dhead .sub{font-size:13px;color:var(--mute);margin-top:4px;overflow-wrap:anywhere}
+.view{gap:16px}
+@media (max-width:900px){
+ .wf-side{position:fixed;left:0;top:0;bottom:0;width:min(300px,86vw);transform:translateX(-102%);transition:transform .25s ease;box-shadow:0 0 0 100vmax rgba(11,27,58,0)}
+ body.wf-menu-open .wf-side{transform:none;box-shadow:0 0 0 100vmax rgba(11,27,58,.35)}
+ .wf-top{padding:10px 14px;gap:10px;background:#fff;border-bottom:1px solid var(--line)}
+ .wf-burger{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:0}
+ .wf-burger svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+ .wf-mlogo{display:flex;align-items:center;min-width:0}
+ .wf-mlogo img{width:auto;height:36px}
+ .wf-crumb{display:none}
+ .body{padding:4px 14px 32px}
+ .dhead{padding:14px 2px 12px}.dhead h1{font-size:22px}
+}
+.wf-shell.wizmode .wf-nav>li:first-child ul{display:none}
+
+/* cards in the firmware style: white, thin border, 18 px corners */
+.card{border-radius:18px;padding:20px 22px;border:1px solid var(--line);box-shadow:var(--sh);gap:12px}
+@media (max-width:719px){.card{padding:16px}}
+.card h3{font-size:16px}
+.blue{border:0;box-shadow:0 10px 28px rgba(18,99,255,.22);background:var(--acc)}
+.blue.wifi{background:var(--green);box-shadow:0 10px 28px rgba(15,157,122,.22)}
+.blue.off{background:#5A6178;box-shadow:none}
+.blue.wifi .seg button[aria-checked=true]{color:var(--greenD)}
+.act,.pick button{border-radius:16px;border:1px solid var(--line);box-shadow:var(--sh)}
+.pick button[aria-checked=true]{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.btn{height:44px;border-radius:12px;font-weight:600;font-size:14px}
+.btn.sm{height:36px;padding:0 14px;font-size:13px;border-radius:10px}
+.btn.pri{box-shadow:none}
+.btn:not(.pri):not(.danger):not(.dark):not(.ghost){background:#fff;border:1px solid var(--line2,#D7DFE9)}
+.btn.ghost{border:0;background:none}
+.in{height:44px;border-radius:12px;border:1px solid #D7DFE9;background:#fff;font-size:15px}
+.in:focus{box-shadow:0 0 0 3px rgba(18,99,255,.18);border-color:var(--acc)}
+.eye{top:2px;right:2px}
+.sheet-card{border-radius:20px}
+.sheet-card .two .btn{height:44px}
+.toast{bottom:24px;border-radius:12px}
+.chip{border-radius:999px}
+.stat,.idrow{border-radius:12px}
+.net-i{border-radius:12px}
+.seg{border-radius:12px}.seg button{border-radius:10px}
+.wbtn{border-radius:10px}
+.qr{border-radius:12px}
+
+/* long text never leaves its box */
+.card,.act,.banner,.msg,.sheet-card,.pick button,.stat,.kv,.ev,.log,.net-i,.idrow{min-width:0}
+.card *{min-width:0}
+.card,.msg,.banner,.sheet-card,.note,.lead,.wiz h1,.dhead{overflow-wrap:anywhere}
+.ch>*{min-width:0}
+.ch>div:first-child{flex:1 1 auto}
+.card h3,.ch .num,.ch>.lbl{overflow:hidden;text-overflow:ellipsis}
+.net-i .n b,.net-i .n span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.net-i .db{white-space:nowrap;flex:none}
+.act>div{min-width:0;flex:1}.act b,.act span.s{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-card .hd>div{min-width:0}.sheet-card .hd b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.kv span:first-child{flex:none}
+.log div,.ev div{overflow-wrap:anywhere}
+.stat b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner>div{min-width:0}.banner b,.banner span{overflow-wrap:anywhere}
+.legend span{min-width:0}
+.idrow code{min-width:0}
+.pill{max-width:46vw}.pill span:last-child{overflow:hidden;text-overflow:ellipsis}
+.toast span{overflow-wrap:anywhere}
+.ssid-full{overflow-wrap:anywhere}
+
+/* guest limits (need the captive portal): shown, not usable yet */
 .card.na{pointer-events:none}
 .card.na>*{opacity:.45}
 .card.na>.ch,.card.na>div:first-child{opacity:.8}
-em.rec{font-style:normal;color:var(--greenD);font-weight:500}
+em.rec{font-style:normal;color:var(--greenD);font-weight:600}
+@media (max-width:600px){.log{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;padding:6px 0;border-bottom:1px solid var(--line)}.log:last-child{border-bottom:0}.log div{grid-column:1/-1;grid-row:2}.log small{justify-self:end;align-self:center}.log .k{min-width:0}}
+.grid>.quick{align-self:start}
+.quick button{border-radius:16px;border:1px solid var(--line);box-shadow:var(--sh)}

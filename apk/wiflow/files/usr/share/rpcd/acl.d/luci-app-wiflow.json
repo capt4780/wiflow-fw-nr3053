@@ -15,6 +15,9 @@
 			"file": {
 				"/tmp/wiflow/diag.txt": [
 					"read"
+				],
+				"/tmp/wiflow/wifitest.txt": [
+					"read"
 				]
 			}
 		},
@@ -31,7 +34,8 @@
 					"diag",
 					"reboot",
 					"change_login",
-					"reset"
+					"reset",
+					"wifitest"
 				]
 			}
 		}

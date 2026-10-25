@@ -1,42 +1,39 @@
 <!doctype html>
-<html lang="vi" translate="no">
+<html lang="vi" translate="no" class="notranslate">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-store">
-  <meta name="theme-color" content="#F2F4F8">
+  <meta name="theme-color" content="#FFFFFF">
   <meta name="google" content="notranslate">
   <title>Wiflow Setup</title>
-  <link rel="icon" href="/wiflow/assets/wiflow-icon.png">
-  <link rel="stylesheet" href="/wiflow/assets/wf.css?v=1.3.0">
+  <link rel="icon" type="image/png" href="/luci-static/wiflow/favicon.png">
+  <link rel="stylesheet" href="/wiflow/assets/wf.css?v=1.4.0">
 </head>
 <body>
-<div class="app" id="shell">
-  <aside class="side" aria-label="Wiflow">
-    <div class="brand"><img src="/wiflow/assets/wiflow-icon.png" alt="Wiflow"><b>Wiflow</b></div>
-    <nav id="sideNav" aria-label="Điều hướng"></nav>
-    <div class="grow"></div>
-    <div class="devcard">
-      <div class="r"><span class="dot" id="devDot"></span><span id="devName">NR3053</span></div>
-      <div class="v" id="devVer">Wiflow</div>
-      <a class="btn sm" href="/cgi-bin/luci/admin/status/overview"><svg class="i" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>Nâng cao (LuCI)</a>
-    </div>
+<!-- Same frame as the Wiflow OS LuCI theme: white sidebar (logo, device, menu,
+     help), top bar with breadcrumb; on phones a menu button opens the sidebar. -->
+<div class="wf-shell" id="shell">
+  <aside class="wf-side" id="wf-side" aria-label="Menu">
+    <a class="wf-side-brand" href="#status" data-go="status"><img class="wf-logo" src="/luci-static/wiflow/wiflow-logo.png" alt="Wiflow"><span class="wf-dev"><span class="wf-model" id="devName">Viettel NR3053</span><span class="wf-ver" id="devVer">Wiflow Setup</span></span></a>
+    <ul class="wf-nav" id="sideNav"></ul>
+    <div class="wf-side-foot">Cần hỗ trợ?<br><b>0833 880 100</b><br>wiflow@projifylab.com</div>
   </aside>
-  <main class="main">
-    <header class="mhead">
-      <div class="b"><img src="/wiflow/assets/wiflow-icon.png" alt=""><div><div class="t" id="mTitle">Wiflow</div><div class="s" id="mSub">NR3053</div></div></div>
-      <div class="pill" id="mPill"><span class="dot"></span><span>Đang tải</span></div>
-    </header>
-    <header class="dhead">
-      <div style="flex:1;min-width:0"><h1 id="dTitle">Wiflow</h1><div class="sub" id="dSub"></div></div>
+  <div class="wf-main">
+    <header class="wf-top">
+      <button class="wf-burger" id="wf-burger" type="button" aria-label="Menu" aria-controls="wf-side" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <a class="wf-mlogo" href="#status" data-go="status"><img src="/luci-static/wiflow/wiflow-logo.png" alt="Wiflow"></a>
+      <div class="wf-crumb" id="crumb"></div>
       <div class="pill" id="dPill"><span class="dot"></span><span>Đang tải</span></div>
     </header>
-    <div class="body" id="body"><div class="view" id="view"><div class="card" style="flex-direction:row;align-items:center"><span class="spin"></span>Đang tải</div></div></div>
-    <nav class="tabbar" id="tabbar" aria-label="Điều hướng"></nav>
-  </main>
+    <div class="body" id="body">
+      <div class="dhead"><h1 id="dTitle">Wiflow Setup</h1><div class="sub" id="dSub"></div></div>
+      <div class="view" id="view"><div class="card" style="flex-direction:row;align-items:center"><span class="spin"></span>Đang tải</div></div>
+    </div>
+  </div>
 </div>
 <div id="layer"></div>
-<script src="/wiflow/assets/qr.js?v=1.3.0"></script>
-<script src="/wiflow/assets/wf.js?v=1.3.0"></script>
+<script src="/wiflow/assets/qr.js?v=1.4.0"></script>
+<script src="/wiflow/assets/wf.js?v=1.4.0"></script>
 </body>
 </html>

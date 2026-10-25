@@ -10,7 +10,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -462,6 +462,9 @@ export function parse_survey(text) {
 function scan_site_survey(r, secs) {
 	if (!access('/usr/sbin/iwpriv') && !access('/usr/bin/iwpriv') && !length(sh('command -v iwpriv')))
 		return [];
+	// survey 100-140 too, even before the WiFi was reloaded with region 7
+	if (r.band == '5g')
+		run(`iwpriv ${q(r.phy)} set CountryRegionABand=7`);
 	run(`iwpriv ${q(r.phy)} set SiteSurvey=1`);
 	let best = [], same = 0, raw = '';
 	const t0 = uptime();
@@ -477,7 +480,7 @@ function scan_site_survey(r, secs) {
 		sleep(1500);
 	}
 	mkdir(RUN, 0700);
-	writefile(`${RUN}/survey-${r.band}.txt`, `uptime ${uptime()} ${r.phy}\n${raw}`);
+	writefile(`${RUN}/survey-${r.band}.txt`, `uptime ${uptime()} ${r.phy} bytes=${length(raw)} rows=${length(best)}\n${raw}`);
 	return best;
 };
 
@@ -785,6 +788,8 @@ export function diag_text() {
 	add(readfile(`${RUN}/log`) ?? '');
 	add('== last join failure');
 	add(readfile(`${RUN}/join-fail.txt`) ?? '(none)');
+	add('== last WiFi source test');
+	add(readfile(`${RUN}/wifitest.txt`) ?? '(none)');
 	add('== last scan');
 	for (let b in [ '2g', '5g' ])
 		add(sprintf('%s %J', b, st_get(`scan_${b}`)));

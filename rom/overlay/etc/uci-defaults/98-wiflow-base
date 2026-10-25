@@ -56,6 +56,8 @@ for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$
 		*) continue ;;
 	esac
 	uci -q delete wireless.$dev.disabled
+	# Vietnam; with the patched table the 5 GHz radio also uses channels 100-140
+	uci -q set wireless.$dev.country='VN'
 	for ifc in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.device='$dev'$/\1/p"); do
 		[ "$(uci -q get wireless.$ifc.mode)" = ap ] || continue
 		uci -q set wireless.$ifc.ssid="$ssid"
