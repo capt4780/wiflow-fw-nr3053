@@ -5,8 +5,8 @@
 The logo pixels are never changed: only the empty transparent margin is
 trimmed and the image resized.
 - wiflow-logo.png: gate/login page, sidebar, mobile top bar
-- favicon.png, apple-touch-icon.png, /www/favicon.ico: the same logo centred
-  on a transparent square
+- favicon.png, apple-touch-icon.png, /www/favicon.ico: the Wiflow app icon
+  (rom/brand/wiflow-icon-source.png, square artwork), only resized
 
 usage: make-brand.py <rom/overlay dir>
 """
@@ -22,10 +22,8 @@ logo = Image.open(os.path.join(os.path.dirname(__file__), "..", "rom/brand/wiflo
 logo = logo.crop(logo.getchannel("A").getbbox())
 logo.resize((480, round(logo.height * 480 / logo.width)), Image.LANCZOS).save(os.path.join(media, "wiflow-logo.png"), optimize=True)
 
-side = max(logo.size)
-square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-square.paste(logo, ((side - logo.width) // 2, (side - logo.height) // 2), logo)
-square.resize((64, 64), Image.LANCZOS).save(os.path.join(media, "favicon.png"), optimize=True)
-square.resize((180, 180), Image.LANCZOS).save(os.path.join(media, "apple-touch-icon.png"), optimize=True)
-square.resize((256, 256), Image.LANCZOS).save(os.path.join(overlay, "www/favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+icon = Image.open(os.path.join(os.path.dirname(__file__), "..", "rom/brand/wiflow-icon-source.png")).convert("RGB")
+icon.resize((64, 64), Image.LANCZOS).save(os.path.join(media, "favicon.png"), optimize=True)
+icon.resize((180, 180), Image.LANCZOS).save(os.path.join(media, "apple-touch-icon.png"), optimize=True)
+icon.resize((256, 256), Image.LANCZOS).save(os.path.join(overlay, "www/favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
 print("brand assets written")
