@@ -20,6 +20,12 @@ const MAX_FAIL = 5;
 const LOCK = 60;
 const COOKIE = 'wiflow_gate';
 
+// Case, spaces and dashes do not matter: "wifdid-nr3053", "WIFDID NR3053"
+// and "WIFDIDNR3053" are the same code.
+function norm(x) {
+	return uc(replace(trim(x ?? ''), /[^0-9A-Za-z]/g, ''));
+};
+
 function codes() {
 	const c = cursor();
 	if (c.get('wiflow_gate', 'main', 'enabled') == '0')
@@ -32,11 +38,6 @@ function codes() {
 		list = [ 'WIFDIDNR3053' ];
 
 	return map(list, (x) => norm(x));
-};
-// Case, spaces and dashes do not matter: "wifdid-nr3053", "WIFDID NR3053"
-// and "WIFDIDNR3053" are the same code.
-function norm(x) {
-	return uc(replace(trim(x ?? ''), /[^0-9A-Za-z]/g, ''));
 };
 // the full device ID (WIFDID-NR3053-123456) also works when its 6-digit part is a code
 function accepts(allowed, input) {
