@@ -250,7 +250,7 @@ checks = {
         and open(F + "/usr/share/ucode/wiflow/stats.uc").read().count("call iwinfo") == 1
         and "viewed" in open(F + "/usr/share/ucode/wiflow/stats.uc").read(),
     "guest network: WiFi on wiflow_guest (10.10.10.1/24), DHCP, firewall zone, portal web server on :2080":
-        all(x in open(F + "/etc/uci-defaults/98-wiflow-base").read() for x in ["wireless.$ifc.network='wiflow_guest'", "ipaddr='10.10.10.1'",
+        all(x in open(F + "/etc/uci-defaults/98-wiflow-base").read() + open(F + "/usr/libexec/wiflow/guest-net").read() for x in ["wireless.$ifc.network='wiflow_guest'", "ipaddr='10.10.10.1'",
             "firewall.wiflow_guest.name='wiflow_guest'", "listen_http='10.10.10.1:2080'", "dest_port='2080'"]),
     "Wiflow App is part of the firmware (service enabled, native LuCI page, no standalone web app)":
         os.path.islink(F + "/etc/rc.d/S96wiflow") and not os.path.exists(F + "/www/wiflow")
