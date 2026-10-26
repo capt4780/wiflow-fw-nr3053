@@ -52,7 +52,7 @@ req() { # path cookie body
 has() { grep -q "$2" <<<"$1"; }
 
 r="$(req /)"
-has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || { no "login page: $(head -c 600 <<<"$r")"; }
+has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || { no "login page: $(grep -v '^\s*$' <<<"$r" | grep -iE 'error|exception|data-title|Status|line|ucode' | head -n 12 | tr '\n' '|' | cut -c1-1500)"; }
 
 r="$(req / "" "wf_gate_code=WRONG")"
 has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused"
