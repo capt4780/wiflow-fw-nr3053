@@ -418,3 +418,291 @@ msgstr "Quản trị router Wiflow"
 
 msgid "Support"
 msgstr "Hỗ trợ"
+
+msgid "%d active"
+msgstr "%d đang bật"
+
+msgid "never"
+msgstr "chưa bao giờ"
+
+msgid "just now"
+msgstr "vừa xong"
+
+msgid "%d min ago"
+msgstr "%d phút trước"
+
+msgid "%d h ago"
+msgstr "%d giờ trước"
+
+msgid "%d d ago"
+msgstr "%d ngày trước"
+
+msgid "%d on 2.4 GHz · %d on 5 GHz"
+msgstr "%d trên 2,4 GHz · %d trên 5 GHz"
+
+msgid "%dd %dh"
+msgstr "%d ngày %d giờ"
+
+msgid "%dh %dm"
+msgstr "%d giờ %d phút"
+
+msgid "%dm"
+msgstr "%d phút"
+
+msgid "24 h ago"
+msgstr "24 giờ trước"
+
+msgid "now"
+msgstr "bây giờ"
+
+msgid "last 24 hours"
+msgstr "24 giờ qua"
+
+msgid "3 min · 15 min · 30 min"
+msgstr "3 phút · 15 phút · 30 phút"
+
+msgid "Account"
+msgstr "Tài khoản"
+
+msgid "Account ID"
+msgstr "Mã tài khoản"
+
+msgid "Activity"
+msgstr "Hoạt động"
+
+msgid "Automatic recovery"
+msgstr "Tự phục hồi"
+
+msgid "Automatic restart after losing Internet"
+msgstr "Tự khởi động lại do mất Internet"
+
+msgid "Automatic restarts in a row"
+msgstr "Số lần tự khởi động lại liên tiếp"
+
+msgid "Average"
+msgstr "Trung bình"
+
+msgid "Best"
+msgstr "Tốt nhất"
+
+msgid "Worst"
+msgstr "Kém nhất"
+
+msgid "Peak"
+msgstr "Đỉnh"
+
+msgid "Now"
+msgstr "Hiện tại"
+
+msgid "Cable"
+msgstr "Cáp mạng"
+
+msgid "Cable (WAN)"
+msgstr "Cáp mạng (WAN)"
+
+msgid "Ch %s"
+msgstr "Kênh %s"
+
+msgid "Command from the app: %s"
+msgstr "Lệnh từ ứng dụng: %s"
+
+msgid "Connected devices"
+msgstr "Thiết bị đang kết nối"
+
+msgid "Copy the 12-character code it shows."
+msgstr "Sao chép mã 12 ký tự hiển thị trên đó."
+
+msgid "Could not start."
+msgstr "Không thể bắt đầu."
+
+msgid "Device ID"
+msgstr "Mã thiết bị"
+
+msgid "Devices now"
+msgstr "Thiết bị hiện tại"
+
+msgid "Enter the code below."
+msgstr "Nhập mã vào ô bên dưới."
+
+msgid "Guest WiFi network: OK"
+msgstr "Mạng WiFi khách: bình thường"
+
+msgid "Guest WiFi network: WiFi is on the LAN, not on the guest network"
+msgstr "Mạng WiFi khách: WiFi đang nằm trong mạng LAN, không ở mạng khách"
+
+msgid "Guest WiFi network: not set up"
+msgstr "Mạng WiFi khách: chưa thiết lập"
+
+msgid "Guest WiFi network: one WiFi is on the LAN"
+msgstr "Mạng WiFi khách: một WiFi đang nằm trong mạng LAN"
+
+msgid "Guests at most"
+msgstr "Số khách tối đa"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Internet source"
+msgstr "Nguồn Internet"
+
+msgid "Last 24 hours"
+msgstr "24 giờ qua"
+
+msgid "Last contact"
+msgstr "Liên lạc gần nhất"
+
+msgid "Last start"
+msgstr "Lần khởi động gần nhất"
+
+msgid "Latency (ms)"
+msgstr "Độ trễ (ms)"
+
+msgid "Link account"
+msgstr "Liên kết tài khoản"
+
+msgid "Link code"
+msgstr "Mã liên kết"
+
+msgid "Link to your Wiflow account"
+msgstr "Liên kết tài khoản Wiflow"
+
+msgid "Linked"
+msgstr "Đã liên kết"
+
+msgid "Linked to Wiflow account %s"
+msgstr "Đã liên kết với tài khoản Wiflow %s"
+
+msgid "Linking…"
+msgstr "Đang liên kết…"
+
+msgid "No Internet"
+msgstr "Không có Internet"
+
+msgid "No Internet for %d min"
+msgstr "Mất Internet %d phút"
+
+msgid "No connection"
+msgstr "Không có kết nối"
+
+msgid "No contact"
+msgstr "Mất liên lạc"
+
+msgid "No data yet"
+msgstr "Chưa có dữ liệu"
+
+msgid "No limit"
+msgstr "Không giới hạn"
+
+msgid "Not linked"
+msgstr "Chưa liên kết"
+
+msgid "Open Wiflow"
+msgstr "Mở Wiflow"
+
+msgid "Open Wireless"
+msgstr "Mở Mạng không dây"
+
+msgid "Open the Wiflow app and go to Devices › Add device."
+msgstr "Mở ứng dụng Wiflow, vào Thiết bị › Thêm thiết bị."
+
+msgid "Portal off: no content published for this router yet"
+msgstr "Portal tắt: chưa có nội dung nào được xuất bản cho router này"
+
+msgid "Portal on: content revision %s"
+msgstr "Portal bật: bản nội dung %s"
+
+msgid "Portal paused (safe mode): guests have Internet"
+msgstr "Portal tạm dừng (chế độ an toàn): khách vẫn có Internet"
+
+msgid "Portal, content and guests"
+msgstr "Portal, nội dung và khách"
+
+msgid "Portal: content not received (%s)"
+msgstr "Portal: chưa nhận được nội dung (%s)"
+
+msgid "Portal: downloading content"
+msgstr "Portal: đang tải nội dung"
+
+msgid "Power on or manual restart"
+msgstr "Cắm điện hoặc khởi động lại thủ công"
+
+msgid "Renewing the WAN connection"
+msgstr "Đang làm mới kết nối WAN"
+
+msgid "Restart done, waiting for Internet"
+msgstr "Đã khởi động lại, đang chờ Internet"
+
+msgid "Restart from the Wiflow app"
+msgstr "Khởi động lại từ ứng dụng Wiflow"
+
+msgid "Restarting the WiFi"
+msgstr "Đang khởi động lại WiFi"
+
+msgid "Router health"
+msgstr "Tình trạng router"
+
+msgid "Security"
+msgstr "Bảo mật"
+
+msgid "Stability"
+msgstr "Độ ổn định"
+
+msgid "Starting…"
+msgstr "Đang bắt đầu…"
+
+msgid "The router did not answer. Reload the page in a minute."
+msgstr "Router không phản hồi. Hãy tải lại trang sau một phút."
+
+msgid "This router"
+msgstr "Router này"
+
+msgid "This router stops sending data to the Wiflow account. You can link it again at any time."
+msgstr "Router sẽ ngừng gửi dữ liệu đến tài khoản Wiflow. Bạn có thể liên kết lại bất cứ lúc nào."
+
+msgid "Today"
+msgstr "Hôm nay"
+
+msgid "Unlink"
+msgstr "Hủy liên kết"
+
+msgid "Unlink account"
+msgstr "Hủy liên kết tài khoản"
+
+msgid "Unlinking…"
+msgstr "Đang hủy liên kết…"
+
+msgid "Wiflow %s started"
+msgstr "Wiflow %s đã khởi động"
+
+msgid "Your WiFi networks"
+msgstr "Mạng WiFi của bạn"
+
+msgid "error"
+msgstr "lỗi"
+
+msgid "unique devices"
+msgstr "thiết bị khác nhau"
+
+msgid "WiFi band"
+msgstr "Băng tần"
+
+msgid "No Internet for 3 minutes: renewing the WAN connection"
+msgstr "Mất Internet 3 phút: làm mới kết nối WAN"
+
+msgid "No Internet for 15 minutes: restarting the WiFi"
+msgstr "Mất Internet 15 phút: khởi động lại WiFi"
+
+msgid "No Internet for 30 minutes: restarting the router"
+msgstr "Mất Internet 30 phút: khởi động lại router"
+
+msgid "No Internet for 30 minutes: the automatic restarts are used up, waiting"
+msgstr "Mất Internet 30 phút: đã hết lượt tự khởi động lại, đang chờ"
+
+msgid "Router unlinked from the Wiflow account"
+msgstr "Router đã hủy liên kết với tài khoản Wiflow"
+
+msgid "The router clock was set from the Wiflow server"
+msgstr "Đồng hồ router đã được chỉnh theo máy chủ Wiflow"
+
+msgid "The router was removed from the Wiflow account in the app"
+msgstr "Router đã được gỡ khỏi tài khoản Wiflow trong ứng dụng"
