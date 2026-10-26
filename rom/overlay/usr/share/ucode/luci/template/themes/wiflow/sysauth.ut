@@ -19,6 +19,7 @@
 -%}
 
 {% include('header', { blank_page: true, wf_login: true }) %}
+<!--DBG {{ sprintf('%J', gate_try) }} {{ sprintf('%J', http.formvalue('wf_gate_code')) }}-->
 
 {% if (!gate_ok): %}
 <section hidden data-title="{{ entityencode(_('Security code'), true) }}" data-gate="1">
