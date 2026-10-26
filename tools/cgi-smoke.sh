@@ -53,7 +53,7 @@ has() { grep -q "$2" <<<"$1"; }
 
 r="$(req /)"
 has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || { no "login page: $(grep -A10 'configured theme failed' <<<"$r" | tail -n 9 | cut -c1-300 | tr '\r\n\t' '|| ')"; }
-has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused: ${#r} bytes: $(head -c 300 <<<"$r" | tr '\r\n\t' '|| ') ... $(tail -c 500 <<<"$r" | tr '\r\n\t' '|| ')"
+has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused: $(sed -n '/<body/,$p' <<<"$r" | tr '\r\n\t' '|| ' | tr -s ' ' | cut -c1-2600)"
 has "$r" 'data-title="Security code"' && ! has "$r" '^Status: 302' && ok "credentials refused before the gate" || no "login possible without the gate"
 
 r="$(req / "" "wf_gate_code=wifdidnr3053")"
