@@ -262,6 +262,29 @@ function series_out() {
 	return { devices: dev, latency: lat };
 };
 
+// Guest portal state for the page: where the WiFi sits and what the portal is doing.
+function portal_state() {
+	const c = cursor();
+	c.load('wireless'); c.load('network');
+	let guest = 0, lan = 0;
+	c.foreach('wireless', 'wifi-iface', i => {
+		if (i.mode != 'ap' || i.disabled == '1')
+			return;
+		if (i.network == 'wiflow_guest') guest++; else lan++;
+	});
+	const net = c.get('network', 'wiflow_guest') == null ? 'missing' : (guest > 0 && lan == 0 ? 'guest' : (guest > 0 ? 'mixed' : 'lan'));
+	const st = readfile('/tmp/wiflow-state') ?? '';
+	const su = match(st, /(^|\n)safe_until=([0-9]+)/);
+	const safe = su && num(su[2], 0) > uptime();
+	const rev = num(core('portal_revision', '0'), 0);
+	let state = 'off';
+	if (safe) state = 'safe';
+	else if (core('portal_enabled', '0') == '1') state = 'on';
+	else if (core('portal_sync_status') == 'syncing') state = 'syncing';
+	else if (core('portal_sync_status') == 'failed') state = 'error';
+	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net };
+};
+
 export function status() {
 	// The Wiflow App page is open: the agent may read the source WiFi signal.
 	rundir();
@@ -281,6 +304,7 @@ export function status() {
 			since: num(core('paired_at', '0'), 0),
 			error: wp_error_text(st_get('wp_error'))
 		},
+		portal: portal_state(),
 		metrics: st.metrics ?? {},
 		clients: st.clients ?? { now: 0, today: 0, band2g: 0, band5g: 0 },
 		networks: st.networks ?? [],

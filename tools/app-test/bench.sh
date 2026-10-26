@@ -29,7 +29,7 @@ install_files() {
 	ln -sfn "$F/www-wiflow-portal/runtime/assets" /www-wiflow-portal/runtime/assets
 	ln -sf "$F/usr/libexec/wiflow/guests" /usr/libexec/wiflow/guests
 	for d in "$F"/www-wiflow-portal/*; do [ "${d##*/}" = runtime ] || ln -sfn "$d" /www-wiflow-portal/; done
-	for f in job agent provision; do ln -sf "$F/usr/libexec/wiflow/$f" /usr/libexec/wiflow/$f; done
+	for f in job agent provision guest-net; do ln -sf "$F/usr/libexec/wiflow/$f" /usr/libexec/wiflow/$f; done
 	ln -sf "$F/usr/share/rpcd/ucode/wiflow" "$PFX/share/rpcd/ucode/wiflow"
 	for s in firewall dnsmasq rpcd; do
 		printf '#!/bin/sh\necho "init.d/%s $*" >> /tmp/mock/calls.log\n' $s > /etc/init.d/$s; chmod +x /etc/init.d/$s

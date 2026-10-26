@@ -29,26 +29,25 @@ wait_for(){ # wait_for <secs> <python expr on status>
 $B start >/dev/null || exit 1
 U(){ LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q "$@"; }
 
-# A router that ran Wiflow Setup 1.x: guest network, guest APs on it, a joined source
-for c in "network.wiflow_guest_dev=device" "network.wiflow_guest=interface" "network.wiflow_wwan=interface" "dhcp.wiflow_guest=dhcp" \
-	"firewall.wiflow_guest=zone" "firewall.wiflow_guest_wan=forwarding" "wireless.wiflow_guest_2g=wifi-iface" "wireless.wiflow_uplink=wifi-iface"; do U set "$c"; done
-U set network.wiflow_guest_dev.name=br-wiflow; U set network.wiflow_guest.device=br-wiflow
-U set network.wiflow_wwan.proto=dhcp; U set network.wan.metric=10; U set network.wan.disabled=1
-U set wireless.wiflow_guest_2g.device=MT7981_1_1; U set wireless.wiflow_guest_2g.mode=ap; U set wireless.wiflow_guest_2g.network=wiflow_guest
-U set wireless.wiflow_guest_2g.ssid='Wiflow Quan'; U set wireless.wiflow_guest_2g.isolate=1
+# A router that kept its settings from an older build: WiFi on the LAN, no guest network,
+# a custom-named AP on the LAN and a joined source
+for c in "network.wiflow_wwan=interface" "wireless.wiflow_guest_2g=wifi-iface" "wireless.wiflow_uplink=wifi-iface"; do U set "$c"; done
+U set network.wiflow_wwan.proto=dhcp
+U set wireless.wiflow_guest_2g.device=MT7981_1_1; U set wireless.wiflow_guest_2g.mode=ap; U set wireless.wiflow_guest_2g.network=lan
+U set wireless.wiflow_guest_2g.ssid='Wiflow Quan'
 U set wireless.wiflow_uplink.device=MT7981_1_1; U set wireless.wiflow_uplink.mode=sta; U set wireless.wiflow_uplink.network=wiflow_wwan
 U set wireless.wiflow_uplink.ssid='Cafe Sua Da'; U set wireless.wiflow_uplink.encryption=psk2; U set wireless.wiflow_uplink.key=cafe1234
-U set wiflow.core=core 2>/dev/null; U set wiflow.core.activated=1; U set wiflow.core.guest_ssid='Wiflow Quan'
+U set wiflow.core=core 2>/dev/null
 U commit
 
 $B x /usr/libexec/wiflow/provision boot
 expect "install: device id" "$(cat /etc/wiflow/device-id)" '^WIFDID-NR3053-[0-9]{6}$'
 expect "install: gate code added" "$(U get wiflow_gate.main.code)" "WIFDIDNR3053 $(cut -c15-20 /etc/wiflow/device-id)"
-expect "upgrade from 1.x: guest network, DHCP and rules removed" "$(U show network | grep -c wiflow_guest)|$(U show dhcp | grep -c wiflow)|$(U show firewall | grep -c wiflow_guest)|$(U get network.wan.disabled)|$(U get network.wan.metric)" '^0\|0\|0\|\|$'
-expect "upgrade from 1.x: guest AP back on LAN, name kept" "$(U get wireless.wiflow_guest_2g.network)|$(U get wireless.wiflow_guest_2g.ssid)|$(U get wireless.wiflow_guest_2g.isolate)" '^lan\|Wiflow Quan\|$'
-expect "upgrade from 1.x: joined source untouched" "$(U get wireless.wiflow_uplink.ssid)|$(U get wireless.wiflow_uplink.key)|$(U get network.wiflow_wwan.proto)" '^Cafe Sua Da\|cafe1234\|dhcp$'
-expect "upgrade from 1.x: old settings dropped, marked done" "$(U get wiflow.core.migrated)|$(U get wiflow.core.activated)|$(U get wiflow.core.guest_ssid)" '^2\|\|$'
-expect "both bands share one WiFi name: factory names become Wiflow, a custom name stays" "$(U get wireless.default_MT7981_1_1.ssid):$(U get wireless.default_MT7981_1_2.ssid):$(U get wireless.wiflow_guest_2g.ssid):$(U get wiflow.core.ssid_merged)" '^Wiflow:Wiflow:Wiflow Quan:1$'
+expect "kept settings: guest network created (10.10.10.1, DHCP, firewall zone, portal web server)" "$(U get network.wiflow_guest.ipaddr)|$(U get network.wiflow_guest_dev.name)|$(U get dhcp.wiflow_guest.interface)|$(U get firewall.wiflow_guest.name)|$(U get firewall.wiflow_guest_portal.dest_port)|$(U get uhttpd.wiflow_portal.home)" '^10\.10\.10\.1\|br-wiflow\|wiflow_guest\|wiflow_guest\|2080\|/www-wiflow-portal$'
+expect "kept settings: factory WiFi moved to the guest network and named Wiflow" "$(U get wireless.default_MT7981_1_1.network)|$(U get wireless.default_MT7981_1_2.network)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.default_MT7981_1_2.ssid)" '^wiflow_guest\|wiflow_guest\|Wiflow\|Wiflow$'
+expect "kept settings: a WiFi with a custom name stays where it was" "$(U get wireless.wiflow_guest_2g.network)|$(U get wireless.wiflow_guest_2g.ssid)" '^lan\|Wiflow Quan$'
+expect "kept settings: joined source untouched" "$(U get wireless.wiflow_uplink.ssid)|$(U get wireless.wiflow_uplink.key)|$(U get network.wiflow_wwan.proto)" '^Cafe Sua Da\|cafe1234\|dhcp$'
+expect "kept settings: marked done" "$(U get wiflow.core.migrated)|$(U get wiflow.core.guest_moved)|$(U get wiflow.core.ssid_merged)" '^2\|1\|1$'
 cp -r /etc/config /tmp/cfg.before
 $B x /usr/libexec/wiflow/provision boot
 diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no config rewrite)" || fail "boot rewrote configs"

@@ -308,10 +308,17 @@ return view.extend({
 		return card('wa-c8', 'list', 'Activity', null, [ E('ul', { 'class': 'wa-log' }, rows) ]);
 	},
 
-	portalCard() {
+	portalText(p) {
+		p = p || {};
+		const net = { guest: 'Guest WiFi network: OK', lan: 'Guest WiFi network: WiFi is on the LAN, not on the guest network', mixed: 'Guest WiFi network: one WiFi is on the LAN', missing: 'Guest WiFi network: not set up' }[p.network] || '';
+		const st = { off: 'Portal off: no content published for this router yet', syncing: 'Portal: downloading content', on: `Portal on: content revision ${p.revision}`, safe: 'Portal paused (safe mode): guests have Internet', error: `Portal: content not received (${p.error || 'error'})` }[p.state] || '';
+		return st + (net ? ' · ' + net : '');
+	},
+
+	portalCard(s) {
 		return E('section', { 'class': 'wa-card wa-c12' }, E('div', { 'class': 'wa-link' }, [
 			E('span', { 'class': 'wa-ico' }, svg('users')),
-			E('div', { 'class': 'wa-t' }, [ 'Portal, content and guests', E('span', {}, 'Managed in your Wiflow account.') ]),
+			E('div', { 'class': 'wa-t' }, [ 'Portal, content and guests', E('span', {}, this.portalText((s || {}).portal)) ]),
 			E('a', { 'class': 'wa-btn pri', 'href': 'https://wiflow.projifylab.com', 'target': '_blank', 'rel': 'noopener', 'style': 'text-decoration:none' }, [ 'Open Wiflow', svg('ext') ])
 		]));
 	},
@@ -328,7 +335,7 @@ return view.extend({
 			E('div', { 'class': 'wa-grid' }, [ this.chartCard(s), this.accountCard(s) ]),
 			E('div', { 'class': 'wa-grid' }, [ this.netCard(s), this.sourceCard(s) ]),
 			E('div', { 'class': 'wa-grid' }, [ this.logCard(s), this.healthCard(s) ]),
-			E('div', { 'class': 'wa-grid' }, [ this.portalCard() ])
+			E('div', { 'class': 'wa-grid' }, [ this.portalCard(s) ])
 		]);
 	},
 

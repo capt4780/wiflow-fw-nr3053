@@ -50,44 +50,20 @@ export function remove_gate_code() {
 	c.commit('wiflow_gate');
 };
 
-// From Wiflow Setup 1.x (once): drop the guest network br-wiflow with its
-// DHCP and firewall rules, and put the guest APs back on the LAN network.
-// The source WiFi (client) and every other setting stay as they are, so a
-// source joined before keeps working. Returns what to reload.
+// The guest network (br-wiflow, 10.10.10.0/24) belongs to Wiflow OS: it is written on
+// first boot and checked at every start. Anything missing is written again, and the
+// factory Wiflow WiFi (still on the LAN) is moved onto it once. Returns what changed.
+export function ensure_guest_network() {
+	const r = W.run('/usr/libexec/wiflow/guest-net ensure');
+	return { reloaded: match(r.out ?? '', /changed/) != null };
+};
+
+// Old marker of Wiflow Setup 1.x clean-up: nothing is removed any more.
 export function migrate() {
-	if (W.core('migrated') == '2')
-		return {};
-	const c = cursor();
-	for (let f in [ 'network', 'wireless', 'firewall', 'dhcp' ]) c.load(f);
-	let net = false, wl = false, fw = false, dh = false;
-
-	for (let s in [ 'wiflow_guest', 'wiflow_guest_dev' ])
-		if (c.get('network', s) != null) { c.delete('network', s); net = true; }
-	if (c.get('dhcp', 'wiflow_guest') != null) { c.delete('dhcp', 'wiflow_guest'); dh = true; }
-	for (let s in [ 'wiflow_guest', 'wiflow_guest_wan', 'wiflow_guest_dhcp', 'wiflow_guest_dns', 'wiflow_guest_setup' ])
-		if (c.get('firewall', s) != null) { c.delete('firewall', s); fw = true; }
-
-	c.foreach('wireless', 'wifi-iface', s => {
-		if (s.network == 'wiflow_guest') {
-			c.set('wireless', s['.name'], 'network', 'lan');
-			c.delete('wireless', s['.name'], 'isolate');
-			wl = true;
-		}
-	});
-	// the cable WAN is no longer switched off by Wiflow (it set metric 10 with it)
-	if (c.get('network', 'wan', 'metric') == '10') {
-		c.delete('network', 'wan', 'metric');
-		c.delete('network', 'wan', 'disabled');
-		net = true;
-	}
-
-	if (net) c.commit('network');
-	if (wl) c.commit('wireless');
-	if (fw) c.commit('firewall');
-	if (dh) c.commit('dhcp');
-	W.core_set({ migrated: '2', activated: null, internet_mode: null, guest_ssid: null, source_ssid: null,
-		setup_username: null, tz_set: null });
-	return { network: net, wireless: wl, firewall: fw, dhcp: dh };
+	if (W.core('migrated') != '2')
+		W.core_set({ migrated: '2', activated: null, internet_mode: null, guest_ssid: null, source_ssid: null,
+			setup_username: null, tz_set: null });
+	return {};
 };
 
 // 1.2.4: both bands use one WiFi name, "Wiflow". Only the two factory names
