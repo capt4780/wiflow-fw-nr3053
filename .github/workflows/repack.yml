@@ -59,7 +59,15 @@ jobs:
           ls /tmp/ucode/b/ucode /tmp/ucode/b/fs.so
 
       - name: Repack
-        run: sudo -E SAVE_ROOT=/tmp/romroot bash scripts/repack.sh dist
+        run: |
+          set -o pipefail
+          sudo -E SAVE_ROOT=/tmp/romroot bash scripts/repack.sh dist 2>&1 | tee /tmp/repack.log
+
+      - name: Show failed checks
+        if: failure()
+        run: |
+          grep -E '^(FAIL|ERROR|Traceback|[A-Za-z]*Error)' /tmp/repack.log | head -20 | while read -r line; do echo "::error title=repack::$line"; done || true
+          tail -n 6 /tmp/repack.log | while read -r line; do echo "::error title=repack-tail::$line"; done || true
 
       - name: Run the ROM's LuCI with the router's ucode
         run: |
