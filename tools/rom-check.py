@@ -229,6 +229,10 @@ checks = {
                 for k in ("admin/network/firewall/zones", "admin/network/firewall/rules", "admin/network/diagnostics")),
     "PPPoE available (pppd, netifd proto, LuCI protocol page)":
         all(os.path.exists(F + x) for x in ["/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh", "/www/luci-static/resources/protocol/ppp.js"]),
+    "stability: guest WiFi isolation, stable channels, DNS cache with fallback servers, tiered uplink recovery":
+        "isolate_guests" in open(F + "/usr/libexec/wiflow/guest-net").read()
+        and all(x in open(F + "/etc/uci-defaults/98-wiflow-base").read() for x in ["htmode='HE80'", "htmode='HE20'", "cachesize='1000'", "1.1.1.1 8.8.8.8"])
+        and all(x in open(F + "/usr/libexec/wiflow/agent").read() for x in ["ifup wan", "wifi reload", "auto_recovery", "REC_MAX"]),
     "Vietnamese is the default LuCI language, English selectable":
         "set luci.main.lang='vi'" in open(F + "/etc/uci-defaults/98-wiflow-base").read()
         and glob.glob(F + "/usr/lib/lua/luci/i18n/base.vi.lmo") and glob.glob(F + "/usr/lib/lua/luci/i18n/firewall.vi.lmo"),

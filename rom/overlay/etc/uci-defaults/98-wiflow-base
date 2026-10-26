@@ -46,6 +46,11 @@ delete dhcp.lan.ra_flags
 delete dhcp.lan.ndp
 delete dhcp.odhcpd
 set dhcp.@dnsmasq[0].quietdhcp='1'
+set dhcp.@dnsmasq[0].cachesize='1000'
+EOF
+uci -q delete dhcp.@dnsmasq[0].server
+for s in 1.1.1.1 8.8.8.8; do uci -q add_list dhcp.@dnsmasq[0].server="$s"; done
+uci -q batch <<'EOF'
 commit dhcp
 EOF
 
@@ -61,6 +66,14 @@ for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$
 	uci -q delete wireless.$dev.disabled
 	# Vietnam; with the patched table the 5 GHz radio also uses channels 100-140
 	uci -q set wireless.$dev.country='VN'
+	# Stable channels: no DFS (radar) channels, no 40/160 MHz. 2.4 GHz: 20 MHz on 1, 6 or 11;
+	# 5 GHz: 80 MHz on 36-48 or 149-161. The pick follows the device MAC so routers
+	# of one shop do not all sit on the same channel. Changeable in LuCI afterwards.
+	n=$(( 0x$(cut -d: -f6 /sys/class/net/eth0/address 2>/dev/null || echo 00) ))
+	case "$(uci -q get wireless.$dev.band)" in
+		2g) set -- 1 6 11; shift $(( n % 3 )); uci -q set wireless.$dev.channel="$1"; uci -q set wireless.$dev.htmode='HE20' ;;
+		5g) set -- 36 149; shift $(( n % 2 )); uci -q set wireless.$dev.channel="$1"; uci -q set wireless.$dev.htmode='HE80' ;;
+	esac
 	for ifc in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.device='$dev'$/\1/p"); do
 		[ "$(uci -q get wireless.$ifc.mode)" = ap ] || continue
 		uci -q set wireless.$ifc.ssid="$ssid"

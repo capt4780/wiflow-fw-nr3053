@@ -142,6 +142,20 @@ move_wifi(){
 	return $moved
 }
 
+# Guests cannot see each other: client isolation on the WiFi of the guest network.
+# Set once; afterwards LuCI ("Isolate Clients") owns the option.
+isolate_guests(){
+	done=1
+	for ifc in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-iface$/\1/p'); do
+		[ "$(uci -q get wireless.$ifc.mode)" = ap ] || continue
+		[ "$(uci -q get wireless.$ifc.network)" = wiflow_guest ] || continue
+		[ "$(uci -q get wireless.$ifc.isolate)" = 1 ] && continue
+		uci -q set wireless.$ifc.isolate='1'; done=0
+	done
+	[ "$done" = 0 ] && uci -q commit wireless
+	return $done
+}
+
 case "${1:-}" in
 apply) apply ;;
 check) check ;;
@@ -151,6 +165,10 @@ ensure)
 	if [ "$(uci -q get wiflow.core.guest_moved)" != 1 ]; then
 		move_wifi && changed=1
 		uci -q set wiflow.core.guest_moved=1; uci -q commit wiflow
+	fi
+	if [ "$(uci -q get wiflow.core.guest_isolated)" != 1 ]; then
+		isolate_guests && changed=1
+		uci -q set wiflow.core.guest_isolated=1; uci -q commit wiflow
 	fi
 	[ "$changed" = 1 ] || exit 0
 	echo changed

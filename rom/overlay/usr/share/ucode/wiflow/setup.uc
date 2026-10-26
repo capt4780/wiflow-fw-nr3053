@@ -305,6 +305,12 @@ export function status() {
 			error: wp_error_text(st_get('wp_error'))
 		},
 		portal: portal_state(),
+		system: {
+			boot_reason: st_get('boot_reason', 'power_or_manual'),
+			recovery: st_get('recovery', { stage: 0, offline_s: 0 }),
+			recovery_reboots: num(core('recovery_reboots', '0'), 0),
+			guest_max: num(core('guest_max', '0'), 0)
+		},
 		metrics: st.metrics ?? {},
 		clients: st.clients ?? { now: 0, today: 0, band2g: 0, band5g: 0 },
 		networks: st.networks ?? [],

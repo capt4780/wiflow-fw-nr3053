@@ -14,7 +14,7 @@ F="$(cd "$WFT/../../rom/overlay" && pwd)"
 PFX="${PFX:-/opt/pfx}"
 U="${UCODE_DIR:-$PFX/ucode}"
 PIDF=/tmp/wfbench.pid
-ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_SYSNET=/tmp/mock/sysnet WIFLOW_TICK=${WIFLOW_TICK:-20} WIFLOW_JOIN_WAIT=${WIFLOW_JOIN_WAIT:-60}"
+ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_SYSNET=/tmp/mock/sysnet WIFLOW_TICK=${WIFLOW_TICK:-20} WIFLOW_REC_SCALE=${WIFLOW_REC_SCALE:-1} WIFLOW_JOIN_WAIT=${WIFLOW_JOIN_WAIT:-60}"
 
 x() { nsenter -t "$(cat $PIDF)" -n -m env -i HOME=/root $ENVP "$@"; }
 

@@ -44,6 +44,74 @@ function internet_tick() {
 	return online;
 }
 
+/* ------------------------------------------------- self-recovery of the uplink */
+// The Internet is down although a link exists (WAN cable with carrier, or a
+// WiFi uplink is configured). Escalate slowly, each step once per outage:
+//   after 3 min  ifup of the WAN interface (a fresh DHCP/PPPoE attempt)
+//   after 8 min  wifi reload (radios and the WiFi uplink restart)
+//   after 20 min reboot, at most 3 in a row; the count resets after 10 min online
+// Nothing is written to flash except right before a recovery reboot (the
+// reboot reason and the counter) and when the counter is cleared again.
+// The test bench runs the same steps WIFLOW_REC_SCALE times faster.
+const RS = +(getenv('WIFLOW_REC_SCALE') ?? 1) || 1;
+const REC_T1 = 180 / RS, REC_T2 = 480 / RS, REC_T3 = 1200 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 240 / RS;
+let off_since = null, on_since = null, rec_stage = 0;
+
+function link_expected() {
+	if (wan_carrier())
+		return true;
+	let sta = false;
+	for (let l in split(W.sh('uci -q show wireless'), '\n'))
+		if (match(l, /\.mode='sta'$/)) { sta = true; break; }
+	return sta;
+}
+
+function boot_reason(reason) {
+	W.core_set({ boot_reason: reason });
+}
+
+function recovery_tick(online) {
+	const now = W.uptime();
+	if (online) {
+		off_since = null;
+		rec_stage = 0;
+		if (on_since == null) on_since = now;
+		if (now - on_since >= REC_OK && W.num(W.core('recovery_reboots', '0'), 0) > 0)
+			W.core_set({ recovery_reboots: null });
+		W.st_set('recovery', { stage: 0, offline_s: 0 });
+		return;
+	}
+	on_since = null;
+	if (off_since == null) off_since = now;
+	const off = now - off_since;
+	W.st_set('recovery', { stage: rec_stage, offline_s: off });
+	// Only act when the first Internet check after boot has had time, a link exists
+	// and the router clock/uplink are not being changed on purpose (LuCI or a job).
+	if (W.uptime() < REC_BOOT || !link_expected() || W.job_busy())
+		return;
+	if (rec_stage < 1 && off >= REC_T1) {
+		rec_stage = 1;
+		W.wlog('system', 'No Internet for 3 minutes: renewing the WAN connection');
+		W.run('ifup wan >/dev/null 2>&1 &');
+	} else if (rec_stage < 2 && off >= REC_T2) {
+		rec_stage = 2;
+		W.wlog('system', 'No Internet for 8 minutes: restarting the WiFi');
+		W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
+	} else if (rec_stage < 3 && off >= REC_T3) {
+		rec_stage = 3;
+		const n = W.num(W.core('recovery_reboots', '0'), 0);
+		if (n >= REC_MAX) {
+			W.wlog('system', 'No Internet for 20 minutes: the automatic restarts are used up, waiting');
+			return;
+		}
+		W.wlog('system', 'No Internet for 20 minutes: restarting the router');
+		W.core_set({ recovery_reboots: n + 1, boot_reason: 'auto_recovery' });
+		W.run('sync');
+		W.run('(sleep 3; reboot) </dev/null >/dev/null 2>&1 &');
+	}
+	W.st_set('recovery', { stage: rec_stage, offline_s: off });
+}
+
 /* ------------------------------------------------------------ WordPress */
 
 function mem_kb(k) {
@@ -59,7 +127,9 @@ function health(online, extra) {
 		clients_now: W.st_get('stats', {}).clients?.now ?? 0, clients_connected: W.st_get('stats', {}).clients?.now ?? 0,
 		load: +load, wan_link: wan_carrier(), wwan_link: up == 'wifi',
 		uplink_active: up, uplink_switches: 0, watchdog_restarts: 0,
-		time_ok: W.st_get('time_ok', false)
+		time_ok: W.st_get('time_ok', false),
+		boot_reason: W.st_get('boot_reason', 'power_or_manual'), recovery_stage: W.st_get('recovery', {}).stage ?? 0,
+		recovery_reboots: W.num(W.core('recovery_reboots', '0'), 0)
 	};
 	// Guest portal numbers (authorized guests, speed, safe mode, opening hours).
 	for (let k, v in extra ?? {})
@@ -124,6 +194,7 @@ function run_command(cmd, online) {
 	switch (action) {
 	case 'reboot':
 		result(id, action, 'rebooting', 'The router is restarting');
+		boot_reason('wp_command');
 		W.run('sync');
 		W.run('(sleep 5; reboot) </dev/null >/dev/null 2>&1 &');
 		break;
@@ -232,11 +303,24 @@ W.bus();
 signal('SIGTERM', 'default');
 signal('SIGINT', 'default');
 
+// Why did the router start? A reason left by our own reboot, else power or a
+// manual restart. Read once per boot; the stored reason is cleared again.
+{
+	const br = W.core('boot_reason');
+	if (br) {
+		W.st_set('boot_reason', br);
+		W.core_set({ boot_reason: null });
+	} else if (W.st_get('boot_reason') == null) {
+		W.st_set('boot_reason', 'power_or_manual');
+	}
+}
 W.wlog('system', `Wiflow ${W.VERSION} started`);
 while (true) {
 	const t0 = W.uptime();
 	let online = false;
 	try { online = internet_tick(); } catch (e) { W.wlog('system', `internet: ${e}`); }
+
+	try { recovery_tick(online); } catch (e) { W.wlog('system', `recovery: ${e}`); }
 
 	try { S.sample(W.st_get('latency', -1)); } catch (e) { W.wlog('system', `stats: ${e}`); }
 
