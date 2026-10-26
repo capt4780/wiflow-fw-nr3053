@@ -22,13 +22,12 @@
 
 {% if (!gate_ok): %}
 <section hidden data-title="{{ entityencode(_('Security code'), true) }}" data-gate="1">
-	<p class="wf-login-sub">{{ _('Enter the security code on the device label.') }}</p>
 	<form method="post" class="cbi-map" autocomplete="off">
 		<div class="cbi-section">
 			<div class="cbi-section-node">
 				<div class="cbi-value">
 					<div class="cbi-value-field">
-						<input name="wf_gate_code" id="wf_gate_code" type="text" placeholder="WIFDID-NR3053-000000" aria-label="{{ entityencode(_('Security code'), true) }}" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
+						<input name="wf_gate_code" id="wf_gate_code" type="text" aria-label="{{ entityencode(_('Security code'), true) }}" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
 					</div>
 				</div>
 			</div>

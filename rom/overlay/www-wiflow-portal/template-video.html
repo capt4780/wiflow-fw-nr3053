@@ -103,12 +103,11 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms. */
-.cp-terms{padding:22px 0 0}
+.cp-terms{padding:22px 0 0;overflow:hidden}
 .cp-terms-head{flex:none;display:flex;align-items:center;gap:12px;padding:0 var(--pad) 8px}
 .cp-terms-head b{display:block;font-weight:600;font-size:18px;line-height:24px}
 .cp-terms-head small{display:block;font-size:12.5px;line-height:17px;color:var(--ink-2)}
-.cp-terms-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px var(--pad) 10px;font-size:14px;line-height:1.6;color:var(--ink-3);
- -webkit-mask:linear-gradient(180deg,transparent,#000 12px,#000 calc(100% - 20px),transparent);mask:linear-gradient(180deg,transparent,#000 12px,#000 calc(100% - 20px),transparent)}
+.cp-terms-body{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px var(--pad) 10px;font-size:14px;line-height:1.6;color:var(--ink-3);}
 .cp-terms-body section{margin:14px 0 0}
 .cp-terms-body section:first-child{margin-top:6px}
 .cp-terms-body h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-weight:600;font-size:15px;line-height:1.4;color:var(--ink)}
@@ -228,7 +227,7 @@ html,body{overscroll-behavior:none}
       <div class="cp-view cp-main" data-view-main>
         <div class="cp-head">
           <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
-          <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified hidden viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b></span>
+          <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b></span>
           <button class="cp-x" type="button" data-dialog-cancel aria-label="Thu gọn"><svg class="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><svg class="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
         <div class="cp-hero" data-dialog-slider hidden>
@@ -543,11 +542,6 @@ html,body{overscroll-behavior:none}
   const termsCloses=[...stage.querySelectorAll('[data-terms-close]')];
   const termsBody=stage.querySelector('[data-terms-body]');
   const mainView=stage.querySelector('[data-view-main]');
-  /* v1.0.23: iOS (Safari and the WiFi sign-in window) can freeze a scroll box
-     that sits exactly on its top/bottom edge: the next swipe goes to the page
-     behind, which cannot move. Keep the box 1px inside its range on touch. */
-  const edgeGuard=el=>{if(!el)return;el.addEventListener('touchstart',()=>{const max=el.scrollHeight-el.clientHeight;if(max<2)return;if(el.scrollTop<=0)el.scrollTop=1;else if(el.scrollTop>=max)el.scrollTop=max-1;},{passive:true});};
-  edgeGuard(termsBody);edgeGuard(mainView);
   const preview=stage.dataset.preview==='1';
   const sessionId=String(stage.dataset.localSessionId||'');
   const authorizeUrl=String(stage.dataset.localAuthorizeUrl||'');
@@ -605,7 +599,7 @@ html,body{overscroll-behavior:none}
     if(name){const hn=stage.querySelector('[data-shop-name]'),hs=stage.querySelector('[data-shop-head-sub]');if(hn)hn.textContent=name;if(hs)hs.hidden=false;}
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const termsSub=stage.querySelector('[data-terms-sub]');if(termsSub&&name)termsSub.textContent='WiFi miễn phí tại '+name;
-    const vf=stage.querySelector('[data-shop-verified]');if(vf){if(shop.verified===true||shop.verified===1||shop.verified==='1'||shop.verified==='true')vf.removeAttribute('hidden');else vf.setAttribute('hidden','');}
+    const vf=stage.querySelector('[data-shop-verified]');if(vf){if(shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false')vf.setAttribute('hidden','');else vf.removeAttribute('hidden');}
     const sections=(shop.terms&&Array.isArray(shop.terms.sections)?shop.terms.sections:[]).filter(x=>x&&typeof x==='object'&&(clip(x.title,120)||clip(x.body,4000))).slice(0,20);
     if(termsBody&&sections.length){
       termsBody.textContent='';
