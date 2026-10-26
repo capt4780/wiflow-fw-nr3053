@@ -1,2 +1,0 @@
-#!/bin/sh
-echo "reboot $*" >> /tmp/mock/calls.log

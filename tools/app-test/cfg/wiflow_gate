@@ -1,3 +1,0 @@
-config gate 'main'
-	option enabled '1'
-	list code 'WIFDIDNR3053'

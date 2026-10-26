@@ -4,11 +4,11 @@ Firmware nền cho router Wiflow trên Viettel NR3053 (MediaTek MT7981B, 512 MB 
 
 Wiflow OS là bản ImmortalWrt v2.3.6 đang chạy ổn định, được **đóng gói lại** chứ không biên dịch lại:
 - **Giữ nguyên từng byte v2.3.6:** kernel, device tree, driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng, script nâng cấp. Bootloader và dữ liệu hiệu chỉnh không bị đụng tới.
-- **Rootfs làm gọn:** chỉ giữ gói Wiflow cần (`tools/lean-keep.txt` cùng các gói phụ thuộc), gỡ hết phần còn lại (kể cả Firewall, Services, VPN, NAS trong menu).
+- **Rootfs làm gọn:** chỉ giữ gói Wiflow cần (`tools/lean-keep.txt` cùng các gói phụ thuộc), gỡ hết phần còn lại.
 - **Thương hiệu Wiflow:** theme LuCI Wiflow (duy nhất), một logo Wiflow đầy đủ (`rom/brand/wiflow-logo-source.png`, `tools/make-brand.py`), tên máy, banner.
-- **Mặc định:** `10.0.0.1`, Gate `WIFDIDNR3053` trước khi đăng nhập, `wiflow` / `wiflow` và `root` / `1234`, WiFi khách mở `Wiflow 2.4G` / `Wiflow 5G` (`10.10.10.0/24`, qua portal khi WordPress có nội dung), HNAT tắt.
+- **Mặc định:** `10.0.0.1`, Gate `WIFDIDNR3053` trước khi đăng nhập, `wiflow` / `wiflow` và `root` / `1234`, WiFi mở `Wiflow 2.4G` / `Wiflow 5G`, HNAT tắt.
 
-**Wiflow App** (liên kết tài khoản WordPress, dashboard tình trạng router, portal khách) nằm sẵn trong firmware, mục đầu của menu LuCI. WiFi và mạng cài thẳng trong LuCI. Xem [docs/HUONG-DAN-WIFLOW-APP.md](docs/HUONG-DAN-WIFLOW-APP.md).
+**Wiflow App** (liên kết tài khoản WordPress, tình trạng router) nằm sẵn trong firmware, mục đầu của menu LuCI. WiFi và mạng cài thẳng trong LuCI.
 
 Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File firmware ở **Releases**.
 
@@ -19,9 +19,7 @@ Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File fir
 | `base/` | Bản v2.3.6 gốc (`.itb`), SHA-256 khớp `tools/nr3053-golden.json` |
 | `tools/lean-keep.txt` | Danh sách gói giữ lại |
 | `tools/lean-rootfs.py` | Tính gói cần giữ theo phụ thuộc trong cơ sở dữ liệu apk, gỡ phần còn lại (file, liên kết, bản ghi apk) |
-| `rom/overlay/` | File thêm vào rootfs: theme LuCI Wiflow (`wiflow.css` + `ui.css`), icon phẳng, Wiflow App (service, agent, trang LuCI, rpcd), cài đặt lần đầu `98-wiflow-base`, tắt HNAT, banner |
-| `tools/app-test/` | Bench kiểm thử Wiflow App (ubusd, rpcd, uci, ucode thật; netifd, driver và WordPress giả) |
-| `tools/make-icons.py` | Sinh bộ icon phẳng cho LuCI |
+| `rom/overlay/` | File thêm vào rootfs: theme LuCI Wiflow, cài đặt lần đầu `98-wiflow-base`, tắt HNAT, banner |
 | `rom/VERSION` | Phiên bản Wiflow OS |
 | `scripts/repack.sh` | Giải nén → làm gọn → thêm Wiflow → kiểm tra → đóng gói `.itb` |
 | `tools/rom-check.py` | Kiểm tra rootfs: WiFi giống v2.3.6, đủ thư viện, đủ module kernel, liên kết, mặc định, gói đã bỏ |

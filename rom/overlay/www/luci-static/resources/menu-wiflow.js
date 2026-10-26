@@ -110,9 +110,6 @@ return baseclass.extend({
 		let crumb = null;
 
 		groups.forEach(group => {
-			if (group.name == 'logout')
-				return;
-
 			const kids = ui.menu.getChildren(group);
 			const active = (group.name == at1);
 			const li = E('li', { 'class': (kids.length ? 'dropdown' : '') + (active ? ' active open' : '') });
@@ -127,17 +124,7 @@ return baseclass.extend({
 				a.setAttribute('aria-expanded', active ? 'true' : 'false');
 				a.addEventListener('click', ev => {
 					ev.preventDefault();
-
-					const open = !li.classList.contains('open');
-
-					// one group open at a time
-					ul.querySelectorAll('li.open').forEach(o => {
-						o.classList.remove('open');
-						o.firstChild.setAttribute('aria-expanded', 'false');
-					});
-
-					li.classList.toggle('open', open);
-					a.setAttribute('aria-expanded', open ? 'true' : 'false');
+					a.setAttribute('aria-expanded', li.classList.toggle('open') ? 'true' : 'false');
 				});
 
 				const sub = E('ul', { 'class': 'dropdown-menu' });
@@ -155,12 +142,14 @@ return baseclass.extend({
 
 				li.appendChild(sub);
 			}
+			else if (active) {
+				crumb = [ _(group.title) ];
+			}
 
 			ul.appendChild(li);
 		});
 
 		ul.style.display = '';
-		this.renderDock(groups, url, at1, at2);
 
 		const box = document.querySelector('#wf-crumb');
 
@@ -174,61 +163,6 @@ return baseclass.extend({
 		}
 
 		return ul;
-	},
-
-	/* Phones and tablets: floating dock with the groups; a group with pages
-	   opens them in a sheet above the dock. */
-	renderDock(groups, url, at1, at2) {
-		const dock = E('nav', { 'class': 'wf-dock', 'aria-label': 'Main menu' });
-		const sheet = E('div', { 'class': 'wf-sheet' });
-		const close = () => {
-			sheet.classList.remove('open');
-			dock.querySelectorAll('a.open').forEach(a => a.classList.remove('open'));
-		};
-		const card = E('div', { 'class': 'wf-sheet-card', 'role': 'dialog' });
-
-		sheet.appendChild(card);
-		sheet.addEventListener('click', ev => { if (ev.target === sheet) close(); });
-		document.addEventListener('keydown', ev => { if (ev.key == 'Escape') close(); });
-
-		groups.forEach(group => {
-			if (group.name == 'logout')
-				return;
-
-			const kids = ui.menu.getChildren(group);
-			const on = group.name == at1;
-			const a = E('a', { 'class': on ? 'on' : '', 'href': kids.length ? '#' : L.url(url, group.name) });
-
-			a.innerHTML = icon(group.name) + '<span></span>';
-			a.querySelector('span').textContent = _(group.title);
-
-			if (kids.length)
-				a.addEventListener('click', ev => {
-					ev.preventDefault();
-					const was = sheet.classList.contains('open') && card.dataset.group == group.name;
-
-					close();
-
-					if (was)
-						return;
-
-					card.dataset.group = group.name;
-					card.innerHTML = '<h4>' + icon(group.name) + '<span></span></h4>';
-					card.querySelector('span').textContent = _(group.title);
-					kids.forEach(kid => {
-						const k = E('a', { 'href': L.url(url, group.name, kid.name), 'class': (on && kid.name == at2) ? 'on' : '' });
-						k.textContent = _(kid.title);
-						card.appendChild(k);
-					});
-					sheet.classList.add('open');
-					a.classList.add('open');
-				});
-
-			dock.appendChild(a);
-		});
-
-		document.body.appendChild(sheet);
-		document.body.appendChild(dock);
 	},
 
 	renderModeMenu(tree) {

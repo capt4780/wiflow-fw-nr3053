@@ -1,5 +1,0 @@
-#!/bin/sh
-# Test double for the uhttpd helper options Wiflow uses: -m (password hash), -d (URL decode)
-[ "$1" = -m ] && exec openssl passwd -1 "$2"
-[ "$1" = -d ] && exec python3 -c 'import sys,urllib.parse; sys.stdout.write(urllib.parse.unquote(sys.argv[1]))' "$2"
-exit 1
