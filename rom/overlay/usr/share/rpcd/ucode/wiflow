@@ -1,0 +1,45 @@
+// ubus object "wiflow" for the Wiflow Setup page (luci-app-wiflow ACL).
+// Quick calls answer directly; pairing and unpairing run as a background job
+// followed through status().job.
+'use strict';
+
+import * as W from 'wiflow.setup';
+
+function str(v) {
+	return type(v) == 'string' ? v : '';
+}
+
+const methods = {
+	status: {
+		call: function() {
+			return W.status();
+		}
+	},
+
+	pair: {
+		args: { code: '' },
+		call: function(req) {
+			const code = replace(uc(str(req.args.code)), /[^A-Z0-9]/g, '');
+			if (!match(code, /^[A-Z0-9]{12}$/))
+				return { ok: false, error: 'The code has 12 letters and digits.' };
+			return W.job_start('pair', { code: code });
+		}
+	},
+
+	unpair: {
+		args: { force: false },
+		call: function(req) {
+			return W.job_start('unpair', { force: !!req.args.force });
+		}
+	},
+
+	job_clear: {
+		call: function() {
+			if (!W.job_busy())
+				W.st_set('job', null);
+			return { ok: true };
+		}
+	}
+};
+
+return { wiflow: methods };

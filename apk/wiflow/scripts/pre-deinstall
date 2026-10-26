@@ -1,8 +1,0 @@
-#!/bin/sh
-# Wiflow Setup removed: stop it and give the router back its own WiFi and
-# network settings (Wiflow's guest network, uplink and rules go away).
-[ -n "$IPKG_INSTROOT" ] && exit 0
-/etc/init.d/wiflow stop 2>/dev/null
-/etc/init.d/wiflow disable 2>/dev/null
-/usr/libexec/wiflow/provision remove 2>/dev/null
-exit 0

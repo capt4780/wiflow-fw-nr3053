@@ -1,0 +1,133 @@
+/* Wiflow UI layer (loaded after wiflow.css): colours from the logo (blue #0054F0,
+   cyan #00B8FF, navy #001033), solid fills, balanced radii (cards 14, controls
+   10, chips 6), white sidebar with the whole menu visible, flat bottom tab bar
+   on phones and tablets. */
+:root,:root[data-darkmode="true"]{
+ --wf-ink:#001033;--wf-text:#001033;--wf-muted:#5A6785;--wf-paper:#F2F5FA;
+ --wf-line:#E1E7F2;--wf-line2:#D3DCEB;
+ --wf-blue:#0054F0;--wf-blue-h:#0044C4;--wf-blue-soft:#EAF1FF;--wf-cyan:#00B8FF;
+ --wf-grad:#0054F0;
+ --r-card:14px;--r-ctl:10px;--r-chip:6px;
+ --primary-color-high:#0054F0;--primary-color-medium:#0044C4;--primary-color-low:#00379F}
+html,body{background:var(--wf-paper)}
+body{letter-spacing:-.003em}
+h2{font-size:24px;letter-spacing:-.02em;color:var(--wf-ink)}
+a{color:var(--wf-blue)}
+
+/* ---- sidebar: white, whole menu visible ---- */
+.wf-side{background:#fff;color:var(--wf-text);border-right:1px solid var(--wf-line);width:248px}
+.wf-side-brand{padding:18px 18px 14px;gap:12px;color:var(--wf-ink)!important;border-bottom:1px solid var(--wf-line);margin:0 0 8px}
+.wf-side-brand .wf-logo{width:64px;height:auto}
+.wf-dev .wf-model{font-size:14px;font-weight:600;color:var(--wf-ink)}
+.wf-dev .wf-ver{font-size:12px;color:var(--wf-muted)}
+.wf-nav{padding:6px 12px 16px}
+.wf-nav>li{margin:0 0 6px}
+.wf-nav>li>a{padding:8px 10px;border-radius:var(--r-ctl);gap:10px;color:var(--wf-ink)!important;font-weight:600;font-size:14px}
+.wf-nav>li>a svg{opacity:1;color:var(--wf-muted)}
+.wf-nav>li>a:hover{background:var(--wf-paper);color:var(--wf-ink)!important}
+.wf-nav>li.active>a svg{color:var(--wf-blue)}
+.wf-nav>li>a .chev{display:none}
+/* single-page group (Wiflow App) is a button-like row */
+.wf-nav>li:not(.dropdown)>a{padding:10px}
+.wf-nav>li:not(.dropdown).active>a{background:var(--wf-blue-soft);color:var(--wf-blue)!important}
+.wf-nav>li:not(.dropdown).active>a svg{color:var(--wf-blue)}
+/* groups: label row + always visible pages with a guide line */
+.wf-nav>li.dropdown>a{padding:8px 10px 4px;pointer-events:none;color:var(--wf-muted)!important;font-size:12.5px;font-weight:600}
+.wf-nav>li.dropdown>a svg{width:17px;height:17px}
+.wf-nav ul{display:block!important;margin:0 0 4px 19px;padding:0 0 0 10px;border-left:1px solid var(--wf-line)}
+.wf-nav ul a{padding:7px 10px;border-radius:8px;font-size:13.5px;color:#34415F!important;position:relative}
+.wf-nav ul a:hover{background:var(--wf-paper);color:var(--wf-ink)!important}
+.wf-nav ul li.active>a{background:var(--wf-blue-soft);color:var(--wf-blue)!important;font-weight:600}
+.wf-nav ul li.active>a::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--wf-blue)}
+.wf-side-foot{border-top:1px solid var(--wf-line);margin:0;padding:14px 18px 18px;color:var(--wf-muted)}
+.wf-side-foot b{color:var(--wf-ink)}
+
+/* ---- top bar ---- */
+header.wf-top{background:rgba(242,245,250,.9);padding:12px 32px;min-height:64px;border-bottom:1px solid var(--wf-line)}
+header.wf-top .wf-crumb{font-size:14px;color:var(--wf-muted)}
+header.wf-top .wf-crumb b{color:var(--wf-ink);font-size:15px}
+#indicators>span,[data-indicator]{border-radius:var(--r-chip);border-color:var(--wf-line);background:#fff;height:30px}
+.wf-logout{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:var(--r-ctl);border:1px solid var(--wf-line2);background:#fff;color:var(--wf-ink)!important;font-weight:600;font-size:13px;text-decoration:none!important;margin-left:8px}
+.wf-logout:hover{border-color:var(--wf-blue);color:var(--wf-blue)!important}
+.wf-logout svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wf-logout span{display:inline}
+#maincontent.container{max-width:1180px;padding:24px 32px 36px}
+
+/* ---- cards and tables of LuCI pages ---- */
+.cbi-section,.cbi-map>.cbi-section,#view>.cbi-section,.cbi-page-actions{background:#fff;border:1px solid var(--wf-line);border-radius:var(--r-card);box-shadow:0 1px 2px rgba(0,16,51,.04);-webkit-backdrop-filter:none;backdrop-filter:none}
+.cbi-section,.cbi-map>.cbi-section,#view>.cbi-section{padding:20px 22px}
+#maincontent .table:not(.cbi-section .table):not(.modal .table):not(.ifacebox .table){border-radius:var(--r-card);border-color:var(--wf-line);box-shadow:0 1px 2px rgba(0,16,51,.04);background:#fff}
+.alert-message{border-radius:var(--r-ctl)}
+
+/* ---- tabs, buttons, inputs ---- */
+.tabs,.cbi-tabmenu{background:#E8EDF6;border-radius:var(--r-ctl);padding:3px}
+.tabs>li,.cbi-tabmenu>li{border-radius:8px}
+.tabs>li.active,.cbi-tabmenu>li.cbi-tab{background:#fff!important;box-shadow:0 1px 2px rgba(0,16,51,.14)}
+.btn,.cbi-button,button.cbi-button,input.cbi-button{min-height:38px;padding:0 16px;border-radius:var(--r-ctl);border-color:var(--wf-line2);background:#fff}
+.btn:hover,.cbi-button:hover{border-color:var(--wf-blue)!important;background:#fff}
+.btn.primary,.btn.important,.cbi-button.important,.cbi-button-apply,.cbi-button-positive.important,.cbi-button-action.important,.cbi-button-save.important,.cbi-page-actions .cbi-button-apply{background:var(--wf-grad)!important;border-color:transparent!important;color:#fff!important;box-shadow:none}
+.btn.primary:hover,.cbi-button.important:hover,.cbi-button-apply:hover,.cbi-button-positive.important:hover,.cbi-button-action.important:hover,.cbi-button-save.important:hover{background:var(--wf-blue-h)!important;filter:none}
+input,select,textarea,.cbi-dropdown:not(.btn):not(.cbi-button),.cbi-select{border-radius:var(--r-ctl);border-color:var(--wf-line2);background-color:#fff}
+input[type=text],input[type=password],input[type=number],input[type=email],input:not([type]),select,.cbi-input-text,.cbi-input-password{height:40px}
+input:focus,textarea:focus,select:focus,.cbi-dropdown:focus,.cbi-dropdown[open],.cbi-select.focus{box-shadow:0 0 0 3px rgba(0,84,240,.16)!important;border-color:var(--wf-blue)!important}
+.cbi-dropdown[open]>ul.dropdown{border-radius:var(--r-ctl)}
+.cbi-progressbar>div{background:var(--wf-grad)}
+
+/* ---- modal: never wider than the screen, long values wrap ---- */
+#modal_overlay{background:rgba(0,16,51,.48);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.modal{border-radius:var(--r-card);border:1px solid var(--wf-line);box-sizing:border-box;max-width:min(560px,calc(100vw - 24px));width:calc(100% - 24px);padding:24px 24px 20px;overflow-wrap:anywhere;box-shadow:0 30px 70px rgba(0,16,51,.3)}
+.modal *{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.modal ul,.modal ol{padding-left:22px}
+.modal li,.modal code,.modal em{overflow-wrap:anywhere}
+.modal h4{font-size:17px;margin:0 0 12px}
+.modal>.right,.modal .right{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+
+footer{padding:14px 32px 28px}
+
+/* ---- tablets and phones: logo left, logout right, flat bottom tab bar ---- */
+.wf-dock,.wf-sheet{display:none}
+.wf-mlogo{display:none}
+@media (max-width:1024px){
+ .wf-side{display:none}
+ .wf-burger{display:none!important}
+ header.wf-top{padding:8px 16px;min-height:56px;gap:8px;background:#fff}
+ .wf-mlogo{display:flex!important;align-items:center;gap:10px;position:static;transform:none;margin-right:auto;text-decoration:none!important;color:var(--wf-ink)!important;font-weight:700;font-size:18px;letter-spacing:-.02em}
+ .wf-mlogo img{height:32px;width:32px;border-radius:8px}
+ header.wf-top .wf-crumb{display:none}
+ #indicators{margin-left:0}
+ .wf-logout{width:38px;padding:0;justify-content:center;margin-left:0}
+ .wf-logout span{display:none}
+ #maincontent.container{padding:16px 16px 96px}
+ footer{padding:8px 16px 96px}
+ h2{font-size:22px}
+ .cbi-section,.cbi-map>.cbi-section,#view>.cbi-section{padding:16px}
+ .cbi-page-actions{position:sticky;bottom:72px;margin:0 0 12px;padding:12px;box-shadow:0 8px 24px rgba(0,16,51,.14)}
+
+ .wf-dock{display:flex;position:fixed;z-index:960;left:0;right:0;bottom:0;padding:0 0 env(safe-area-inset-bottom);background:#fff;border-top:1px solid var(--wf-line);box-shadow:0 -6px 20px rgba(0,16,51,.06)}
+ .wf-dock a{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:60px;color:var(--wf-muted)!important;text-decoration:none!important;font-size:11.5px;font-weight:600}
+ .wf-dock a svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+ .wf-dock a span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+ .wf-dock a.on,.wf-dock a.open{color:var(--wf-blue)!important}
+ .wf-dock a.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:var(--wf-grad)}
+
+ .wf-sheet{display:block;position:fixed;inset:0;z-index:950;visibility:hidden;opacity:0;background:rgba(0,16,51,.4);transition:opacity .2s,visibility .2s}
+ .wf-sheet.open{visibility:visible;opacity:1}
+ .wf-sheet-card{position:absolute;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom));margin:0 auto;max-width:560px;max-height:62dvh;overflow:auto;padding:14px 12px 12px;border-radius:var(--r-card) var(--r-card) 0 0;background:#fff;border:1px solid var(--wf-line);border-bottom:0;box-shadow:0 -12px 40px rgba(0,16,51,.18);transform:translateY(24px);transition:transform .22s}
+ .wf-sheet.open .wf-sheet-card{transform:none}
+ .wf-sheet-card h4{display:flex;align-items:center;gap:10px;margin:0 8px 8px;font-size:14px;color:var(--wf-muted)}
+ .wf-sheet-card h4 svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+ .wf-sheet-card a{display:flex;align-items:center;justify-content:space-between;min-height:48px;padding:0 12px;border-radius:var(--r-ctl);color:var(--wf-ink)!important;font-weight:600;font-size:15px;text-decoration:none!important}
+ .wf-sheet-card a::after{content:"";width:7px;height:7px;border-top:2px solid #AAB6D0;border-right:2px solid #AAB6D0;transform:rotate(45deg)}
+ .wf-sheet-card a:active,.wf-sheet-card a.on{background:var(--wf-blue-soft);color:var(--wf-blue)!important}
+}
+
+/* ---- interface / radio / signal tiles (Interfaces, Wireless, stations) ---- */
+.ifacebadge{border:1px solid var(--wf-line);background:#F6F8FC;border-radius:var(--r-ctl);padding:6px 8px;color:var(--wf-ink);text-shadow:none;box-shadow:none}
+.ifacebadge img{width:28px;height:28px}
+.ifacebadge-active{border-color:var(--wf-blue);font-weight:600}
+.ifacebox{border-radius:var(--r-ctl)}
+.zonebadge{border-radius:var(--r-chip);text-shadow:none}
+#maincontent [data-name="_badge"] .ifacebadge{border-radius:var(--r-ctl);font-size:11.5px;padding:8px 4px}
+/* zone / interface headers (Interfaces page): one soft blue instead of per-zone colours */
+.ifacebox .ifacebox-head,.ifacebox .ifacebox-head[style]{background:#EAF1FF!important;color:var(--wf-blue)!important;border-bottom-color:#D6E4FF}
+.ifacebox .ifacebox-head strong{color:inherit!important}

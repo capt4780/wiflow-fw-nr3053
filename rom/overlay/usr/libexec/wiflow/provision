@@ -1,0 +1,31 @@
+#!/usr/bin/ucode
+// provision boot    every start of the wiflow service (idempotent)
+// provision remove  package removal
+'use strict';
+
+import { readfile, writefile, unlink, mkdir } from 'fs';
+import * as W from 'wiflow.setup';
+import * as P from 'wiflow.provision';
+
+function boot() {
+	mkdir(W.ROOT, 0700);
+	P.ensure_core();
+	W.ensure_device_id();
+	P.ensure_gate_code();
+	if (W.core('last_command_status') == 'rebooting')
+		W.core_set({ last_command_status: 'success', last_command_message: 'The router restarted' });
+	P.reload(P.migrate());
+}
+
+function remove() {
+	P.remove_gate_code();
+	W.run(`rm -rf ${W.RUN}`);
+}
+
+switch (ARGV[0]) {
+case 'boot': boot(); break;
+case 'remove': remove(); break;
+default:
+	warn('usage: provision boot|remove\n');
+	exit(1);
+}

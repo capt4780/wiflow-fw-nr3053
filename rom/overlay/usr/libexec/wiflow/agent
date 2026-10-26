@@ -1,0 +1,222 @@
+#!/usr/bin/ucode
+// Wiflow agent (procd service "wiflow"): every 20 s
+//  - checks the Internet (HTTPS 204);
+//  - talks to WordPress: heartbeat, commands, command results, unpair.
+// It does not change the WiFi or the network: that is done in LuCI.
+// Everything it keeps is in RAM (/tmp/wiflow); nothing is written to flash
+// except the pairing / settings a command changes.
+'use strict';
+
+import { readfile, writefile, unlink, access } from 'fs';
+import * as W from 'wiflow.setup';
+import * as S from 'wiflow.stats';
+
+// 20 s on the router; the test bench runs the same loop faster.
+const TICK = +(getenv('WIFLOW_TICK') ?? 20) || 20;
+
+let hb_delay = TICK;
+let next_hb = 0;
+
+/* -------------------------------------------------------------- helpers */
+
+// Which uplink carries the traffic: wifi (a client interface apcli*), lan or none.
+function uplink_kind() {
+	for (let l in split(readfile('/proc/net/route') ?? '', '\n')) {
+		const f = split(trim(replace(l, /\s+/g, ' ')), ' ');
+		if (length(f) >= 8 && f[1] == '00000000' && f[7] == '00000000')
+			return match(f[0], /^(apcli|apclii|apclix|wlan[0-9]+-sta|phy[0-9]+-sta)/) ? 'wifi' : 'lan';
+	}
+	return 'none';
+}
+
+function wan_carrier() {
+	const dev = W.uci_get('network', 'wan', 'device') ?? 'wan';
+	return trim(readfile(`/sys/class/net/${dev}/carrier`) ?? '0') == '1';
+}
+
+function internet_tick() {
+	const ms = W.has_default_route() ? W.probe_ms(4) : -1;
+	const online = ms >= 0;
+	const prev = W.st_get('online', false);
+	if (online && !prev) W.st_set('online_since', W.uptime());
+	W.st_set('online', online);
+	W.st_set('latency', ms);
+	return online;
+}
+
+/* ------------------------------------------------------------ WordPress */
+
+function mem_kb(k) {
+	const m = match(readfile('/proc/meminfo') ?? '', regexp(`${k}:\\s+([0-9]+)`));
+	return m ? +m[1] : 0;
+}
+
+function health(online) {
+	const load = split(readfile('/proc/loadavg') ?? '0', ' ')[0];
+	const up = online ? uplink_kind() : 'none';
+	return {
+		uptime: W.uptime(), mem_total_kb: mem_kb('MemTotal'), mem_free_kb: mem_kb('MemAvailable'),
+		clients_now: W.st_get('stats', {}).clients?.now ?? 0, clients_connected: W.st_get('stats', {}).clients?.now ?? 0,
+		load: +load, wan_link: wan_carrier(), wwan_link: up == 'wifi',
+		uplink_active: up, uplink_switches: 0, watchdog_restarts: 0,
+		time_ok: W.st_get('time_ok', false)
+	};
+}
+
+function command_result() {
+	const id = W.core('last_command_id');
+	if (!id)
+		return null;
+	return {
+		id: id, action: W.core('last_command_action', ''),
+		status: W.core('last_command_status', 'failed'), message: W.core('last_command_message', '')
+	};
+}
+
+function result(id, action, status, message) {
+	W.core_set({ last_command_id: id, last_command_action: action, last_command_status: status, last_command_message: message });
+}
+
+function df_total() {
+	const o = W.sh('df -k /overlay');
+	const l = split(trim(o), '\n');
+	const f = split(trim(replace(l[length(l) - 1] ?? '', /\s+/g, ' ')), ' ');
+	return W.num(f[1], 0) * 1024;
+}
+
+function diag_send(id, online) {
+	const text = W.diag_text();
+	writefile(`${W.RUN}/diag.txt`, text);
+	const r = W.http('POST', '/devices/diag', { command_id: id, health: health(online), text: substr(text, 0, 16000), log: W.wlog_list(150) }, W.auth(), 20);
+	return !!r.body?.ok;
+}
+
+function run_command(cmd, online) {
+	const id = cmd?.id, action = cmd?.action;
+	if (type(id) != 'string' || !match(id, /^[A-Za-z0-9._:-]{1,80}$/) || type(action) != 'string')
+		return;
+	if (id == W.core('last_command_id'))
+		return;
+
+	W.wlog('system', `Command from the app: ${action}`);
+	switch (action) {
+	case 'reboot':
+		result(id, action, 'rebooting', 'The router is restarting');
+		W.run('sync');
+		W.run('(sleep 5; reboot) </dev/null >/dev/null 2>&1 &');
+		break;
+	case 'diag': {
+		result(id, action, 'running', 'Sending the diagnostics report');
+		const ok = diag_send(id, online);
+		result(id, action, ok ? 'success' : 'failed', ok ? 'The diagnostics report was sent' : 'The diagnostics report could not be sent');
+		break;
+	}
+	default:
+		result(id, action, 'failed', 'Not supported by this router. WiFi and network are set in LuCI.');
+	}
+}
+
+function heartbeat(online) {
+	const a = W.auth();
+	if (!a || W.core('paired', '0') != '1') {
+		W.st_set('wp_online', false);
+		return TICK;
+	}
+	if (!online) {
+		W.st_set('wp_online', false);
+		W.st_set('wp_error', 'no_internet');
+		return TICK;
+	}
+
+	const names = W.wifi_names();
+	const r = W.http('POST', '/devices/heartbeat', {
+		agent_version: W.VERSION, data_generation: +W.GEN, internet: online,
+		connection: names.source ? 'auto' : 'lan',
+		wifi_ssid: names.source, guest_ssid: names.ap,
+		active_portal_revision: 0, storage_total_bytes: df_total(), media_budget_bytes: 0,
+		portal_sync_status: 'idle', portal_sync_error: '',
+		events: [], command_result: command_result(), health: health(online),
+		stats: [], ad_stats: [], log: W.wlog_list(15)
+	}, a, 15);
+
+	const b = r.body;
+	if (b?.ok) {
+		if (`${b.data_generation}` != W.GEN) {
+			W.st_set('wp_online', false);
+			W.st_set('wp_error', 'generation_mismatch');
+			return 15 * TICK;
+		}
+		W.st_set('wp_online', true);
+		W.st_set('wp_error', null);
+		W.st_set('wp_last_ok', W.now());
+		W.st_set('unpair_n', null);
+		if (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)
+		    && b.account_public_id != W.core('account_public_id'))
+			W.core_set({ account_public_id: b.account_public_id });
+		const st = +b.server_time;
+		if (st > 1600000000) {
+			if (W.now() - st <= 300 && st - W.now() <= 300) W.st_set('time_ok', true);
+			else if (W.run(`date -s @${st}`).code == 0) {
+				W.st_set('time_ok', true);
+				W.wlog('system', 'The router clock was set from the Wiflow server');
+			}
+		}
+		if (b.command)
+			run_command(b.command, online);
+		return TICK;
+	}
+
+	W.st_set('wp_online', false);
+	const code = b?.code;
+	W.st_set('wp_error', code ?? 'transport');
+	if (code == 'DEVICE_UNPAIRED') {
+		// Confirmed three times over at least two minutes before the router
+		// forgets its account.
+		let u = W.st_get('unpair_n') ?? { n: 0, first: W.uptime() };
+		u.n++;
+		W.st_set('unpair_n', u);
+		if (u.n >= 3 && W.uptime() - u.first >= 6 * TICK) {
+			W.clear_pairing();
+			W.wlog('system', 'The router was removed from the Wiflow account in the app');
+		}
+		return 3 * TICK;
+	}
+	W.st_set('unpair_n', null);
+	if (code == 'DEVICE_AUTH_INVALID' || code == 'DEVICE_AUTH_MISSING')
+		return min(30 * TICK, max(3 * TICK, hb_delay * 2));
+	if (code == 'DEVICE_GENERATION_MISMATCH')
+		return 15 * TICK;
+	return min(9 * TICK, hb_delay * 2);
+}
+
+/* -------------------------------------------------------------- main */
+
+// libubox installs its own SIGTERM/SIGINT handlers on the first ubus
+// connection; this loop does not run uloop, so procd's stop must kill it.
+W.bus();
+signal('SIGTERM', 'default');
+signal('SIGINT', 'default');
+
+W.wlog('system', `Wiflow ${W.VERSION} started`);
+while (true) {
+	const t0 = W.uptime();
+	let online = false;
+	try { online = internet_tick(); } catch (e) { W.wlog('system', `internet: ${e}`); }
+
+	try { S.sample(W.st_get('latency', -1)); } catch (e) { W.wlog('system', `stats: ${e}`); }
+
+	const kicked = access(`${W.RUN}/kick`);
+	if (kicked) unlink(`${W.RUN}/kick`);
+	if (kicked || t0 >= next_hb) {
+		try { hb_delay = heartbeat(online); } catch (e) { hb_delay = 60; W.wlog('system', `heartbeat: ${e}`); }
+		next_hb = W.uptime() + hb_delay;
+	}
+
+	// Sleep until the next tick; a kick file (pairing, command result) wakes
+	// the loop early.
+	for (let i = 0; i < TICK; i++) {
+		if (access(`${W.RUN}/kick`))
+			break;
+		sleep(1000);
+	}
+}

@@ -1,0 +1,150 @@
+#!/usr/bin/ucode
+// Wiflow Setup background job: job <kind> <request.json>
+//   pair    connect the router to a Wiflow account
+//   unpair  disconnect it
+//   diag    collect (and optionally send) a diagnostics report
+// Progress and the result go to /tmp/wiflow/st/job (read by status()).
+// A request from a WordPress command carries command_id: the result is
+// also stored as the command result for the next heartbeat.
+'use strict';
+
+import { readfile, writefile, readlink, unlink } from 'fs';
+import * as W from 'wiflow.setup';
+
+const kind = ARGV[0];
+const reqfile = ARGV[1];
+const req = json(readfile(reqfile) ?? '{}') ?? {};
+unlink(reqfile);
+
+const PID = +(readlink('/proc/self') ?? 0);
+
+function job(state, message, extra) {
+	const j = { kind: kind, state: state, message: message, at: W.uptime(), pid: PID };
+	for (let k, v in extra ?? {}) j[k] = v;
+	W.st_set('job', j);
+}
+
+function command_result(status, message) {
+	if (!req.command_id)
+		return;
+	W.core_set({
+		last_command_id: req.command_id, last_command_action: req.command_action ?? kind,
+		last_command_status: status, last_command_message: message
+	});
+	W.kick_agent();
+}
+
+function done(ok, message, extra) {
+	job(ok ? 'success' : 'failed', message, extra);
+	command_result(ok ? 'success' : 'failed', message);
+	exit(ok ? 0 : 1);
+}
+
+function step(message) {
+	job('running', message);
+	if (req.command_id)
+		W.core_set({ last_command_id: req.command_id, last_command_action: req.command_action ?? kind, last_command_status: 'running', last_command_message: message });
+}
+
+/* -------------------------------------------------------------------- diag */
+
+function diag() {
+	step('Collecting information…');
+	W.st_set('diag_at', W.now());
+	const text = W.diag_text();
+	writefile(`${W.RUN}/diag.txt`, text);
+	if (req.send) {
+		step('Sending to Wiflow…');
+		const a = W.auth();
+		if (!a)
+			done(false, 'This router is not linked to a Wiflow account.');
+		const r = W.http('POST', '/devices/diag', { command_id: 'local', health: {}, text: substr(text, 0, 16000), log: W.wlog_list(150) }, a, 20);
+		if (!r.body?.ok)
+			done(false, 'The report could not be sent.');
+		done(true, 'The diagnostics report was sent to Wiflow.');
+	}
+	done(true, 'The diagnostics report is ready.', { file: `${W.RUN}/diag.txt` });
+}
+
+/* ---------------------------------------------------------------- account */
+
+const PAIR_ERRORS = {
+	PAIR_CODE_NOT_FOUND: 'The code is not correct. Check it in the Wiflow app.',
+	PAIR_CODE_ALREADY_USED: 'This code was already used. Create a new one in the app.',
+	PAIR_CODE_EXPIRED: 'The code has expired. Create a new one in the app.',
+	PAIR_CODE_FORMAT: 'The code has 12 letters and digits.',
+	PAIR_ACCOUNT_INACTIVE: 'This Wiflow account is locked.',
+	PAIR_RATE_LIMIT: 'Too many attempts. Wait a moment and try again.',
+	PAIR_GENERATION_MISMATCH: 'The Wiflow server and this router use different data versions.'
+};
+
+function pair() {
+	const code = replace(uc(req.code ?? ''), /[^A-Z0-9]/g, '');
+	if (!match(code, /^[A-Z0-9]{12}$/))
+		done(false, PAIR_ERRORS.PAIR_CODE_FORMAT);
+	const id = W.device_id();
+	if (!id)
+		done(false, 'The device code could not be read.');
+
+	step('Contacting the Wiflow server…');
+	const h = W.http('GET', '/devices/health', null, null, 10);
+	if (!h.ok)
+		done(false, h.http ? `The Wiflow server returned HTTP ${h.http}.` : 'Cannot reach the Wiflow server. Check the router\'s Internet.');
+	const hb = h.body;
+	if (!hb.ok || +hb.api_version != 1 || `${hb.data_generation}` != W.GEN || (hb.rest_root && hb.rest_root != W.REST))
+		done(false, 'The Wiflow server and this router use different versions. Update Wiflow Setup.');
+
+	step('Linking the account…');
+	const r = W.http('POST', '/devices/pair', {
+		pairing_code: code, device_id: id, model: W.MODEL, agent_version: W.VERSION, data_generation: +W.GEN
+	}, null, 20);
+	if (!r.body)
+		done(false, r.http ? `The Wiflow server returned HTTP ${r.http}.` : 'The request could not be sent.');
+	const b = r.body;
+	if (!b.ok)
+		done(false, PAIR_ERRORS[b.code] ?? b.message ?? 'The server refused the link.');
+	if (`${b.data_generation}` != W.GEN)
+		done(false, PAIR_ERRORS.PAIR_GENERATION_MISMATCH);
+	if (type(b.device_token) != 'string' || !match(b.device_token, /^[A-Za-z0-9_-]{40,160}$/))
+		done(false, 'The server did not issue a valid device key.');
+
+	const acct = (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)) ? b.account_public_id : null;
+	W.core_set({
+		paired: '1', paired_at: W.now(), device_token: b.device_token, account_public_id: acct,
+		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
+	});
+	W.st_set('wp_error', null);
+	W.st_set('wp_online', true);
+	W.st_set('wp_last_ok', W.now());
+	W.st_set('unpair_n', null);
+	W.wlog('system', `Linked to Wiflow account ${acct ?? ''}`);
+	W.kick_agent();
+	done(true, acct ? `Linked to account ${acct}.` : 'Linked to your Wiflow account.', { account: acct });
+}
+
+function unpair() {
+	const a = W.auth();
+	if (!a) {
+		W.clear_pairing();
+		done(true, 'The router is no longer linked.');
+	}
+	step('Unlinking…');
+	const r = W.http('POST', '/devices/unpair', {}, a, 15);
+	const code = r.body?.code;
+	if (r.body?.ok || code == 'DEVICE_UNPAIRED' || code == 'DEVICE_AUTH_INVALID' || req.force) {
+		W.clear_pairing();
+		W.wlog('system', 'Router unlinked from the Wiflow account');
+		done(true, 'The router is no longer linked.');
+	}
+	done(false, r.body?.message ?? 'Cannot reach the Wiflow server, so the router was not unlinked. Try again when it has Internet.');
+}
+
+/* ------------------------------------------------------------------- main */
+
+job('running', 'Starting…');
+switch (kind) {
+case 'diag': diag(); break;
+case 'pair': pair(); break;
+case 'unpair': unpair(); break;
+default: done(false, 'Unknown job.');
+}

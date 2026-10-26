@@ -6,7 +6,7 @@ Wiflow OS là chính bản v2.3.6 được làm gọn:
 - Kernel, device tree, driver và firmware WiFi MediaTek giống v2.3.6 từng byte.
 - Bootloader, phân vùng NAND, dữ liệu hiệu chỉnh sóng không bị đụng tới.
 
-Ứng dụng Wiflow (Setup, portal, kết nối WordPress) là gói `.apk` riêng, cài sau.
+Wiflow App (liên kết WordPress, tình trạng router) nằm sẵn trong firmware, không cần cài thêm.
 
 ## Chuẩn bị
 
@@ -32,7 +32,7 @@ Wiflow OS là chính bản v2.3.6 được làm gọn:
 | SSH | `root@10.0.0.1`, mật khẩu `1234` |
 
 - Internet nguồn: cắm cáp vào cổng **WAN** (DHCP), hoặc cài ở LuCI → **Network → Interfaces**.
-- Cài ứng dụng Wiflow: LuCI → **System → Software → Upload Package…**, chọn file `.apk` Wiflow.
+- Liên kết tài khoản Wiflow: mở **Wiflow App** ở đầu menu LuCI (xem docs/HUONG-DAN-WIFLOW-APP.md).
 
 ## Reset
 
@@ -54,7 +54,7 @@ Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặ
 | | |
 |---|---|
 | Nền | ImmortalWrt v2.3.6 (quytttb/immortalwrt-mt798x-rebase `495af17`), kernel 6.12.94, driver WiFi MediaTek mt_wifi 7.6.7.3 |
-| Giữ | Mạng lõi, tường lửa nftables, DHCP/DNS, driver và công cụ WiFi MediaTek, curl/HTTPS, LuCI tiếng Anh gốc OpenWrt (Status, Network, Wireless, Firewall, System, Software), SSH, apk |
+| Giữ | Mạng lõi, tường lửa nftables, DHCP/DNS, driver và công cụ WiFi MediaTek, curl/HTTPS, LuCI tiếng Anh gốc OpenWrt rút gọn (Wiflow App, Status, Network, System, Software), SSH, apk |
 | Giao diện | Theme LuCI Wiflow, theme duy nhất, không đổi được; một logo Wiflow đầy đủ duy nhất (trang Gate, đăng nhập, sidebar, favicon); sidebar nền trắng |
 | Gate | Nhập sai 5 lần thì địa chỉ đó bị khóa 60 giây. Router chỉ kiểm tra tài khoản sau khi qua Gate |
 | Đã bỏ | PPPoE, Tailscale, WireGuard, chặn quảng cáo, DDNS, UPnP, TurboACC, EQoS, IPv6 (DHCPv6/RA), zram, iptables cũ, htop/nano/tcpdump, theme Aurora/Bootstrap, mọi gói dịch (chỉ tiếng Anh) |

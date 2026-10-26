@@ -1,0 +1,21 @@
+{
+	"luci-app-wiflow": {
+		"description": "Wiflow App",
+		"read": {
+			"ubus": {
+				"wiflow": [
+					"status"
+				]
+			}
+		},
+		"write": {
+			"ubus": {
+				"wiflow": [
+					"pair",
+					"unpair",
+					"job_clear"
+				]
+			}
+		}
+	}
+}
