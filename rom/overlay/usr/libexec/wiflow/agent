@@ -49,12 +49,12 @@ function internet_tick() {
 // WiFi uplink is configured). Escalate slowly, each step once per outage:
 //   after 3 min  ifup of the WAN interface (a fresh DHCP/PPPoE attempt)
 //   after 8 min  wifi reload (radios and the WiFi uplink restart)
-//   after 20 min reboot, at most 3 in a row; the count resets after 10 min online
+//   after 30 min reboot, at most 3 in a row; the count resets after 10 min online
 // Nothing is written to flash except right before a recovery reboot (the
 // reboot reason and the counter) and when the counter is cleared again.
 // The test bench runs the same steps WIFLOW_REC_SCALE times faster.
 const RS = +(getenv('WIFLOW_REC_SCALE') ?? 1) || 1;
-const REC_T1 = 180 / RS, REC_T2 = 480 / RS, REC_T3 = 1200 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 240 / RS;
+const REC_T1 = 180 / RS, REC_T2 = 480 / RS, REC_T3 = 1800 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 240 / RS;
 let off_since = null, on_since = null, rec_stage = 0;
 
 function link_expected() {
@@ -101,10 +101,10 @@ function recovery_tick(online) {
 		rec_stage = 3;
 		const n = W.num(W.core('recovery_reboots', '0'), 0);
 		if (n >= REC_MAX) {
-			W.wlog('system', 'No Internet for 20 minutes: the automatic restarts are used up, waiting');
+			W.wlog('system', 'No Internet for 30 minutes: the automatic restarts are used up, waiting');
 			return;
 		}
-		W.wlog('system', 'No Internet for 20 minutes: restarting the router');
+		W.wlog('system', 'No Internet for 30 minutes: restarting the router');
 		W.core_set({ recovery_reboots: n + 1, boot_reason: 'auto_recovery' });
 		W.run('sync');
 		W.run('(sleep 3; reboot) </dev/null >/dev/null 2>&1 &');
