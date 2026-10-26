@@ -254,7 +254,10 @@ checks = {
         not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())
                 for x in ["/usr/lib/wiflow/common.sh", "/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
                           "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
-                          "/usr/libexec/wiflow/agent", "/usr/libexec/wiflow/guests", "/usr/share/ucode/wiflow/setup.uc"])
+                          "/usr/libexec/wiflow/guests", "/usr/share/ucode/wiflow/setup.uc"])
+        # the agent restarts the WiFi (wifi reload) only as the 15-minute step of the uplink recovery, never polls the driver
+        and not re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down))\b", open(F + "/usr/libexec/wiflow/agent").read())
+        and open(F + "/usr/libexec/wiflow/agent").read().count("(wifi reload)") == 1
         # the only driver question: the source WiFi signal, one call, only while the Wiflow App page is open
         and not re.search(r"iwpriv|iwconfig|hostapd|wifi (up|down|reload)", open(F + "/usr/share/ucode/wiflow/stats.uc").read())
         and open(F + "/usr/share/ucode/wiflow/stats.uc").read().count("call iwinfo") == 1
