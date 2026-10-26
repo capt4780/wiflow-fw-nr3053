@@ -121,7 +121,7 @@ print(bad); sys.exit(1 if bad else 0)" $APP; then pass "Wiflow App text is Engli
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 : > /tmp/mock/calls.log
 export WIFLOW_REC_SCALE=30
-$B world 'w["inet"]["wan"]=False'
+$B world 'w["inet"].update({k: False for k in w["inet"]})'
 $B agent
 wait_for 40 "s['system']['recovery']['stage']>=1" && grep -q '^ifup wan' /tmp/mock/calls.log && pass "recovery 1: the WAN connection is renewed (ifup wan)" || fail "recovery 1: $(st "s['system']['recovery']") $(cat /tmp/mock/calls.log | tr '\n' ' ')"
 wait_for 60 "s['system']['recovery']['stage']>=2" && grep -q '^wifi reload' /tmp/mock/calls.log && pass "recovery 2: the WiFi is restarted" || fail "recovery 2: $(st "s['system']['recovery']")"
@@ -132,7 +132,7 @@ grep -q '^reboot' /tmp/mock/calls.log && pass "recovery 3: the router restarts" 
 expect "recovery: reason and counter kept for the next start" "$(U get wiflow.core.boot_reason)|$(U get wiflow.core.recovery_reboots)" '^auto_recovery\|1$'
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 rm -rf /tmp/wiflow/st/boot_reason /tmp/wiflow/st/recovery
-$B world 'w["inet"]["wan"]=True'
+$B world 'w["inet"].update({k: True for k in w["inet"]})'
 $B agent
 wait_for 30 "s['internet']['online']" && pass "recovery: online again" || fail "not online again"
 expect "reboot reason shown after the restart, and cleared" "$(st "s['system']['boot_reason']")|$(U get wiflow.core.boot_reason)" '^auto_recovery\|$'
