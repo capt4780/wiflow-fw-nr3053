@@ -31,7 +31,21 @@ function codes() {
 	if (type(list) != 'array' || !length(list))
 		list = [ 'WIFDIDNR3053' ];
 
-	return map(list, (x) => uc(trim(x)));
+	return map(list, (x) => norm(x));
+};
+// Case, spaces and dashes do not matter: "wifdid-nr3053", "WIFDID NR3053"
+// and "WIFDIDNR3053" are the same code.
+function norm(x) {
+	return uc(replace(trim(x ?? ''), /[^0-9A-Za-z]/g, ''));
+};
+// the full device ID (WIFDID-NR3053-123456) also works when its 6-digit part is a code
+function accepts(allowed, input) {
+	const v = norm(input);
+	if (index(allowed, v) >= 0)
+		return true;
+
+	const m = match(v, /^WIFDIDNR3053([0-9]{6})$/);
+	return m != null && index(allowed, m[1]) >= 0;
 };
 function new_token() {
 	const raw = readfile('/dev/urandom', 16);
@@ -92,7 +106,7 @@ export function attempt(http) {
 	if (count >= MAX_FAIL)
 		return { ok: false, error: 'locked', wait: LOCK - (now - since) };
 
-	if (index(allowed, uc(trim(input))) >= 0) {
+	if (accepts(allowed, input)) {
 		cleanup();
 		const t = new_token();
 		writefile(`${DIR}/t-${t}`, `${now}`);

@@ -13,11 +13,7 @@
 		{% if (!blank_page): %}
 		</div>
 		<footer>
-			<span>
-				Wiflow OS {{ wiflow_os }} · Powered by
-				<a href="https://github.com/openwrt/luci" target="_blank" rel="noreferrer">{{ version.luciname }} ({{ version.luciversion }})</a>
-				/ OpenWrt
-			</span>
+			<span>Wiflow OS {{ wiflow_os }} · <a href="https://github.com/openwrt/luci" target="_blank" rel="noreferrer">{{ version.luciname }}</a> / OpenWrt</span>
 			<ul class="breadcrumb pull-right" id="modemenu" style="display:none"></ul>
 		</footer>
 		</div>
