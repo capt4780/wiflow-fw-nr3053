@@ -518,6 +518,17 @@ portal_health_json(){
         "$(num_or0 "$(state_get stat_rx_bps)")" "$(num_or0 "$(state_get stat_tx_bps)")" "$(num_or0 "$(state_get stat_ping)")" "$(num_or0 "$(state_get wd_restarts)")" \
         "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_down_kbps 0)" "$(cfg_num guest_up_kbps 0)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)"
 }
+# One place that turns the guest portal on: a valid content snapshot is on the router and
+# safe mode is not active -> flag on + captive rules. Safe to call again and again.
+portal_activate(){
+    safe_mode_active && return 0
+    [ -f "$PORTAL_ACTIVE/portal.json" ] || return 0
+    if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" != 1 ]; then
+        uci set wiflow.core.portal_enabled='1'; uci commit wiflow >/dev/null 2>&1 || true
+    fi
+    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || { state_set portal_error 'captive_firewall_enable_failed'; return 1; }
+    return 0
+}
 # Every minute from portal-mode-loop: web server and DNS stay up; three failures
 # of the portal listener in 10 minutes = safe mode (guests keep the Internet).
 watchdog_tick(){

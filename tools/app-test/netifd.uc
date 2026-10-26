@@ -29,8 +29,8 @@ const ENC = {
 	eap: { enabled: true, wpa: [ 2 ], authentication: [ '802.1x' ], ciphers: [ 'ccmp' ] }
 };
 const AP = {
-	ra0: { ssid: 'Wiflow 2.4G', channel: 6, frequency: 2437 },
-	rax0: { ssid: 'Wiflow 5G', channel: 36, frequency: 5180 }
+	ra0: { ssid: 'Wiflow', channel: 6, frequency: 2437 },
+	rax0: { ssid: 'Wiflow', channel: 36, frequency: 5180 }
 };
 function iw_log(m) {
 	system([ 'sh', '-c', 'echo ' + m + ' >> /tmp/mock/iwinfo.log' ]);

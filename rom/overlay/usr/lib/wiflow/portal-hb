@@ -44,6 +44,11 @@ content)
  if [ "$desired" -ne "$current" ] || [ ! -f "$PORTAL_ACTIVE/portal.json" ]; then
   /usr/lib/wiflow/portal-sync "$desired" >/dev/null 2>&1 || exit 1
  fi
+ portal_activate || exit 1
+ ;;
+enable)
+ # Content on the router and not in safe mode: the captive portal must be on.
+ portal_activate
  ;;
 timeok) state_set wp_time_ok 1 ;;
 unpaired)

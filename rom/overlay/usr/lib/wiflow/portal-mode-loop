@@ -17,14 +17,7 @@ portal_reconcile_local(){
   # active even if WP is temporarily unavailable or returns a transient flag.
   # Unpair explicitly clears storage and disables captive via pairing_clear_local.
   # v1.0.26: safe mode keeps the captive portal off for a while (fail-open).
-  safe_mode_active && return 0
-  if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
-    if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" != 1 ]; then
-      uci set wiflow.core.portal_enabled='1'
-      uci commit wiflow >/dev/null 2>&1 || true
-    fi
-    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || state_set portal_error 'captive_firewall_enable_failed'
-  fi
+  portal_activate || true
 }
 
 wd=0

@@ -13,8 +13,4 @@ tcp_listening 010A0A0A 0820 || /etc/init.d/uhttpd restart >/dev/null 2>&1 || tru
 uci -q get wiflow.core >/dev/null 2>&1 || { uci set wiflow.core=core; uci commit wiflow; }
 portal_storage_gc
 restored="$(session_restore 2>/dev/null || echo 0)"; wlog system "Khôi phục ${restored:-0} phiên khách"
-if [ -f "$PORTAL_ACTIVE/portal.json" ]; then
-    # The local snapshot is the source of truth after a reboot.
-    uci set wiflow.core.portal_enabled='1'; uci commit wiflow >/dev/null 2>&1 || true
-    /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || wlog portal 'Không bật được tường lửa cổng chào'
-fi
+portal_activate || wlog portal 'Không bật được tường lửa cổng chào'

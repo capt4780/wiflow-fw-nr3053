@@ -90,6 +90,25 @@ export function migrate() {
 	return { network: net, wireless: wl, firewall: fw, dhcp: dh };
 };
 
+// 1.2.4: both bands use one WiFi name, "Wiflow". Only the two factory names
+// are changed, and only once: a name set in LuCI stays as it is.
+export function merge_ssid() {
+	if (W.core('ssid_merged') == '1')
+		return {};
+	const c = cursor();
+	c.load('wireless');
+	let wl = false;
+	c.foreach('wireless', 'wifi-iface', s => {
+		if (s.mode == 'ap' && (s.ssid == 'Wiflow 2.4G' || s.ssid == 'Wiflow 5G')) {
+			c.set('wireless', s['.name'], 'ssid', 'Wiflow');
+			wl = true;
+		}
+	});
+	if (wl) c.commit('wireless');
+	W.core_set({ ssid_merged: '1' });
+	return { wireless: wl };
+};
+
 export function reload(what) {
 	if (what.network)
 		W.run('ubus call network reload');

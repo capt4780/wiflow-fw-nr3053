@@ -13,7 +13,7 @@ echo '{"v":1,"brand":"Quan Test"}' > /tmp/mock/wp/media/shop.json
 wp "s['codes']['PORT00001111']={'account':'WIFUID777000'}; s['commands']=[]"
 r="$(job pair '{"code":"PORT00001111"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
 wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'}]}"
-$B x setsid /usr/lib/wiflow/portal-mode-loop >/tmp/mock/mode-loop.log 2>&1 &
+# the mode loop is NOT started: the content download alone must switch the portal on
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 7 ] && $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && break; sleep 2; done
 expect "portal: content revision 7 downloaded, checked and active" "$(U get wiflow.core.portal_revision)|$(U get wiflow.core.portal_sync_status)|$(U get wiflow.core.portal_enabled)|$($B x jsonfilter -i /www-wiflow-portal/runtime/active/portal.json -e '@.mode' 2>/dev/null)" '^7\|active\|1\|image$'
 cmp -s /tmp/mock/wp/media/bg.jpg /www-wiflow-portal/runtime/active/media/bg.jpg && pass "portal: media identical to the server copy (sha256 checked)" || fail "portal: media differs"
@@ -63,7 +63,13 @@ wp "s['portal']={'revision':8,'mode':'image','files':[{'role':'image_landscape',
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 8 ] && break; sleep 2; done
 expect "portal: revision 8 replaces 7, old media removed" "$(U get wiflow.core.portal_revision)|$(ls /www-wiflow-portal/runtime/active/media | tr '\n' ' ')|$(ls /www-wiflow-portal/runtime/revisions | tr '\n' ' ')" '^8\|bg2.jpg shop.json \|rev-8 $'
 
+# Rules wiped (reboot, firewall trouble): the self-repair step brings them back
+$B x nft delete table inet wiflow_captive
+$B x sh -c '. /usr/lib/wiflow/common.sh; portal_activate'
+$B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && pass "self-repair: captive rules rebuilt from the content on the router" || fail "self-repair did not rebuild the rules"
+rules="$($B x nft list ruleset)"
+expect "Private DNS: DoT (853) passes for guests, web (80) goes to the portal, the rest is rejected until the confirm" "$(printf '%s' "$rules" | grep -c 'dport 853 accept')|$(printf '%s' "$rules" | grep -c 'redirect to :2080')|$(printf '%s' "$rules" | grep -c 'reject')" '^2\|1\|[1-9]'
+
 # Leaving the account clears everything
-pkill -f 'portal-mode-loo[p]'
 r="$(job unpair)"
 expect "unpair: portal off, content and guests cleared" "$r|$(U get wiflow.core.portal_enabled)|$(ls /www-wiflow-portal/runtime/revisions 2>/dev/null | wc -l)|$($B x nft list table inet wiflow_captive >/dev/null 2>&1 && echo table || echo none)|$(ls /tmp/wiflow-client-sessions 2>/dev/null | wc -l)" '^success\|.*\|0\|0\|none\|0$'

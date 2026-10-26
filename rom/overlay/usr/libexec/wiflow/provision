@@ -15,6 +15,7 @@ function boot() {
 	if (W.core('last_command_status') == 'rebooting')
 		W.core_set({ last_command_status: 'success', last_command_message: 'The router restarted' });
 	P.reload(P.migrate());
+	P.reload(P.merge_ssid());
 }
 
 function remove() {

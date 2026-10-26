@@ -19,7 +19,7 @@ Số liệu được router lưu trong RAM, mất khi khởi động lại (bi�
 
 ## Portal cho khách
 
-- WiFi `Wiflow 2.4G` / `Wiflow 5G` là mạng khách (`10.10.10.0/24`), tách khỏi cáp LAN `10.0.0.1` dùng để quản lý. Khách vào được `10.0.0.1` và Internet.
+- WiFi `Wiflow` (cả hai băng tần) là mạng khách (`10.10.10.0/24`), tách khỏi cáp LAN `10.0.0.1` dùng để quản lý. Khách vào được `10.0.0.1` và Internet.
 - Router không thu thập dữ liệu khách (không số điện thoại, Zalo, email). Chỉ đếm lượt xem và xác nhận.
 - Chưa có nội dung từ WordPress thì portal tắt và khách có Internet bình thường. Khi WordPress công bố nội dung (website, hình hoặc video), router tải về, kiểm tra sha256, dùng tối đa 80% bộ nhớ và xoá nội dung cũ trước khi tải bản mới.
 - Khách mở WiFi sẽ thấy portal, bấm xác nhận để có Internet. Băng thông chia đều; giới hạn tốc độ chỉ có khi WordPress đặt (mặc định 0 = không giới hạn).

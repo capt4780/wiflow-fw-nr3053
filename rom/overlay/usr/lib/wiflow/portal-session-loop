@@ -16,7 +16,7 @@ while true; do
     net_maintain
     # v1.0.26: opening hours + session time every 30 s, statistics every minute.
     tick=$((tick+1))
-    if [ $((tick % 6)) = 0 ]; then guest_sched_tick >/dev/null 2>&1 || true; guest_session_expire >/dev/null 2>&1 || true; fi
+    if [ $((tick % 6)) = 0 ]; then guest_sched_tick >/dev/null 2>&1 || true; guest_session_expire >/dev/null 2>&1 || true; portal_activate >/dev/null 2>&1 || true; fi
     if [ $((tick % 12)) = 0 ]; then stats_sample >/dev/null 2>&1 || true; tick=0; fi
     # Guests = devices the guest bridge has learned on a WiFi port (the driver is
     # never asked: LuCI owns it). The helper prints one MAC per line.

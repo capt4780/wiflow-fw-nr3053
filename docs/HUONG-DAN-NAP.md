@@ -28,7 +28,7 @@ Wiflow App (liên kết WordPress, tình trạng router) nằm sẵn trong firmw
 | Địa chỉ router | `http://10.0.0.1`, máy nối LAN hoặc WiFi nhận IP `10.0.0.x` |
 | Mã truy cập (Gate) | `WIFDIDNR3053`, nhập trước khi đăng nhập; hiệu lực 12 giờ trên trình duyệt đó |
 | Đăng nhập LuCI | `wiflow` / `wiflow` (quản trị hằng ngày) hoặc `root` / `1234` (truy cập chuyên sâu); cả hai đều toàn quyền |
-| WiFi | `Wiflow 2.4G` và `Wiflow 5G`, mở, không mật khẩu |
+| WiFi | `Wiflow` trên cả 2.4G và 5G, mở, không mật khẩu |
 | SSH | `root@10.0.0.1`, mật khẩu `1234` |
 
 - Internet nguồn: cắm cáp vào cổng **WAN** (DHCP), hoặc cài ở LuCI → **Network → Interfaces**.
@@ -36,7 +36,7 @@ Wiflow App (liên kết WordPress, tình trạng router) nằm sẵn trong firmw
 
 ## Reset
 
-Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặc định của Wiflow OS: `10.0.0.1`, Gate `WIFDIDNR3053`, `wiflow` / `wiflow` và `root` / `1234`, WiFi `Wiflow 2.4G` / `Wiflow 5G`.
+Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặc định của Wiflow OS: `10.0.0.1`, Gate `WIFDIDNR3053`, `wiflow` / `wiflow` và `root` / `1234`, WiFi `Wiflow` (cả hai băng tần).
 
 ## Quay về v2.3.6 / cứu router
 
