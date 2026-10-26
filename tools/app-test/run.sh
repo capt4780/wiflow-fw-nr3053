@@ -64,12 +64,12 @@ wait_for 30 "s['internet']['online']" && pass "agent: Internet check" || fail "o
 r="$(job pair '{"code":"ZZZZ-1111-2222"}')"; expect "pair: unknown code" "$r" '^failed\|The code is not correct'
 r="$(job pair '{"code":"abcd-1234-efgh"}')"; expect "pair" "$r" '^success\|Linked to account WIFUID482913'
 wait_for 20 "s['wp']['online']" && pass "heartbeat accepted" || fail "heartbeat: $(st "s['wp']")"
-$B world 'w["clients"]["ra0"]=["A4:83:E7:AA:BB:CC","3C:22:FB:11:22:33"]; w["clients"]["rax0"]=["10:20:30:40:50:60"]'
-wait_for 60 "s['clients']['now']==3" && pass "dashboard: 3 devices (2 on 2.4G, 1 on 5G)" || fail "clients: $(st "s['clients']")"
+wait_for 60 "s['clients']['now']==3" && pass "dashboard: 3 WiFi devices from the bridge table (2 on 2.4G, 1 on 5G; cable and the router itself not counted)" || fail "clients: $(st "s['clients']")"
 expect "dashboard: devices per band, today" "$(st "(s['clients']['band2g'], s['clients']['band5g'], s['clients']['today'])")" '^\(2, 1, 3\)$'
-expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow 2.4G', '2g', 6, 2, 'Open'\), \('Wiflow 5G', '5g', 36, 1, 'Open'\)\]$"
+expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow 2.4G', '2g', 'Auto', 2, 'Open'\), \('Wiflow 5G', '5g', 'Auto', 1, 'Open'\)\]$"
 expect "dashboard: router health" "$(st "(s['metrics']['mem_total_mb'] > 0, s['metrics']['flash_total_mb'] >= 0, s['metrics']['cpu'] is None or 0 <= s['metrics']['cpu'] <= 100)")" '^\(True, True, True\)$'
 expect "dashboard: 24 h history and latency" "$(st "(len(s['series']['devices']), s['series']['devices'][-1], len(s['series']['latency']), s['internet']['latency'] >= 0, s['wp']['since'] > 0)")" '^\(24, 3, 24, True, True\)$'
+[ ! -s /tmp/mock/iwinfo.log ] && pass "Wiflow never asks the WiFi driver (no iwinfo call from agent, rpcd or jobs)" || fail "iwinfo was called: $(sort /tmp/mock/iwinfo.log | uniq -c | tr '\n' ' ')"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
 expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^2\.0\.0 4 Cafe Sua Da Wiflow 2.4G (lan|wifi) \[\]$'

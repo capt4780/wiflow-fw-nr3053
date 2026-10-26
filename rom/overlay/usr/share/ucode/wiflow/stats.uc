@@ -4,14 +4,9 @@
 // Everything lives in RAM (/tmp/wiflow/st), nothing is written to flash.
 'use strict';
 
-import { readfile } from 'fs';
+import { readfile, lsdir } from 'fs';
+import { cursor } from 'uci';
 import * as W from 'wiflow.setup';
-
-function jq(cmd) {
-	let o = null;
-	try { o = json(W.sh(cmd)); } catch (e) { o = null; }
-	return o;
-}
 
 function fields(line) {
 	return split(trim(replace(line ?? '', /\s+/g, ' ')), ' ');
@@ -64,43 +59,82 @@ function route() {
 	return null;
 }
 
+// Nothing here talks to the WiFi driver (no iwinfo, no iwpriv): the driver is
+// the router's most delicate part and LuCI owns it. The WiFi names come from
+// the configuration, the devices from the bridge forwarding table of the kernel.
+const SYSNET = getenv('WIFLOW_SYSNET') || '/sys/class/net';
+
 function enc_text(e) {
-	if (!e || !e.enabled)
-		return 'Open';
-	return replace(e.description ?? 'Encrypted', /\s*\(.*\)/, '');
+	switch (e ?? 'none') {
+	case 'none': return 'Open';
+	case 'psk2': case 'psk2+ccmp': case 'psk2+aes': return 'WPA2-PSK';
+	case 'psk': case 'psk+ccmp': return 'WPA-PSK';
+	case 'psk-mixed': case 'psk-mixed+ccmp': return 'WPA/WPA2-PSK';
+	case 'sae': return 'WPA3-SAE';
+	case 'sae-mixed': return 'WPA2/WPA3';
+	default: return uc(`${e}`);
+	}
 }
 
-// Access points (SSID, band, channel, devices) and the source WiFi (client).
-function wifi() {
-	const nets = [], macs = {};
-	let n2 = 0, n5 = 0, src = null;
-	const d = jq("ubus -t 3 call iwinfo devices '{}'");
-	for (let dev in d?.devices ?? []) {
-		if (!match(dev, /^[A-Za-z0-9_.-]+$/))
-			continue;
-		const i = jq(`ubus -t 3 call iwinfo info '{"device":"${dev}"}'`);
-		if (!i)
-			continue;
-		const ch = W.num(i.channel, 0);
-		const band = (ch > 14 || W.num(i.frequency, 0) >= 4900) ? '5g' : '2g';
-		if (i.mode == 'Client' || match(dev, /^apcli/)) {
-			if (i.ssid)
-				src = { ssid: i.ssid, band: band, signal: W.num(i.signal, 0), channel: ch };
-			continue;
+// Access points and the source WiFi, as configured in LuCI.
+function wifi_conf() {
+	const c = cursor();
+	c.load('wireless');
+	const dev = {};
+	c.foreach('wireless', 'wifi-device', d => {
+		dev[d['.name']] = { band: d.band == '5g' ? '5g' : '2g', channel: d.channel, off: d.disabled == '1' };
+	});
+	const nets = [];
+	let src = null;
+	c.foreach('wireless', 'wifi-iface', s => {
+		const d = dev[s.device];
+		if (!d || d.off || s.disabled == '1' || !s.ssid)
+			return;
+		if (s.mode == 'sta') {
+			if (!src)
+				src = { ssid: s.ssid, band: d.band };
+			return;
 		}
-		if (i.mode != 'Master' || !i.ssid)
-			continue;
-		const a = jq(`ubus -t 3 call iwinfo assoclist '{"device":"${dev}"}'`);
-		let n = 0;
-		for (let s in a?.results ?? []) {
-			n++;
-			if (s.mac)
-				macs[uc(s.mac)] = 1;
-		}
-		if (band == '5g') n5 += n; else n2 += n;
-		push(nets, { ssid: i.ssid, band: band, channel: ch, clients: n, enc: enc_text(i.encryption) });
+		if (s.mode == 'ap')
+			push(nets, { ssid: s.ssid, band: d.band, channel: (d.channel == null || d.channel == 'auto') ? 'Auto' : W.num(d.channel, 0), clients: 0, enc: enc_text(s.encryption) });
+	});
+	return { nets: nets, src: src };
+}
+
+// WiFi devices seen by the bridge: { MAC: band }. Entries come from
+// brforward (16 bytes each: MAC, port, is_local, age, port high byte, pad);
+// the ports named ra* / rax* are the WiFi interfaces (2.4 GHz / 5 GHz).
+function stations() {
+	const out = {};
+	const ports = {};
+	for (let n in lsdir(`${SYSNET}/br-lan/brif`) ?? []) {
+		const p = trim(readfile(`${SYSNET}/br-lan/brif/${n}/port_no`) ?? '');
+		if (p != '')
+			ports[hexdec(replace(p, /^0x/, ''))] = n;
 	}
-	return { nets: nets, macs: macs, n2: n2, n5: n5, src: src };
+	const raw = readfile(`${SYSNET}/br-lan/brforward`) ?? '';
+	for (let o = 0; o + 16 <= length(raw); o += 16) {
+		const port = ord(raw, o + 6) + ord(raw, o + 12) * 256;
+		if (ord(raw, o + 7) != 0)
+			continue;
+		const name = ports[port];
+		if (!name || !match(name, /^ra/))
+			continue;
+		out[sprintf('%02X:%02X:%02X:%02X:%02X:%02X', ord(raw, o), ord(raw, o + 1), ord(raw, o + 2), ord(raw, o + 3), ord(raw, o + 4), ord(raw, o + 5))] = match(name, /^ra[0-9]/) ? '2g' : '5g';
+	}
+	return out;
+}
+
+function wifi() {
+	const w = wifi_conf();
+	const macs = stations();
+	let n2 = 0, n5 = 0;
+	for (let m, b in macs) {
+		if (b == '5g') n5++; else n2++;
+	}
+	for (let n in w.nets)
+		n.clients = n.band == '5g' ? n5 : n2;
+	return { nets: w.nets, macs: macs, n2: n2, n5: n5, src: w.src };
 }
 
 // Unique devices seen since local midnight.
@@ -152,7 +186,7 @@ export function sample(latency) {
 		const src = w.src ?? {};
 		const viaWifi = r && match(r.dev, /^(apcli|apclii|apclix)/);
 		st.source = {
-			ssid: viaWifi ? (src.ssid ?? '') : '', band: viaWifi ? (src.band ?? '') : '', signal: viaWifi ? (src.signal ?? 0) : 0,
+			ssid: viaWifi ? (src.ssid ?? '') : '', band: viaWifi ? (src.band ?? '') : '',
 			ip: r?.ip ?? '', gateway: r?.gateway ?? ''
 		};
 	}

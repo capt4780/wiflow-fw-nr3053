@@ -14,7 +14,7 @@ F="$(cd "$WFT/../../rom/overlay" && pwd)"
 PFX="${PFX:-/opt/pfx}"
 U="${UCODE_DIR:-$PFX/ucode}"
 PIDF=/tmp/wfbench.pid
-ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_TICK=${WIFLOW_TICK:-20} WIFLOW_JOIN_WAIT=${WIFLOW_JOIN_WAIT:-60}"
+ENVP="LD_LIBRARY_PATH=$PFX/lib PATH=$WFT/bin:$PFX/bin:$PFX/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin WIFLOW_REST=http://127.0.0.1:8099/wp-json WFT=$WFT PFX=$PFX WIFLOW_SYSNET=/tmp/mock/sysnet WIFLOW_TICK=${WIFLOW_TICK:-20} WIFLOW_JOIN_WAIT=${WIFLOW_JOIN_WAIT:-60}"
 
 x() { nsenter -t "$(cat $PIDF)" -n -m env -i HOME=/root $ENVP "$@"; }
 
@@ -49,6 +49,19 @@ start)
   ],
   "clients": { "ra0": [], "rax0": [] } }
 EOF
+	# bridge forwarding table fixture (see stats.uc): ra0 = 2.4G, rax0 = 5G, lan1 = cable
+	python3 - <<'PY'
+import os, struct
+b = '/tmp/mock/sysnet/br-lan'
+for name, no in (('ra0', 1), ('rax0', 2), ('lan1', 3)):
+    os.makedirs(f'{b}/brif/{name}', exist_ok=True)
+    open(f'{b}/brif/{name}/port_no', 'w').write(f'0x{no:x}\n')
+ent = [('A4:83:E7:AA:BB:CC', 1, 0), ('3C:22:FB:11:22:33', 1, 0), ('10:20:30:40:50:60', 2, 0), ('AA:AA:AA:AA:AA:AA', 3, 0), ('04:5F:A6:3C:D0:DD', 1, 1)]
+raw = b''
+for mac, port, local in ent:
+    raw += bytes(int(x, 16) for x in mac.split(':')) + struct.pack('<BBIBxxx', port, local, 100, 0)
+open(f'{b}/brforward', 'wb').write(raw)
+PY
 	install_files
 	unshare -n -m sh -c 'mount -t sysfs none /sys; exec sleep infinity' & echo $! > $PIDF
 	sleep 0.5

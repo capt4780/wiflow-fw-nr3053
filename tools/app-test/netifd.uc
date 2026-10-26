@@ -32,11 +32,16 @@ const AP = {
 	ra0: { ssid: 'Wiflow 2.4G', channel: 6, frequency: 2437 },
 	rax0: { ssid: 'Wiflow 5G', channel: 36, frequency: 5180 }
 };
+function iw_log(m) {
+	system([ 'sh', '-c', 'echo ' + m + ' >> /tmp/mock/iwinfo.log' ]);
+}
 conn.publish('iwinfo', {
 	devices: { call: function() {
+		iw_log('devices');
 		return { devices: [ 'ra0', 'rax0', 'apcli0', 'apclix0' ] };
 	} },
 	info: { args: { device: '' }, call: function(req) {
+		iw_log('info');
 		const ap = AP[req.args.device];
 		if (ap)
 			return { ssid: ap.ssid, mode: 'Master', channel: ap.channel, frequency: ap.frequency, encryption: { enabled: false, description: 'None' } };
@@ -47,12 +52,14 @@ conn.publish('iwinfo', {
 			: { bssid: '00:00:00:00:00:00', mode: 'Client' };
 	} },
 	scan: { args: { device: '' }, call: function(req) {
+		iw_log('scan');
 		const band = req.args.device == 'rax0' ? '5g' : '2g';
 		if (index(world().iwinfo_empty ?? [], band) >= 0)
 			return { results: [] };
 		return { results: map(filter(world().aps, a => a.band == band), a => ({ ssid: a.ssid, bssid: a.bssid, channel: a.channel, signal: a.signal, mode: 'Master', encryption: ENC[a.enc] })) };
 	} },
 	assoclist: { args: { device: '' }, call: function(req) {
+		iw_log('assoclist');
 		return { results: map(world().clients?.[req.args.device] ?? [], m => ({ mac: m, signal: -60 })) };
 	} }
 });
