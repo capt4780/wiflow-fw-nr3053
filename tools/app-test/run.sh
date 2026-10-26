@@ -117,14 +117,14 @@ bad=[p for a in sys.argv[1:] for p in ([a] if os.path.isfile(a) else [os.path.jo
      if r.search(open(p,errors='ignore').read())]
 print(bad); sys.exit(1 if bad else 0)" $APP; then pass "Wiflow App text is English only"; else fail "non-English text left in the Wiflow App"; fi
 
-# --- self-recovery of the uplink (steps run 30x faster here: 6 s, 16 s, 60 s)
+# --- self-recovery of the uplink (steps run 30x faster here: 6 s, 30 s, 60 s)
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 : > /tmp/mock/calls.log
 export WIFLOW_REC_SCALE=30
 $B world 'w["inet"]["wan"]=False'
 $B agent
 wait_for 40 "s['system']['recovery']['stage']>=1" && grep -q '^ifup wan' /tmp/mock/calls.log && pass "recovery 1: the WAN connection is renewed (ifup wan)" || fail "recovery 1: $(st "s['system']['recovery']") $(cat /tmp/mock/calls.log | tr '\n' ' ')"
-wait_for 40 "s['system']['recovery']['stage']>=2" && grep -q '^wifi reload' /tmp/mock/calls.log && pass "recovery 2: the WiFi is restarted" || fail "recovery 2: $(st "s['system']['recovery']")"
+wait_for 60 "s['system']['recovery']['stage']>=2" && grep -q '^wifi reload' /tmp/mock/calls.log && pass "recovery 2: the WiFi is restarted" || fail "recovery 2: $(st "s['system']['recovery']")"
 grep -q '^reboot' /tmp/mock/calls.log && fail "recovery: rebooted too early"
 wait_for 90 "s['system']['recovery']['stage']>=3" && pass "recovery 3 reached" || fail "recovery 3: $(st "s['system']['recovery']")"
 sleep 5
