@@ -74,6 +74,11 @@ jobs:
           set -o pipefail
           sudo bash tools/cgi-smoke.sh /tmp/romroot /tmp/ucode/b | tee /tmp/cgi-smoke.txt
 
+      - name: Show failed smoke checks
+        if: failure()
+        run: |
+          grep -E '^FAIL' /tmp/cgi-smoke.txt | cut -c1-900 | while read -r line; do echo "::error title=cgi-smoke::$line"; done || true
+
       - name: Verify the image
         run: |
           set -euo pipefail
