@@ -1,0 +1,43 @@
+{
+	"luci-app-wiflow": {
+		"description": "Wiflow Setup",
+		"read": {
+			"ubus": {
+				"wiflow": [
+					"status",
+					"scan",
+					"overview",
+					"inet",
+					"log",
+					"netcheck"
+				]
+			},
+			"file": {
+				"/tmp/wiflow/diag.txt": [
+					"read"
+				],
+				"/tmp/wiflow/wifitest.txt": [
+					"read"
+				]
+			}
+		},
+		"write": {
+			"ubus": {
+				"wiflow": [
+					"set_uplink",
+					"set_guest",
+					"reconnect",
+					"pair",
+					"unpair",
+					"job_clear",
+					"activate",
+					"diag",
+					"reboot",
+					"change_login",
+					"reset",
+					"wifitest"
+				]
+			}
+		}
+	}
+}

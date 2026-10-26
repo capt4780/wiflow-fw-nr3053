@@ -1,0 +1,5 @@
+#!/bin/sh
+# The router clock is trusted once NTP has synced (reported to WordPress).
+[ "$ACTION" = stratum ] || exit 0
+mkdir -p /tmp/wiflow/st 2>/dev/null
+printf 'true' > /tmp/wiflow/st/time_ok

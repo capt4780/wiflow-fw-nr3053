@@ -1,7 +1,7 @@
 #!/bin/sh
 # Wiflow ROM base settings for Viettel NR3053.
 # Runs once after flashing and after every factory reset.
-# The Wiflow App service (init.d/wiflow) adds its own settings at start.
+# Only the base router: the Wiflow app (.apk) adds its own settings on top.
 
 # --- system ---
 uci -q batch <<'EOF'
@@ -46,7 +46,7 @@ set dhcp.@dnsmasq[0].quietdhcp='1'
 commit dhcp
 EOF
 
-# --- WiFi: "Wiflow 2.4G" / "Wiflow 5G", open, on, on the guest network (below) ---
+# --- WiFi: "Wiflow 2.4G" / "Wiflow 5G", open, on ---
 # (the MediaTek driver scripts stay identical to v2.3.6; only uci values change)
 uci -q show wireless | grep -q '=wifi-device$' || /sbin/wifi config
 for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
@@ -61,124 +61,12 @@ for dev in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$
 	for ifc in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.device='$dev'$/\1/p"); do
 		[ "$(uci -q get wireless.$ifc.mode)" = ap ] || continue
 		uci -q set wireless.$ifc.ssid="$ssid"
-		uci -q set wireless.$ifc.network='wiflow_guest'
 		uci -q set wireless.$ifc.encryption='none'
 		uci -q delete wireless.$ifc.key
 		uci -q delete wireless.$ifc.disabled
 	done
 done
 uci -q commit wireless
-
-# --- guest network 10.10.10.0/24 (br-wiflow): the WiFi for guests, behind the portal ---
-# The LAN cable ports stay on 10.0.0.1/24 (management). Guests may only reach the
-# router itself (DHCP, DNS, the portal on :2080, the login on 10.0.0.1:80) and the
-# Internet; the captive rules (nftables table wiflow_captive) are added by the
-# Wiflow portal once it has content. Without content guests simply have Internet.
-uci -q batch <<'EOF'
-delete network.wiflow_guest
-set network.wiflow_guest='interface'
-set network.wiflow_guest.proto='static'
-set network.wiflow_guest.device='br-wiflow'
-set network.wiflow_guest.ipaddr='10.10.10.1'
-set network.wiflow_guest.netmask='255.255.255.0'
-set network.wiflow_guest.delegate='0'
-delete network.wiflow_guest_dev
-set network.wiflow_guest_dev='device'
-set network.wiflow_guest_dev.name='br-wiflow'
-set network.wiflow_guest_dev.type='bridge'
-set network.wiflow_guest_dev.bridge_empty='1'
-commit network
-
-delete dhcp.wiflow_guest
-set dhcp.wiflow_guest='dhcp'
-set dhcp.wiflow_guest.interface='wiflow_guest'
-set dhcp.wiflow_guest.start='100'
-set dhcp.wiflow_guest.limit='150'
-set dhcp.wiflow_guest.leasetime='4h'
-set dhcp.wiflow_guest.force='1'
-add_list dhcp.wiflow_guest.dhcp_option='6,10.10.10.1'
-add_list dhcp.wiflow_guest.dhcp_option='114,http://10.10.10.1:2080/cgi-bin/captive-api'
-set dhcp.wiflow_guest.dhcpv6='disabled'
-set dhcp.wiflow_guest.ra='disabled'
-set dhcp.wiflow_guest.ndp='disabled'
-commit dhcp
-
-delete firewall.wiflow_guest
-set firewall.wiflow_guest='zone'
-set firewall.wiflow_guest.name='wiflow_guest'
-add_list firewall.wiflow_guest.network='wiflow_guest'
-set firewall.wiflow_guest.input='REJECT'
-set firewall.wiflow_guest.output='ACCEPT'
-set firewall.wiflow_guest.forward='REJECT'
-delete firewall.wiflow_guest_wan
-set firewall.wiflow_guest_wan='forwarding'
-set firewall.wiflow_guest_wan.src='wiflow_guest'
-set firewall.wiflow_guest_wan.dest='wan'
-
-delete firewall.wiflow_guest_dns
-set firewall.wiflow_guest_dns='rule'
-set firewall.wiflow_guest_dns.name='Wiflow-Guest-DNS'
-set firewall.wiflow_guest_dns.src='wiflow_guest'
-set firewall.wiflow_guest_dns.dest_port='53'
-add_list firewall.wiflow_guest_dns.proto='tcp'
-add_list firewall.wiflow_guest_dns.proto='udp'
-set firewall.wiflow_guest_dns.target='ACCEPT'
-
-delete firewall.wiflow_guest_private_dns
-set firewall.wiflow_guest_private_dns='rule'
-set firewall.wiflow_guest_private_dns.name='Wiflow-Guest-Private-DNS'
-set firewall.wiflow_guest_private_dns.src='wiflow_guest'
-set firewall.wiflow_guest_private_dns.dest='wan'
-set firewall.wiflow_guest_private_dns.dest_port='853'
-add_list firewall.wiflow_guest_private_dns.proto='tcp'
-add_list firewall.wiflow_guest_private_dns.proto='udp'
-set firewall.wiflow_guest_private_dns.target='ACCEPT'
-
-delete firewall.wiflow_guest_dhcp
-set firewall.wiflow_guest_dhcp='rule'
-set firewall.wiflow_guest_dhcp.name='Wiflow-Guest-DHCP'
-set firewall.wiflow_guest_dhcp.src='wiflow_guest'
-set firewall.wiflow_guest_dhcp.proto='udp'
-set firewall.wiflow_guest_dhcp.dest_port='67-68'
-set firewall.wiflow_guest_dhcp.target='ACCEPT'
-
-delete firewall.wiflow_guest_setup
-set firewall.wiflow_guest_setup='rule'
-set firewall.wiflow_guest_setup.name='Wiflow-Guest-Login-Access'
-set firewall.wiflow_guest_setup.src='wiflow_guest'
-set firewall.wiflow_guest_setup.dest_ip='10.0.0.1'
-set firewall.wiflow_guest_setup.dest_port='80'
-set firewall.wiflow_guest_setup.proto='tcp'
-set firewall.wiflow_guest_setup.target='ACCEPT'
-
-delete firewall.wiflow_guest_portal
-set firewall.wiflow_guest_portal='rule'
-set firewall.wiflow_guest_portal.name='Wiflow-Captive-Portal'
-set firewall.wiflow_guest_portal.src='wiflow_guest'
-set firewall.wiflow_guest_portal.proto='tcp'
-set firewall.wiflow_guest_portal.dest_port='2080'
-set firewall.wiflow_guest_portal.target='ACCEPT'
-commit firewall
-EOF
-
-# portal web server: only on the guest address, own web root, no keep-alive
-# (a connection redirected before the confirm must not be reused afterwards)
-uci -q batch <<'EOF'
-delete uhttpd.wiflow_portal
-set uhttpd.wiflow_portal='uhttpd'
-add_list uhttpd.wiflow_portal.listen_http='10.10.10.1:2080'
-set uhttpd.wiflow_portal.home='/www-wiflow-portal'
-set uhttpd.wiflow_portal.cgi_prefix='/cgi-bin'
-add_list uhttpd.wiflow_portal.index_page='index.html'
-set uhttpd.wiflow_portal.error_page='/cgi-bin/portal'
-set uhttpd.wiflow_portal.rfc1918_filter='0'
-set uhttpd.wiflow_portal.script_timeout='10'
-set uhttpd.wiflow_portal.network_timeout='5'
-set uhttpd.wiflow_portal.http_keepalive='0'
-set uhttpd.wiflow_portal.max_requests='4'
-set uhttpd.wiflow_portal.max_connections='48'
-commit uhttpd
-EOF
 
 # --- no software/hardware flow offload: every packet goes through the firewall ---
 uci -q set firewall.@defaults[0].flow_offloading='0'

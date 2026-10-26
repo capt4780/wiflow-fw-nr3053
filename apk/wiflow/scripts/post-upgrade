@@ -1,0 +1,9 @@
+#!/bin/sh
+# Wiflow Setup updated: keep enabled the service; rpcd (LuCI's backend) and the
+# Wiflow service restart a few seconds later, after the installer has
+# answered LuCI. The router then moves its WiFi to the guest network "Wiflow".
+[ -n "$IPKG_INSTROOT" ] && exit 0
+/etc/init.d/wiflow enable
+rm -f /tmp/luci-indexcache* 2>/dev/null; rm -rf /tmp/luci-modulecache 2>/dev/null
+setsid sh -c 'sleep 4; /etc/init.d/rpcd reload; sleep 2; /etc/init.d/wiflow restart' </dev/null >/dev/null 2>&1 &
+exit 0

@@ -1,0 +1,15 @@
+{
+	"admin/wiflow": {
+		"title": "Wiflow Setup",
+		"order": 1,
+		"action": {
+			"type": "view",
+			"path": "wiflow/app"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-wiflow"
+			]
+		}
+	}
+}

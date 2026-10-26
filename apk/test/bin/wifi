@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "wifi $*" >> /tmp/mock/calls.log
+rm -f /tmp/mock/apcli.json
+$WFT/netsim.py "wifi $*"

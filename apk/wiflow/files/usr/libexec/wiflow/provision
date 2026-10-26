@@ -1,0 +1,72 @@
+#!/usr/bin/ucode
+// provision boot    every start of the wiflow service (idempotent)
+// provision remove  package removal: back to the router as it was
+'use strict';
+
+import { readfile, writefile, access, unlink, mkdir } from 'fs';
+import * as W from 'wiflow.setup';
+import * as P from 'wiflow.provision';
+
+const MARK = `${W.ROOT}/.provisioned`;
+const TXN = `${W.ROOT}/txn`;
+
+function boot() {
+	mkdir(W.ROOT, 0700);
+	P.ensure_core();
+	W.ensure_device_id();
+	P.ensure_gate_code();
+
+	// A source-WiFi change cut by a power loss: back to the previous settings.
+	if (access(`${TXN}/.pending`)) {
+		const cid = trim(readfile(`${TXN}/.pending`) ?? '');
+		for (let f in [ 'wireless', 'network', 'wiflow' ])
+			if (access(`${TXN}/${f}`) && length(readfile(`${TXN}/${f}`) ?? ''))
+				writefile(`/etc/config/${f}`, readfile(`${TXN}/${f}`));
+		for (let f in [ 'wireless', 'network', 'wiflow', '.pending' ])
+			unlink(`${TXN}/${f}`);
+		if (length(cid))
+			W.core_set({ last_command_id: cid, last_command_status: 'failed', last_command_message: 'Thay đổi bị gián đoạn, cấu hình trước đó đã được khôi phục' });
+		W.wlog('uplink', 'Thay đổi WiFi nguồn bị gián đoạn: đã khôi phục cấu hình trước');
+	}
+	if (W.core('last_command_status') == 'rebooting')
+		W.core_set({ last_command_status: 'success', last_command_message: 'Thiết bị đã khởi động lại' });
+
+	// Wiflow takes over the WiFi only once the admin presses "Bật Wiflow"
+	// (job activate). An install of 1.1.x had already done so.
+	if (W.core('activated') == null)
+		W.core_set({ activated: W.uci_get('wireless', 'wiflow_guest_2g') == 'wifi-iface' ? '1' : '0' });
+	const active = W.core('activated') == '1';
+
+	if (P.ensure_timezone())
+		W.run('/etc/init.d/system reload');
+	P.ensure_networks();
+	// 5 GHz channels 100-140 (country VN, region 7), activated or not
+	let wl = P.ensure_region();
+	if (active) {
+		wl = P.ensure_wireless(false);
+		wl = P.plan_radios() || wl;
+	}
+	const m = P.apply_mode(active ? W.core('internet_mode', 'auto') : 'auto');
+	if (active && m.wireless)
+		wl = P.plan_radios() || wl;
+	writefile(MARK, W.VERSION);
+
+	P.reload({ network: true, wireless: wl || m.wireless, firewall: true, dhcp: true });
+}
+
+function remove() {
+	W.run('ip route del default metric 1');
+	P.remove_gate_code();
+	P.remove_ours();
+	unlink(MARK);
+	P.reload({ network: true, wireless: true, firewall: true, dhcp: true });
+	W.run(`rm -rf ${W.RUN}`);
+}
+
+switch (ARGV[0]) {
+case 'boot': boot(); break;
+case 'remove': remove(); break;
+default:
+	warn('usage: provision boot|remove\n');
+	exit(1);
+}

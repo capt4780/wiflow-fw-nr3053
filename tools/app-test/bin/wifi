@@ -1,3 +1,0 @@
-#!/bin/sh
-echo "wifi $*" >> /tmp/mock/calls.log
-$WFT/netsim.py "wifi $*"
