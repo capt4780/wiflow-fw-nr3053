@@ -96,11 +96,10 @@ luci-mod-admin-full
 luci-mod-network
 luci-mod-status
 luci-mod-system
-luci-app-firewall
 luci-app-mtwifi-cfg
 luci-app-package-manager
 
-# --- package manager, so the Wiflow .apk can be installed later ---
+# --- package manager (LuCI > System > Software) ---
 apk-openssl
 openwrt-keyring
 usign

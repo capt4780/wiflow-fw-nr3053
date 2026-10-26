@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "ifdown $*" >> /tmp/mock/calls.log

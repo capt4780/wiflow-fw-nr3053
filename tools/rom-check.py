@@ -192,6 +192,9 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
         "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
+        "/www/luci-static/wiflow/ui.css", "/www/luci-static/resources/view/wiflow/account.js",
+        "/etc/init.d/wiflow", "/etc/rc.d/S96wiflow", "/usr/libexec/wiflow/agent", "/usr/libexec/wiflow/job", "/usr/libexec/wiflow/provision",
+        "/usr/share/ucode/wiflow/setup.uc", "/usr/share/ucode/wiflow/stats.uc", "/usr/share/rpcd/ucode/wiflow", "/usr/share/rpcd/acl.d/luci-app-wiflow.json",
         "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
         "/usr/sbin/hostapd", "/usr/sbin/iwpriv", "/usr/bin/curl", "/bin/uclient-fetch", "/usr/bin/jsonfilter",
         "/sbin/ip", "/usr/bin/awk", "/usr/bin/sort", "/usr/bin/apk", "/sbin/sysupgrade",
@@ -219,7 +222,42 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
-    "LuCI package upload accepts the unsigned Wiflow Setup apk":
+    "LuCI menu: Wiflow App, Status, Network, System only (no Firewall, Services, VPN, NAS)":
+        sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
+        == ["admin/network", "admin/status", "admin/system", "admin/wiflow"]
+        and not any("firewall" in k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f))),
+    "LuCI menu copy that the first boot writes over menu.d is pruned too (dropped pages must not come back)":
+        sorted(json.load(open(F + "/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json")))
+        == ["admin/status/logs", "admin/status/logs/syslog", "admin/status/overview"],
+    "guest portal: scripts executable, valid shell, web pages, service starts the loops":
+        all(os.access(F + x, os.X_OK) for x in ["/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
+            "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
+            "/usr/libexec/wiflow/guests", "/www-wiflow-portal/cgi-bin/portal", "/www-wiflow-portal/cgi-bin/captive-api",
+            "/etc/hotplug.d/iface/60-wiflow-portal"])
+        and all(subprocess.run(["sh", "-n", F + x]).returncode == 0 for x in ["/usr/lib/wiflow/common.sh", "/usr/lib/wiflow/portal-client",
+            "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync", "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop",
+            "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot", "/www-wiflow-portal/cgi-bin/portal", "/www-wiflow-portal/cgi-bin/captive-api"])
+        and all(os.path.isfile(F + "/www-wiflow-portal/" + x) for x in ["template-website.html", "template-image.html", "template-video.html",
+            "connected.html", "runtime/assets/bg-landscape.webp", "runtime/assets/fonts/lexend.woff"])
+        and "portal-mode-loop" in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
+    "guest portal: no WiFi-driver access (no iwinfo/iwpriv/hostapd/wifi calls in the portal and agent)":
+        not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())
+                for x in ["/usr/lib/wiflow/common.sh", "/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
+                          "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
+                          "/usr/libexec/wiflow/agent", "/usr/libexec/wiflow/guests", "/usr/share/ucode/wiflow/setup.uc"])
+        # the only driver question: the source WiFi signal, one call, only while the Wiflow App page is open
+        and not re.search(r"iwpriv|iwconfig|hostapd|wifi (up|down|reload)", open(F + "/usr/share/ucode/wiflow/stats.uc").read())
+        and open(F + "/usr/share/ucode/wiflow/stats.uc").read().count("call iwinfo") == 1
+        and "viewed" in open(F + "/usr/share/ucode/wiflow/stats.uc").read(),
+    "guest network: WiFi on wiflow_guest (10.10.10.1/24), DHCP, firewall zone, portal web server on :2080":
+        all(x in open(F + "/etc/uci-defaults/98-wiflow-base").read() for x in ["wireless.$ifc.network='wiflow_guest'", "ipaddr='10.10.10.1'",
+            "firewall.wiflow_guest.name='wiflow_guest'", "listen_http='10.10.10.1:2080'", "dest_port='2080'"]),
+    "Wiflow App is part of the firmware (service enabled, native LuCI page, no standalone web app)":
+        os.path.islink(F + "/etc/rc.d/S96wiflow") and not os.path.exists(F + "/www/wiflow")
+        and json.load(open(F + "/usr/share/luci/menu.d/luci-app-wiflow.json"))["admin/wiflow"]["title"] == "Wiflow App",
+    "Wiflow UI: solid buttons (no gradient fill on buttons)":
+        "linear-gradient" not in open(F + "/www/luci-static/wiflow/ui.css").read(),
+    "LuCI package upload accepts an unsigned package file":
         '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
     "LuCI pages are not offered for machine translation":
         'translate="no"' in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
@@ -240,7 +278,8 @@ deny = ["/usr/sbin/tailscaled", "/etc/init.d/adblock", "/etc/init.d/ddns", "/etc
         "/usr/sbin/odhcpd", "/usr/sbin/odhcp6c", "/usr/sbin/tcpdump", "/usr/bin/htop", "/usr/bin/nano",
         "/www/luci-static/aurora", "/www/luci-static/bootstrap", "/etc/hotplug.d/iface/99-hnat-detect",
         "/etc/init.d/viettel-apk-mirror", "/usr/sbin/iptables", "/etc/init.d/blockd",
-        "/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh"]
+        "/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh",
+        "/usr/share/luci/menu.d/luci-app-firewall.json", "/www/luci-static/resources/view/firewall", "/www/luci-static/resources/view/status/processes.js"]
 left = [p for p in deny if os.path.lexists(F + p)]
 zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*.lmo") + glob.glob(F + "/usr/share/luci/i18n/*")
 if left or zh:

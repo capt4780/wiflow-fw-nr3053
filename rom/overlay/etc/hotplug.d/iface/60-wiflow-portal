@@ -1,0 +1,6 @@
+#!/bin/sh
+# The portal web server listens on the guest address: restart it once that
+# address exists (it may have started before the network was up).
+[ "$ACTION" = ifup ] && [ "$INTERFACE" = wiflow_guest ] || exit 0
+awk '$2 == "010A0A0A:0820" && $4 == "0A" {ok=1} END{exit ok?0:1}' /proc/net/tcp && exit 0
+( sleep 2; /etc/init.d/uhttpd restart ) </dev/null >/dev/null 2>&1 &

@@ -1,0 +1,4 @@
+config system
+	option hostname 'Wiflow'
+	option timezone 'UTC'
+	option zonename 'UTC'

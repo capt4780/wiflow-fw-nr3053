@@ -24,10 +24,11 @@
 		<meta name="google" content="notranslate">
 		<title>{{ striptags(node?.title ? `${node.title} · Wiflow` : 'Wiflow') }}</title>
 		<meta name="viewport" content="initial-scale=1.0,width=device-width">
-		<meta name="theme-color" content="#0B1B3A">
+		<meta name="theme-color" content="#FFFFFF">
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
 		<link rel="stylesheet" media="only screen and (max-width: 854px)" href="{{ media }}/mobile.css" />
 		<link rel="stylesheet" href="{{ media }}/wiflow.css">
+		<link rel="stylesheet" href="{{ media }}/ui.css">
 		<link rel="icon" type="image/png" href="{{ media }}/favicon.png">
 		<link rel="apple-touch-icon" href="{{ media }}/apple-touch-icon.png">
 		{% if (node?.css): %}
@@ -51,9 +52,10 @@
 		<div class="wf-main">
 		<header class="wf-top">
 			<button class="wf-burger" id="wf-burger" type="button" aria-label="Menu" aria-controls="wf-side" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-			<a class="wf-mlogo" href="{{ dispatcher.build_url('admin') }}"><img src="{{ media }}/wiflow-logo.png" alt="Wiflow"></a>
+			<a class="wf-mlogo" href="{{ dispatcher.build_url('admin') }}"><img src="{{ media }}/favicon.png" alt=""><span>Wiflow</span></a>
 			<div class="wf-crumb" id="wf-crumb"></div>
 			<div id="indicators" class="pull-right"></div>
+			<a class="wf-logout" href="{{ dispatcher.build_url('admin') }}/logout" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg><span>Log out</span></a>
 		</header>
 
 		<div id="maincontent" class="container">
