@@ -52,8 +52,10 @@ req() { # path cookie body
 has() { grep -q "$2" <<<"$1"; }
 
 r="$(req /)"
-has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || { no "login page: $(grep -A10 'configured theme failed' <<<"$r" | tail -n 9 | cut -c1-300 | tr '\r\n\t' '|| ')"; }
-has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused: $(grep -o '<!--DBG[^>]*-->' <<<"$r")"
+has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || no "login page: $(head -c 400 <<<"$r" | tr '\r\n\t' '|| ')"
+r="$(req / "" "wf_gate_code=WRONG")"
+has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused"
+r="$(req / "" "luci_username=wiflow&luci_password=wiflow")"
 has "$r" 'data-title="Security code"' && ! has "$r" '^Status: 302' && ok "credentials refused before the gate" || no "login possible without the gate"
 
 r="$(req / "" "wf_gate_code=wifdidnr3053")"
