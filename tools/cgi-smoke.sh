@@ -52,17 +52,17 @@ req() { # path cookie body
 has() { grep -q "$2" <<<"$1"; }
 
 r="$(req /)"
-has "$r" '^Status: 403' && has "$r" 'data-title="Access code"' && ok "login page renders, gate shown first" || { no "login page: $(head -c 600 <<<"$r")"; }
+has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || { no "login page: $(head -c 600 <<<"$r")"; }
 
 r="$(req / "" "wf_gate_code=WRONG")"
-has "$r" 'Wrong access code' && ok "wrong access code refused" || no "wrong code not refused"
+has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused"
 
 r="$(req / "" "luci_username=wiflow&luci_password=wiflow")"
-has "$r" 'data-title="Access code"' && ! has "$r" '^Status: 302' && ok "credentials refused before the gate" || no "login possible without the gate"
+has "$r" 'data-title="Security code"' && ! has "$r" '^Status: 302' && ok "credentials refused before the gate" || no "login possible without the gate"
 
 r="$(req / "" "wf_gate_code=wifdidnr3053")"
 tok="$(grep -o 'wiflow_gate=[0-9a-f]\{32\}' <<<"$r" | head -n1)"
-[ -n "$tok" ] && has "$r" 'data-title="Authorization Required"' && ok "correct access code gives a token and the login form" || no "gate pass failed"
+[ -n "$tok" ] && has "$r" 'data-title="Sign in"' && ok "correct access code gives a token and the login form" || no "gate pass failed"
 
 for cred in "wiflow:wiflow" "root:1234"; do
 	r="$(req / "$tok" "luci_username=${cred%%:*}&luci_password=${cred#*:}")"
@@ -96,6 +96,6 @@ done
 [ -z "$bad" ] && ok "$n pages, menu and translations render (logged in)" || no "pages with errors:$bad"
 
 r="$(req /admin/status/overview "$sess")"
-has "$r" 'wf-logo' && has "$r" 'wf-model' && ok "Wiflow theme frame (logo, device) on inside pages" || no "theme frame missing"
+has "$r" 'wf-logo' && has "$r" 'wf-brand' && ok "Wiflow theme frame (logo, device) on inside pages" || no "theme frame missing"
 
 exit $fail

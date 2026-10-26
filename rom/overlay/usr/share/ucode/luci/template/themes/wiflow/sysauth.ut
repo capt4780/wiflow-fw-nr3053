@@ -36,9 +36,9 @@
 	</form>
 
 	{% if (gate_try?.error == 'locked'): %}
-	<div class="alert-message error">{{ replace(_('Too many wrong codes. Try again in %d seconds.'), '%d', gate_try.wait) }}</div>
+	<div class="alert-message error">{{ sprintf(_('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</div>
 	{% elif (gate_try?.error == 'invalid'): %}
-	<div class="alert-message error">{{ replace(_('Wrong security code. %d attempts left.'), '%d', gate_try.left) }}</div>
+	<div class="alert-message error">{{ sprintf(_('Wrong security code. %d attempts left.'), gate_try.left) }}</div>
 	{% endif %}
 
 	<button class="btn cbi-button-positive important">{{ _('Continue') }}</button>
