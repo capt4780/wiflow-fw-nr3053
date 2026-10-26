@@ -192,7 +192,7 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
         "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
-        "/www/luci-static/wiflow/ui.css", "/www/luci-static/resources/view/wiflow/account.js",
+        "/www/luci-static/resources/view/wiflow/account.js",
         "/etc/init.d/wiflow", "/etc/rc.d/S96wiflow", "/usr/libexec/wiflow/agent", "/usr/libexec/wiflow/job", "/usr/libexec/wiflow/provision",
         "/usr/share/ucode/wiflow/setup.uc", "/usr/share/ucode/wiflow/stats.uc", "/usr/share/rpcd/ucode/wiflow", "/usr/share/rpcd/acl.d/luci-app-wiflow.json",
         "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
@@ -266,7 +266,11 @@ checks = {
         os.path.islink(F + "/etc/rc.d/S96wiflow") and not os.path.exists(F + "/www/wiflow")
         and json.load(open(F + "/usr/share/luci/menu.d/luci-app-wiflow.json"))["admin/wiflow"]["title"] == "Wiflow App",
     "Wiflow UI: solid buttons (no gradient fill on buttons)":
-        "linear-gradient" not in open(F + "/www/luci-static/wiflow/ui.css").read(),
+        "linear-gradient" not in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
+    "Wiflow UI: one stylesheet, phone bar + tablet rail + Vietnamese gate":
+        not os.path.exists(F + "/www/luci-static/wiflow/ui.css")
+        and "wf-dock" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
+        and "M\u00e3 b\u1ea3o m\u1eadt".encode() in open(F + "/usr/lib/lua/luci/i18n/wiflow.vi.lmo", "rb").read(),
     "LuCI package upload accepts an unsigned package file":
         '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
     "LuCI pages are not offered for machine translation":

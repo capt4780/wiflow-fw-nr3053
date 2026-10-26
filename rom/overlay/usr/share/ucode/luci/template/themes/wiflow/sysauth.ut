@@ -21,34 +21,31 @@
 {% include('header', { blank_page: true, wf_login: true }) %}
 
 {% if (!gate_ok): %}
-<section hidden data-title="Access code" data-gate="1">
-	<p class="wf-login-sub">Enter the Wiflow access code to continue.</p>
+<section hidden data-title="{{ entityencode(_('Security code'), true) }}" data-gate="1">
+	<p class="wf-login-sub">{{ _('Enter the security code on the device label.') }}</p>
 	<form method="post" class="cbi-map" autocomplete="off">
 		<div class="cbi-section">
 			<div class="cbi-section-node">
 				<div class="cbi-value">
-					<label class="cbi-value-title" for="wf_gate_code">Access code</label>
 					<div class="cbi-value-field">
-						<input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
+						<input name="wf_gate_code" id="wf_gate_code" type="text" placeholder="WIFDID-NR3053-000000" aria-label="{{ entityencode(_('Security code'), true) }}" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
 					</div>
 				</div>
 			</div>
 		</div>
 	</form>
 
-	<hr>
-
 	{% if (gate_try?.error == 'locked'): %}
-	<div class="alert-message error">Too many wrong codes. Try again in {{ gate_try.wait }} seconds.</div>
+	<div class="alert-message error">{{ replace(_('Too many wrong codes. Try again in %d seconds.'), '%d', gate_try.wait) }}</div>
 	{% elif (gate_try?.error == 'invalid'): %}
-	<div class="alert-message error">Wrong access code. {{ gate_try.left }} {{ gate_try.left == 1 ? 'attempt' : 'attempts' }} left.</div>
+	<div class="alert-message error">{{ replace(_('Wrong security code. %d attempts left.'), '%d', gate_try.left) }}</div>
 	{% endif %}
 
-	<button class="btn cbi-button-positive important">Continue</button>
+	<button class="btn cbi-button-positive important">{{ _('Continue') }}</button>
 </section>
 {% else %}
-<section hidden data-title="Authorization Required">
-	<p class="wf-login-sub">Wiflow router administration</p>
+<section hidden data-title="{{ entityencode(_('Sign in'), true) }}">
+	<p class="wf-login-sub">{{ _('Wiflow router administration') }}</p>
 	<form method="post" class="cbi-map">
 		<div class="cbi-section">
 			<div class="cbi-section-node">
@@ -68,8 +65,6 @@
 		</div>
 	</form>
 
-	<hr>
-
 	{% if (fuser && gate_passed(http)): %}
 	<div class="alert-message error">
 		{{ _('Invalid username and/or password! Please try again.') }}
@@ -80,7 +75,7 @@
 </section>
 {% endif %}
 
-<div class="wf-login-foot">Support <b>0833 880 100</b> · wiflow@projifylab.com</div>
+<div class="wf-login-foot">{{ _('Support') }} <b>0833 880 100</b> · wiflow@projifylab.com</div>
 
 <div id="view">
 	<div class="spinning">{{ _('Loading view…') }}</div>

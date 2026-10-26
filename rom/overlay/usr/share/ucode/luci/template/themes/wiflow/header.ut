@@ -63,7 +63,7 @@
 				<span class="wf-chip{{ wf_online ? '' : ' off' }}"><i></i>{{ wf_online ? _('Online') : _('Offline') }}</span>
 			</div>
 			<div id="indicators" class="pull-right"></div>
-			<a class="wf-logout" href="{{ dispatcher.build_url('admin') }}/logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg><span>{{ _('Log out') }}</span></a>
+			<a class="wf-logout" href="{{ dispatcher.build_url('admin') }}/logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg><span>{{ _('Sign out') }}</span></a>
 		</header>
 
 		<div id="maincontent" class="container">

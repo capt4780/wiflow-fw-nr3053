@@ -2,8 +2,8 @@
 'require baseclass';
 'require ui';
 
-/* Wiflow theme menu: the LuCI menu tree as a sidebar (groups with icons,
-   the open group shows its pages), a breadcrumb in the top bar and the
+/* Wiflow theme menu: the LuCI menu tree as a sidebar (PC), an icon rail (tablet)
+   or a floating bar with a More sheet (phone), the page title in the top bar and the
    Bootstrap-compatible third-level tab menu. Structure from menu-bootstrap.js
    (luci-theme-bootstrap, Apache-2.0). */
 
@@ -16,6 +16,7 @@ const ICONS = {
 	vpn: '<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 	nas: '<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/>',
 	statistics: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+	more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
 	logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
 	_: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/>'
 };
@@ -32,28 +33,17 @@ return baseclass.extend({
 	},
 
 	bindChrome() {
-		const burger = document.querySelector('#wf-burger');
-		const close = () => {
-			document.body.classList.remove('wf-menu-open');
-			if (burger) burger.setAttribute('aria-expanded', 'false');
-		};
-
-		if (burger)
-			burger.addEventListener('click', ev => {
-				ev.stopPropagation();
-				const open = document.body.classList.toggle('wf-menu-open');
-				burger.setAttribute('aria-expanded', open ? 'true' : 'false');
-			});
-
-		document.addEventListener('click', ev => {
-			if (document.body.classList.contains('wf-menu-open') && !ev.target.closest('#wf-side'))
-				close();
-		});
-
 		document.addEventListener('keydown', ev => {
 			if (ev.key == 'Escape')
-				close();
+				this.closeSheet();
 		});
+	},
+
+	closeSheet() {
+		const sheet = document.querySelector('.wf-sheet');
+
+		if (sheet)
+			sheet.classList.remove('open');
 	},
 
 	render(tree) {
@@ -105,14 +95,53 @@ return baseclass.extend({
 
 	renderMainMenu(tree, url) {
 		const ul = document.querySelector('#topmenu');
-		const groups = ui.menu.getChildren(tree);
 		const at1 = L.env.dispatchpath[1], at2 = L.env.dispatchpath[2];
-		let crumb = null;
+		const rail = window.matchMedia('(max-width:1179px)');
+		// the pages people use most come first on the phone bar
+		const first = [ 'wiflow', 'status', 'network' ];
+		const groups = ui.menu.getChildren(tree).filter(g => g.name != 'logout').sort((a, b) => {
+			const ia = first.indexOf(a.name), ib = first.indexOf(b.name);
+			return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+		});
+		const sheet = E('div', { 'class': 'wf-sheet' });
+		const card = E('div', { 'class': 'wf-sheet-card', 'role': 'dialog' });
+		let title = null;
+
+		sheet.appendChild(card);
+		sheet.addEventListener('click', ev => { if (ev.target === sheet) this.closeSheet(); });
+		document.body.appendChild(sheet);
+
+		const openSheet = (key, fill) => {
+			const was = sheet.classList.contains('open') && card.dataset.key == key;
+
+			if (was)
+				return this.closeSheet();
+
+			card.dataset.key = key;
+			card.textContent = '';
+			fill(card);
+			sheet.classList.add('open');
+		};
+
+		const link = (group, kid) => {
+			const k = E('a', { 'href': L.url(url, group.name, kid.name), 'class': (group.name == at1 && kid.name == at2) ? 'on' : '' });
+			k.textContent = _(kid.title);
+			return k;
+		};
+
+		const head = (group) => {
+			const h = E('h4');
+			h.innerHTML = icon(group.name) + '<span></span>';
+			h.querySelector('span').textContent = _(group.title);
+			return h;
+		};
+
+		const fillGroup = (group, kids) => c => {
+			c.appendChild(head(group));
+			kids.forEach(kid => c.appendChild(link(group, kid)));
+		};
 
 		groups.forEach(group => {
-			if (group.name == 'logout')
-				return;
-
 			const kids = ui.menu.getChildren(group);
 			const active = (group.name == at1);
 			const li = E('li', { 'class': (kids.length ? 'dropdown' : '') + (active ? ' active open' : '') });
@@ -127,6 +156,12 @@ return baseclass.extend({
 				a.setAttribute('aria-expanded', active ? 'true' : 'false');
 				a.addEventListener('click', ev => {
 					ev.preventDefault();
+
+					if (rail.matches) {
+						// icon rail: the pages open in a card next to it
+						openSheet(group.name, fillGroup(group, kids));
+						return;
+					}
 
 					const open = !li.classList.contains('open');
 
@@ -150,54 +185,47 @@ return baseclass.extend({
 					]));
 
 					if (on)
-						crumb = [ _(group.title), _(kid.title) ];
+						title = _(kid.title);
 				});
 
 				li.appendChild(sub);
+			}
+			else if (active) {
+				title = _(group.title);
 			}
 
 			ul.appendChild(li);
 		});
 
 		ul.style.display = '';
-		this.renderDock(groups, url, at1, at2);
+		this.renderDock(groups, url, at1, at2, openSheet, head, link);
 
-		const box = document.querySelector('#wf-crumb');
+		const h1 = document.querySelector('#wf-crumb');
 
-		if (box && crumb) {
-			box.textContent = '';
+		if (h1 && title) {
+			h1.textContent = title;
 
-			if (crumb.length > 1)
-				box.appendChild(document.createTextNode(crumb[0] + ' › '));
+			// the page's own heading repeats the title in the top bar: hide that copy
+			const dedupe = () => document.querySelectorAll('#maincontent h2').forEach(h => {
+				if (h.textContent.trim() == title)
+					h.classList.add('wf-dup');
+			});
 
-			box.appendChild(E('b', {}, [ crumb[crumb.length - 1] ]));
+			new MutationObserver(dedupe).observe(document.querySelector('#maincontent'), { childList: true, subtree: true });
+			dedupe();
 		}
 
 		return ul;
 	},
 
-	/* Phones and tablets: floating dock with the groups; a group with pages
-	   opens them in a sheet above the dock. */
-	renderDock(groups, url, at1, at2) {
-		const dock = E('nav', { 'class': 'wf-dock', 'aria-label': 'Main menu' });
-		const sheet = E('div', { 'class': 'wf-sheet' });
-		const close = () => {
-			sheet.classList.remove('open');
-			dock.querySelectorAll('a.open').forEach(a => a.classList.remove('open'));
-		};
-		const card = E('div', { 'class': 'wf-sheet-card', 'role': 'dialog' });
+	/* Phone: floating bar with the first three groups and "More" (everything else). */
+	renderDock(groups, url, at1, at2, openSheet, head, link) {
+		const dock = E('nav', { 'class': 'wf-dock', 'aria-label': _('Menu') });
+		const shown = groups.slice(0, 3), rest = groups.slice(3);
 
-		sheet.appendChild(card);
-		sheet.addEventListener('click', ev => { if (ev.target === sheet) close(); });
-		document.addEventListener('keydown', ev => { if (ev.key == 'Escape') close(); });
-
-		groups.forEach(group => {
-			if (group.name == 'logout')
-				return;
-
+		shown.forEach(group => {
 			const kids = ui.menu.getChildren(group);
-			const on = group.name == at1;
-			const a = E('a', { 'class': on ? 'on' : '', 'href': kids.length ? '#' : L.url(url, group.name) });
+			const a = E('a', { 'class': group.name == at1 ? 'on' : '', 'href': kids.length ? '#' : L.url(url, group.name) });
 
 			a.innerHTML = icon(group.name) + '<span></span>';
 			a.querySelector('span').textContent = _(group.title);
@@ -205,29 +233,43 @@ return baseclass.extend({
 			if (kids.length)
 				a.addEventListener('click', ev => {
 					ev.preventDefault();
-					const was = sheet.classList.contains('open') && card.dataset.group == group.name;
-
-					close();
-
-					if (was)
-						return;
-
-					card.dataset.group = group.name;
-					card.innerHTML = '<h4>' + icon(group.name) + '<span></span></h4>';
-					card.querySelector('span').textContent = _(group.title);
-					kids.forEach(kid => {
-						const k = E('a', { 'href': L.url(url, group.name, kid.name), 'class': (on && kid.name == at2) ? 'on' : '' });
-						k.textContent = _(kid.title);
-						card.appendChild(k);
+					openSheet(group.name, c => {
+						c.appendChild(head(group));
+						kids.forEach(kid => c.appendChild(link(group, kid)));
 					});
-					sheet.classList.add('open');
-					a.classList.add('open');
 				});
 
 			dock.appendChild(a);
 		});
 
-		document.body.appendChild(sheet);
+		if (rest.length) {
+			const more = E('a', { 'class': rest.some(g => g.name == at1) ? 'on' : '', 'href': '#' });
+
+			more.innerHTML = icon('more') + '<span></span>';
+			more.querySelector('span').textContent = _('More');
+			more.addEventListener('click', ev => {
+				ev.preventDefault();
+				openSheet('more', c => {
+					rest.forEach(group => {
+						const kids = ui.menu.getChildren(group);
+						const h = E('h5');
+
+						h.textContent = _(group.title);
+						c.appendChild(h);
+
+						if (!kids.length) {
+							const k = E('a', { 'href': L.url(url, group.name) });
+							k.textContent = _(group.title);
+							c.appendChild(k);
+						}
+
+						kids.forEach(kid => c.appendChild(link(group, kid)));
+					});
+				});
+			});
+			dock.appendChild(more);
+		}
+
 		document.body.appendChild(dock);
 	},
 

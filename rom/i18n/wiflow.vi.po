@@ -382,3 +382,39 @@ msgstr "Thêm thẻ"
 
 msgid "Wiflow App"
 msgstr "Wiflow App"
+
+msgid "Sign out"
+msgstr "Đăng xuất"
+
+msgid "Online"
+msgstr "Trực tuyến"
+
+msgid "Offline"
+msgstr "Ngoại tuyến"
+
+msgid "More"
+msgstr "Thêm"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Security code"
+msgstr "Mã bảo mật"
+
+msgid "Enter the security code on the device label."
+msgstr "Nhập mã bảo mật in trên nhãn thiết bị."
+
+msgid "Too many wrong codes. Try again in %d seconds."
+msgstr "Nhập sai quá nhiều lần. Thử lại sau %d giây."
+
+msgid "Wrong security code. %d attempts left."
+msgstr "Sai mã bảo mật. Còn %d lần thử."
+
+msgid "Sign in"
+msgstr "Đăng nhập"
+
+msgid "Wiflow router administration"
+msgstr "Quản trị router Wiflow"
+
+msgid "Support"
+msgstr "Hỗ trợ"

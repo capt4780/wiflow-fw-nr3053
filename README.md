@@ -19,7 +19,7 @@ Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File fir
 | `base/` | Bản v2.3.6 gốc (`.itb`), SHA-256 khớp `tools/nr3053-golden.json` |
 | `tools/lean-keep.txt` | Danh sách gói giữ lại |
 | `tools/lean-rootfs.py` | Tính gói cần giữ theo phụ thuộc trong cơ sở dữ liệu apk, gỡ phần còn lại (file, liên kết, bản ghi apk) |
-| `rom/overlay/` | File thêm vào rootfs: theme LuCI Wiflow (`wiflow.css` + `ui.css`), icon phẳng, Wiflow App (service, agent, trang LuCI, rpcd), cài đặt lần đầu `98-wiflow-base`, tắt HNAT, banner |
+| `rom/overlay/` | File thêm vào rootfs: theme LuCI Wiflow (`wiflow.css`), icon phẳng, Wiflow App (service, agent, trang LuCI, rpcd), cài đặt lần đầu `98-wiflow-base`, tắt HNAT, banner |
 | `tools/app-test/` | Bench kiểm thử Wiflow App (ubusd, rpcd, uci, ucode thật; netifd, driver và WordPress giả) |
 | `tools/make-icons.py` | Sinh bộ icon phẳng cho LuCI |
 | `rom/VERSION` | Phiên bản Wiflow OS |
