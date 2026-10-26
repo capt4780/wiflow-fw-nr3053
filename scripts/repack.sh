@@ -44,10 +44,8 @@ cp -a "$ROOT/rom/overlay/." "$F/"
 chmod 0755 "$F/etc/init.d/wiflow-hnat-off" "$F/etc/uci-defaults/98-wiflow-base"
 ln -sf ../init.d/wiflow-hnat-off "$F/etc/rc.d/S21wiflow-hnat-off"
 
-# Wiflow App (service, agent, LuCI page): part of the firmware, not a separate package
+# Wiflow App files (LuCI page, rpcd plugin). TEST 1.2.2: the service is NOT started at boot.
 chmod 0755 "$F/etc/init.d/wiflow" "$F/etc/hotplug.d/ntp/20-wiflow" "$F"/usr/libexec/wiflow/*
-ln -sf ../init.d/wiflow "$F/etc/rc.d/S96wiflow"
-ln -sf ../init.d/wiflow "$F/etc/rc.d/K10wiflow"
 sed -i "s/@VERSION@/$VERSION/" "$F/etc/banner"
 echo "$VERSION" > "$F/etc/wiflow_release"
 
