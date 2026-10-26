@@ -49,6 +49,35 @@ class H(BaseHTTPRequestHandler):
             if os.path.exists(D + '/down'):
                 return self.reply({'code': 'rest_no_route'}, 503)
             return self.reply({'ok': True, 'service': 'wiflow-devices', 'api_version': 1, 'data_generation': '4', 'wp_home': 'x', 'rest_root': REST})
+        if self.path.startswith('/wp-json/devices/sync') or self.path.startswith('/wp-json/portal/'):
+            st = load()
+            d, e = self.auth(st)
+            if e:
+                return self.reply(e)
+            po = st.get('portal') or {}
+            if self.path.startswith('/wp-json/devices/sync'):
+                return self.reply({'ok': True, 'data_generation': '4', 'account_public_id': d['account'],
+                                   'device': {'account_public_id': d['account'], 'desired_portal_revision': po.get('revision', 0), 'portal_mode': po.get('mode', '')}})
+            if self.path.startswith('/wp-json/portal/manifest'):
+                if not po:
+                    return self.reply(perr('PORTAL_NOT_READY', 'no content'))
+                files = []
+                for f in po['files']:
+                    data = open(D + '/media/' + f['name'], 'rb').read()
+                    import hashlib
+                    files.append({'role': f['role'], 'name': f['name'], 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                                  'download_url': REST.replace('/wp-json', '/wp-json') + '/portal/media/' + f['name']})
+                return self.reply({'ok': True, 'data_generation': '4', 'manifest': {
+                    'revision': po['revision'], 'api_version': 1, 'data_generation': '4', 'snapshot_schema': 2, 'mode': po['mode'],
+                    'website_url': po.get('website_url', ''), 'popup_count': 0, 'files': files}})
+            if self.path.startswith('/wp-json/portal/media/'):
+                n = self.path.rsplit('/', 1)[1]
+                try:
+                    b = open(D + '/media/' + n, 'rb').read()
+                except Exception:
+                    return self.reply({'code': 'nf'}, 404)
+                self.send_response(200); self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
+                return
         self.reply({'code': 'rest_no_route'}, 404)
 
     def do_POST(self):
@@ -59,6 +88,9 @@ class H(BaseHTTPRequestHandler):
             b = {}
         s = load()
         p = self.path.replace('/wp-json/devices/', '')
+        if self.path == '/wp-json/portal/ack':
+            log('portal-ack', b)
+            return self.reply({'ok': True, 'data_generation': '4'})
         if os.path.exists(D + '/down'):
             return self.reply({'code': 'down'}, 503)
         if p == 'pair':
@@ -93,7 +125,7 @@ class H(BaseHTTPRequestHandler):
                 if not r or r.get('status') not in ('success', 'failed', 'rebooting', 'running'):
                     cmd = c; break
             save(s)
-            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': 0, 'account_public_id': d['account'], 'data_generation': '4', 'server_time': int(time.time())})
+            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': (s.get('portal') or {}).get('revision', 0), 'account_public_id': d['account'], 'data_generation': '4', 'server_time': int(time.time())})
         if p == 'unpair':
             s['revoked'].append([hw, d['token']]); del s['devices'][hw]; save(s)
             return self.reply({'ok': True, 'data_generation': '4'})

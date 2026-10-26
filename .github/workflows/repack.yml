@@ -117,7 +117,7 @@ jobs:
             echo "- WiFi: \`Wiflow 2.4G\`, \`Wiflow 5G\` (mở)"
             echo "- Quốc gia Việt Nam (5 GHz dùng cả kênh 100–140), múi giờ UTC+7 (Hồ Chí Minh / Hà Nội)"
             echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
-            echo "- Wiflow App (mục đầu menu LuCI): liên kết tài khoản Wiflow và xem tình trạng router, nằm sẵn trong firmware. WiFi nguồn cài thẳng ở LuCI → Network → Wireless → Scan → Join Network. Hướng dẫn: docs/HUONG-DAN-WIFLOW-APP.md"
+            echo "- Wiflow App (mục đầu menu LuCI): liên kết tài khoản Wiflow, xem tình trạng router và portal cho khách (nội dung từ WordPress), nằm sẵn trong firmware. WiFi nguồn cài thẳng ở LuCI → Network → Wireless → Scan → Join Network. Hướng dẫn: docs/HUONG-DAN-WIFLOW-APP.md"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'

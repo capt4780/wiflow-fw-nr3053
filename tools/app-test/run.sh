@@ -66,10 +66,15 @@ r="$(job pair '{"code":"abcd-1234-efgh"}')"; expect "pair" "$r" '^success\|Linke
 wait_for 20 "s['wp']['online']" && pass "heartbeat accepted" || fail "heartbeat: $(st "s['wp']")"
 wait_for 60 "s['clients']['now']==3" && pass "dashboard: 3 WiFi devices from the bridge table (2 on 2.4G, 1 on 5G; cable and the router itself not counted)" || fail "clients: $(st "s['clients']")"
 expect "dashboard: devices per band, today" "$(st "(s['clients']['band2g'], s['clients']['band5g'], s['clients']['today'])")" '^\(2, 1, 3\)$'
-expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow 2.4G', '2g', 'Auto', 2, 'Open'\), \('Wiflow 5G', '5g', 'Auto', 1, 'Open'\)\]$"
+expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow 2.4G', '2g', 'Auto', 2, 'Open'\), \('Wiflow 5G', '5g', 'Auto', 1, 'Open'\), \('Wiflow Quan', '2g', 'Auto', 2, 'Open'\)\]$"
 expect "dashboard: router health" "$(st "(s['metrics']['mem_total_mb'] > 0, s['metrics']['flash_total_mb'] >= 0, s['metrics']['cpu'] is None or 0 <= s['metrics']['cpu'] <= 100)")" '^\(True, True, True\)$'
 expect "dashboard: 24 h history and latency" "$(st "(len(s['series']['devices']), s['series']['devices'][-1], len(s['series']['latency']), s['internet']['latency'] >= 0, s['wp']['since'] > 0)")" '^\(24, 3, 24, True, True\)$'
-[ ! -s /tmp/mock/iwinfo.log ] && pass "Wiflow never asks the WiFi driver (no iwinfo call from agent, rpcd or jobs)" || fail "iwinfo was called: $(sort /tmp/mock/iwinfo.log | uniq -c | tr '\n' ' ')"
+[ -z "$(grep -v '^info$' /tmp/mock/iwinfo.log 2>/dev/null)" ] && pass "Wiflow only reads the source WiFi signal (info), never scans or lists the driver" || fail "driver calls: $(sort /tmp/mock/iwinfo.log | uniq -c | tr '\n' ' ')"
+sleep 50
+n0="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
+sleep 30
+n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
+[ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
 expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^2\.0\.0 4 Cafe Sua Da Wiflow 2.4G (lan|wifi) \[\]$'
@@ -100,6 +105,8 @@ r="$(job pair '{"code":"QWER5678TYUI"}')"; expect "pair again" "$r" 'WIFUID55511
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
 echo '{}' > /tmp/rq.json; $B x /usr/libexec/wiflow/job diag /tmp/rq.json
 r="$(st "(s['job'] or {}).get('state','')")"; expect "diagnostic report (keys hidden)" "$r|$(grep -c '== wireless' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234' /tmp/wiflow/diag.txt)" '^success\|1\|0$'
+
+. "$T/portal-test.sh"
 
 APP="$T/../../rom/overlay/usr/share/ucode/wiflow $T/../../rom/overlay/usr/libexec/wiflow $T/../../rom/overlay/etc/init.d/wiflow $T/../../rom/overlay/www/luci-static/resources/view/wiflow/account.js $T/../../rom/overlay/usr/share/rpcd/ucode/wiflow"
 grep -rq iwpriv $APP && fail "Wiflow App calls iwpriv" || pass "Wiflow App never touches the driver with iwpriv"

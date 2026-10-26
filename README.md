@@ -6,9 +6,9 @@ Wiflow OS là bản ImmortalWrt v2.3.6 đang chạy ổn định, được **đ�
 - **Giữ nguyên từng byte v2.3.6:** kernel, device tree, driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng, script nâng cấp. Bootloader và dữ liệu hiệu chỉnh không bị đụng tới.
 - **Rootfs làm gọn:** chỉ giữ gói Wiflow cần (`tools/lean-keep.txt` cùng các gói phụ thuộc), gỡ hết phần còn lại (kể cả Firewall, Services, VPN, NAS trong menu).
 - **Thương hiệu Wiflow:** theme LuCI Wiflow (duy nhất), một logo Wiflow đầy đủ (`rom/brand/wiflow-logo-source.png`, `tools/make-brand.py`), tên máy, banner.
-- **Mặc định:** `10.0.0.1`, Gate `WIFDIDNR3053` trước khi đăng nhập, `wiflow` / `wiflow` và `root` / `1234`, WiFi mở `Wiflow 2.4G` / `Wiflow 5G`, HNAT tắt.
+- **Mặc định:** `10.0.0.1`, Gate `WIFDIDNR3053` trước khi đăng nhập, `wiflow` / `wiflow` và `root` / `1234`, WiFi khách mở `Wiflow 2.4G` / `Wiflow 5G` (`10.10.10.0/24`, qua portal khi WordPress có nội dung), HNAT tắt.
 
-**Wiflow App** (liên kết tài khoản WordPress, dashboard tình trạng router) nằm sẵn trong firmware, mục đầu của menu LuCI. WiFi và mạng cài thẳng trong LuCI. Xem [docs/HUONG-DAN-WIFLOW-APP.md](docs/HUONG-DAN-WIFLOW-APP.md).
+**Wiflow App** (liên kết tài khoản WordPress, dashboard tình trạng router, portal khách) nằm sẵn trong firmware, mục đầu của menu LuCI. WiFi và mạng cài thẳng trong LuCI. Xem [docs/HUONG-DAN-WIFLOW-APP.md](docs/HUONG-DAN-WIFLOW-APP.md).
 
 Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File firmware ở **Releases**.
 

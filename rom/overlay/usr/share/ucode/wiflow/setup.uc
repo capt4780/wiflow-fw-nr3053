@@ -263,6 +263,9 @@ function series_out() {
 };
 
 export function status() {
+	// The Wiflow App page is open: the agent may read the source WiFi signal.
+	rundir();
+	writefile(`${RUN}/viewed`, `${uptime()}`);
 	const online = !!st_get('online', false) && has_default_route();
 	const st = st_get('stats', {});
 	return {
@@ -378,6 +381,8 @@ export function clear_pairing() {
 	st_set('wp_online', false);
 	st_set('wp_error', null);
 	st_set('unpair_n', null);
+	// Portal off, content and guest sessions cleared.
+	run('/usr/lib/wiflow/portal-hb unpaired');
 };
 
 export function kick_agent() {

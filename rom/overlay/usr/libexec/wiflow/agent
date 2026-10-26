@@ -51,16 +51,38 @@ function mem_kb(k) {
 	return m ? +m[1] : 0;
 }
 
-function health(online) {
+function health(online, extra) {
 	const load = split(readfile('/proc/loadavg') ?? '0', ' ')[0];
 	const up = online ? uplink_kind() : 'none';
-	return {
+	const h = {
 		uptime: W.uptime(), mem_total_kb: mem_kb('MemTotal'), mem_free_kb: mem_kb('MemAvailable'),
 		clients_now: W.st_get('stats', {}).clients?.now ?? 0, clients_connected: W.st_get('stats', {}).clients?.now ?? 0,
 		load: +load, wan_link: wan_carrier(), wwan_link: up == 'wifi',
 		uplink_active: up, uplink_switches: 0, watchdog_restarts: 0,
 		time_ok: W.st_get('time_ok', false)
 	};
+	// Guest portal numbers (authorized guests, speed, safe mode, opening hours).
+	for (let k, v in extra ?? {})
+		h[k] = v;
+	return h;
+}
+
+// Guest portal engine (shell): events, statistics and state to report.
+function portal_report() {
+	const r = W.run('/usr/lib/wiflow/portal-hb report');
+	const o = r.code == 0 ? json(trim(r.out)) : null;
+	return type(o) == 'object' ? o : {};
+}
+
+// Fetch the content revision WordPress wants, in the background, at most once a minute.
+function portal_content(desired) {
+	if (!match(`${desired}`, /^[0-9]+$/) || +desired <= 0)
+		return;
+	const t = W.st_get('content_try');
+	if (t != null && W.uptime() - t < 60)
+		return;
+	W.st_set('content_try', W.uptime());
+	W.run(`(/usr/lib/wiflow/portal-hb content ${+desired}) </dev/null >/dev/null 2>&1 &`);
 }
 
 function command_result() {
@@ -111,6 +133,14 @@ function run_command(cmd, online) {
 		result(id, action, ok ? 'success' : 'failed', ok ? 'The diagnostics report was sent' : 'The diagnostics report could not be sent');
 		break;
 	}
+	case 'guest_settings': {
+		// Speed limit, session time, maximum guests and opening hours (set in WordPress).
+		writefile(`${W.RUN}/guest-settings.json`, sprintf('%J', cmd.payload ?? {}));
+		const ok = W.run(`/usr/lib/wiflow/portal-hb guest-settings ${W.RUN}/guest-settings.json`).code == 0;
+		result(id, action, ok ? 'success' : 'failed', ok ? 'Guest WiFi settings applied' : 'Guest WiFi settings are not valid');
+		W.kick_agent();
+		break;
+	}
 	default:
 		result(id, action, 'failed', 'Not supported by this router. WiFi and network are set in LuCI.');
 	}
@@ -129,14 +159,16 @@ function heartbeat(online) {
 	}
 
 	const names = W.wifi_names();
+	const p = portal_report();
 	const r = W.http('POST', '/devices/heartbeat', {
 		agent_version: W.VERSION, data_generation: +W.GEN, internet: online,
 		connection: names.source ? 'auto' : 'lan',
 		wifi_ssid: names.source, guest_ssid: names.ap,
-		active_portal_revision: 0, storage_total_bytes: df_total(), media_budget_bytes: 0,
-		portal_sync_status: 'idle', portal_sync_error: '',
-		events: [], command_result: command_result(), health: health(online),
-		stats: [], ad_stats: [], log: W.wlog_list(15)
+		active_portal_revision: p.active_portal_revision ?? 0,
+		storage_total_bytes: p.storage_total_bytes ?? df_total(), media_budget_bytes: p.media_budget_bytes ?? 0,
+		portal_sync_status: p.portal_sync_status ?? 'idle', portal_sync_error: p.portal_sync_error ?? '',
+		events: p.events ?? [], command_result: command_result(), health: health(online, p.health),
+		stats: p.stats ?? [], ad_stats: p.ad_stats ?? [], log: W.wlog_list(15)
 	}, a, 15);
 
 	const b = r.body;
@@ -161,6 +193,9 @@ function heartbeat(online) {
 				W.wlog('system', 'The router clock was set from the Wiflow server');
 			}
 		}
+		// WordPress took the events and counters: drop them from the queue.
+		W.run(`/usr/lib/wiflow/portal-hb ack ${W.num(p.event_count, 0)}`);
+		portal_content(b.desired_portal_revision);
 		if (b.command)
 			run_command(b.command, online);
 		return TICK;

@@ -1,6 +1,6 @@
 /* Wiflow UI layer (loaded after wiflow.css): colours from the logo (blue #0054F0,
    cyan #00B8FF, navy #001033), solid fills, balanced radii (cards 14, controls
-   10, chips 6), white sidebar with the whole menu visible, flat bottom tab bar
+   10, chips 6), white sidebar with groups that open one at a time, flat bottom tab bar
    on phones and tablets. */
 :root,:root[data-darkmode="true"]{
  --wf-ink:#001033;--wf-text:#001033;--wf-muted:#5A6785;--wf-paper:#F2F5FA;
@@ -14,28 +14,27 @@ body{letter-spacing:-.003em}
 h2{font-size:24px;letter-spacing:-.02em;color:var(--wf-ink)}
 a{color:var(--wf-blue)}
 
-/* ---- sidebar: white, whole menu visible ---- */
+/* ---- sidebar: white, groups open one at a time ---- */
 .wf-side{background:#fff;color:var(--wf-text);border-right:1px solid var(--wf-line);width:248px}
 .wf-side-brand{padding:18px 18px 14px;gap:12px;color:var(--wf-ink)!important;border-bottom:1px solid var(--wf-line);margin:0 0 8px}
 .wf-side-brand .wf-logo{width:64px;height:auto}
 .wf-dev .wf-model{font-size:14px;font-weight:600;color:var(--wf-ink)}
 .wf-dev .wf-ver{font-size:12px;color:var(--wf-muted)}
 .wf-nav{padding:6px 12px 16px}
-.wf-nav>li{margin:0 0 6px}
-.wf-nav>li>a{padding:8px 10px;border-radius:var(--r-ctl);gap:10px;color:var(--wf-ink)!important;font-weight:600;font-size:14px}
-.wf-nav>li>a svg{opacity:1;color:var(--wf-muted)}
+.wf-nav>li{margin:0 0 4px}
+.wf-nav>li>a{padding:10px 12px;border-radius:var(--r-ctl);gap:12px;color:var(--wf-ink)!important;font-weight:600;font-size:14px;line-height:20px}
+.wf-nav>li>a>svg:first-child{opacity:1;color:var(--wf-muted)}
 .wf-nav>li>a:hover{background:var(--wf-paper);color:var(--wf-ink)!important}
-.wf-nav>li.active>a svg{color:var(--wf-blue)}
-.wf-nav>li>a .chev{display:none}
+.wf-nav>li.active>a>svg:first-child,.wf-nav>li.open>a>svg:first-child{color:var(--wf-blue)}
 /* single-page group (Wiflow App) is a button-like row */
-.wf-nav>li:not(.dropdown)>a{padding:10px}
 .wf-nav>li:not(.dropdown).active>a{background:var(--wf-blue-soft);color:var(--wf-blue)!important}
-.wf-nav>li:not(.dropdown).active>a svg{color:var(--wf-blue)}
-/* groups: label row + always visible pages with a guide line */
-.wf-nav>li.dropdown>a{padding:8px 10px 4px;pointer-events:none;color:var(--wf-muted)!important;font-size:12.5px;font-weight:600}
-.wf-nav>li.dropdown>a svg{width:17px;height:17px}
-.wf-nav ul{display:block!important;margin:0 0 4px 19px;padding:0 0 0 10px;border-left:1px solid var(--wf-line)}
-.wf-nav ul a{padding:7px 10px;border-radius:8px;font-size:13.5px;color:#34415F!important;position:relative}
+/* groups: a row with a chevron; the pages show only while the group is open */
+.wf-nav>li.dropdown>a{cursor:pointer}
+.wf-nav>li>a .chev{display:block;flex:none;width:16px;height:16px;margin:0 0 0 auto;color:var(--wf-muted);opacity:1;transition:transform .18s}
+.wf-nav>li.open>a .chev{transform:rotate(90deg);color:var(--wf-blue)}
+.wf-nav ul{display:none!important;margin:2px 0 6px 21px;padding:0 0 0 10px;border-left:1px solid var(--wf-line)}
+.wf-nav li.open>ul{display:block!important}
+.wf-nav ul a{padding:8px 10px;border-radius:8px;font-size:13.5px;color:#34415F!important;position:relative}
 .wf-nav ul a:hover{background:var(--wf-paper);color:var(--wf-ink)!important}
 .wf-nav ul li.active>a{background:var(--wf-blue-soft);color:var(--wf-blue)!important;font-weight:600}
 .wf-nav ul li.active>a::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--wf-blue)}
@@ -77,10 +76,18 @@ input:focus,textarea:focus,select:focus,.cbi-dropdown:focus,.cbi-dropdown[open],
 #modal_overlay{background:rgba(0,16,51,.48);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal{border-radius:var(--r-card);border:1px solid var(--wf-line);box-sizing:border-box;max-width:min(560px,calc(100vw - 24px));width:calc(100% - 24px);padding:24px 24px 20px;overflow-wrap:anywhere;box-shadow:0 30px 70px rgba(0,16,51,.3)}
 .modal *{min-width:0;max-width:100%;overflow-wrap:anywhere}
+/* buttons keep their label on one line (the Join Network button of the WiFi scan) */
+.modal .btn,.modal .cbi-button,.modal button{min-width:max-content;max-width:none;white-space:nowrap;overflow-wrap:normal}
+.modal .td.cbi-section-actions{display:table-cell!important;width:1%;white-space:nowrap;text-align:right}
+.modal .td.cbi-section-actions>*{display:inline-block!important;margin:0}
+.modal .ifacebadge,.modal .ifacebadge *,.modal .cbi-tooltip{white-space:nowrap;overflow-wrap:normal}
+.modal .ifacebadge{display:inline-flex;align-items:center;gap:6px;width:auto;max-width:none;min-width:max-content;padding:6px 10px}
+@media (max-width:900px){.modal .ifacebadge{flex-direction:column;gap:2px;padding:6px 4px;font-size:11.5px;min-width:0;width:100%;box-sizing:border-box}}
+.modal .table .tr,.modal .table .td{background:transparent!important}
 .modal ul,.modal ol{padding-left:22px}
 .modal li,.modal code,.modal em{overflow-wrap:anywhere}
 .modal h4{font-size:17px;margin:0 0 12px}
-.modal>.right,.modal .right{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+.modal>.right{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
 
 footer{padding:14px 32px 28px}
 
@@ -131,3 +138,13 @@ footer{padding:14px 32px 28px}
 /* zone / interface headers (Interfaces page): one soft blue instead of per-zone colours */
 .ifacebox .ifacebox-head,.ifacebox .ifacebox-head[style]{background:#EAF1FF!important;color:var(--wf-blue)!important;border-bottom-color:#D6E4FF}
 .ifacebox .ifacebox-head strong{color:inherit!important}
+
+/* ---- drop-down arrows: one chevron, 14px from the edge, text never runs under it ---- */
+:root{--wf-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235A6785' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+select:not([multiple]),.cbi-select{background-image:var(--wf-chev)!important;background-repeat:no-repeat!important;background-position:right 14px center!important;background-size:16px!important}
+select:not([multiple]){-webkit-appearance:none;appearance:none;padding:0 42px 0 12px}
+.cbi-select::before{display:none!important;content:none!important}
+.cbi-select select:not([multiple]){background:transparent!important;padding:0 42px 0 12px;margin:0;width:100%}
+.cbi-dropdown:not(.btn):not(.cbi-button)>.open{font-size:0;line-height:0;flex:0 0 42px;width:42px;padding:0;background:var(--wf-chev) no-repeat center/16px}
+.cbi-dropdown:not(.btn):not(.cbi-button)[open]>.open{transform:rotate(180deg)}
+.cbi-dropdown:not(.btn):not(.cbi-button)>ul>li{padding-left:12px}

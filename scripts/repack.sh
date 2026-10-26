@@ -45,7 +45,7 @@ chmod 0755 "$F/etc/init.d/wiflow-hnat-off" "$F/etc/uci-defaults/98-wiflow-base"
 ln -sf ../init.d/wiflow-hnat-off "$F/etc/rc.d/S21wiflow-hnat-off"
 
 # Wiflow App (service, agent, LuCI page): part of the firmware, not a separate package
-chmod 0755 "$F/etc/init.d/wiflow" "$F/etc/hotplug.d/ntp/20-wiflow" "$F"/usr/libexec/wiflow/*
+chmod 0755 "$F/etc/init.d/wiflow" "$F/etc/hotplug.d/ntp/20-wiflow" "$F/etc/hotplug.d/iface/60-wiflow-portal" "$F"/usr/libexec/wiflow/* "$F"/usr/lib/wiflow/* "$F"/www-wiflow-portal/cgi-bin/*
 ln -sf ../init.d/wiflow "$F/etc/rc.d/S96wiflow"
 ln -sf ../init.d/wiflow "$F/etc/rc.d/K10wiflow"
 sed -i "s/@VERSION@/$VERSION/" "$F/etc/banner"
@@ -58,32 +58,7 @@ sed -i 's/ipad=${ipaddr:-"192.168.1.1"}/ipad=${ipaddr:-"10.0.0.1"}/' "$F/bin/con
 # LuCI menu: only what a Wiflow router needs. Everything else in the menu
 # files of luci-base / luci-mod-* is dropped, and so are the view files of the
 # dropped pages.
-python3 - "$F/usr/share/luci/menu.d" <<'PY'
-import glob, json, os, sys
-d = sys.argv[1]
-KEEP = {"admin", "admin/status", "admin/status/overview", "admin/status/logs", "admin/status/logs/syslog",
-        "admin/system", "admin/system/system", "admin/system/admin", "admin/system/admin/password", "admin/system/admin/dropbear",
-        "admin/system/package-manager", "admin/system/flash", "admin/system/reboot",
-        "admin/network", "admin/network/network", "admin/network/wireless", "admin/network/dhcp", "admin/network/remote_addr/*",
-        "admin/wiflow"}
-TECH = {"translations", "ubus", "uci", "logout", "menu"}
-seen = set()
-for f in sorted(glob.glob(d + "/*.json")):
-    m = json.load(open(f))
-    out = {}
-    for k, v in m.items():
-        top = k.split("/")[1] if "/" in k else ""
-        if k in KEEP or top in TECH:
-            out[k] = v
-    seen.update(out)
-    if out:
-        open(f, "w").write(json.dumps(out, indent="\t") + "\n")
-    else:
-        os.remove(f)
-missing = KEEP - seen
-if missing:
-    sys.exit("menu pages missing: %s" % sorted(missing))
-PY
+python3 "$ROOT/tools/prune-menu.py" "$F/usr/share/luci/menu.d" "$F/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json"
 V="$F/www/luci-static/resources/view"
 rm -rf "$V"/firewall "$V"/system/led-trigger
 for v in status/bandwidth status/channel_analysis status/connections status/dmesg status/iptables status/load status/nftables status/processes \

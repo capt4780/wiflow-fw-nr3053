@@ -127,7 +127,17 @@ return baseclass.extend({
 				a.setAttribute('aria-expanded', active ? 'true' : 'false');
 				a.addEventListener('click', ev => {
 					ev.preventDefault();
-					a.setAttribute('aria-expanded', li.classList.toggle('open') ? 'true' : 'false');
+
+					const open = !li.classList.contains('open');
+
+					// one group open at a time
+					ul.querySelectorAll('li.open').forEach(o => {
+						o.classList.remove('open');
+						o.firstChild.setAttribute('aria-expanded', 'false');
+					});
+
+					li.classList.toggle('open', open);
+					a.setAttribute('aria-expanded', open ? 'true' : 'false');
 				});
 
 				const sub = E('ul', { 'class': 'dropdown-menu' });

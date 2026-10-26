@@ -1,0 +1,66 @@
+#!/bin/sh
+set -u
+. /usr/lib/wiflow/common.sh
+current=/tmp/wiflow-portal-associated
+# A phone that sleeps its WiFi or walks out briefly keeps its authorization.
+DISCONNECT_GRACE=1800
+SNAP_EVERY=120   # loops of 5 s = 10 minutes
+loops=0; tick=0
+
+while true; do
+    sleep 5
+    loops=$((loops+1)); if [ "$loops" -ge "$SNAP_EVERY" ]; then loops=0; session_snapshot >/dev/null 2>&1 || true; fi
+    # v1.0.15: keep the router Internet status fresh for the portal (owner of
+    # the periodic check). Link loss is seen at once without network traffic;
+    # while offline the check repeats every 5 s so guests get Internet back fast.
+    net_maintain
+    # v1.0.26: opening hours + session time every 30 s, statistics every minute.
+    tick=$((tick+1))
+    if [ $((tick % 6)) = 0 ]; then guest_sched_tick >/dev/null 2>&1 || true; guest_session_expire >/dev/null 2>&1 || true; fi
+    if [ $((tick % 12)) = 0 ]; then stats_sample >/dev/null 2>&1 || true; tick=0; fi
+    # Guests = devices the guest bridge has learned on a WiFi port (the driver is
+    # never asked: LuCI owns it). The helper prints one MAC per line.
+    : > "$current"
+    /usr/libexec/wiflow/guests br-wiflow 2>/dev/null | tr 'a-f' 'A-F' >> "$current" || true
+    [ -d /sys/class/net/br-wiflow ] || continue
+    sort -u "$current" -o "$current" 2>/dev/null || true
+    now="$(date +%s)"
+
+    while read -r mac; do
+        [ -n "$mac" ] || continue
+        ip="$(awk -v m="$mac" 'toupper($2)==m{print $3;exit}' /tmp/dhcp.leases 2>/dev/null || true)"
+        [ -n "$ip" ] || ip="$(ip neigh show dev br-wiflow 2>/dev/null | awk -v m="$mac" 'toupper($0) ~ m && /lladdr/{print $1;exit}')"
+        [ -n "$ip" ] && /usr/lib/wiflow/portal-client ensure "$ip" >/dev/null 2>&1 || true
+    done < "$current"
+
+    for f in "$CLIENT_SESSIONS"/*; do
+        [ -f "$f" ] || continue
+        IFS='|' read -r mac cid sid ip connected authorized last absent < "$f" 2>/dev/null || continue
+        case "${absent:-0}" in ''|*[!0-9]*) absent=0;; esac
+        if grep -qx "$mac" "$current" 2>/dev/null; then
+            newip="$(awk -v m="$mac" 'toupper($2)==m{print $3;exit}' /tmp/dhcp.leases 2>/dev/null || true)"; [ -n "$newip" ] || newip="$ip"
+            if [ "$newip" != "$ip" ]; then
+                if [ "${authorized:-0}" != 0 ]; then
+                    portal_nft_add "$newip" "$mac" || true
+                    portal_nft_del "$ip" "$mac"
+                fi
+            fi
+            # Re-read: a confirm may have authorized this guest since the loop read the file.
+            IFS='|' read -r _m _c _s _i _cn authorized _l _ab < "$f" 2>/dev/null || true
+            client_session_write "$f" "$mac" "$cid" "$sid" "$newip" "$connected" "${authorized:-0}" "$now" 0 || true
+        else
+            [ "$absent" -gt 0 ] || absent="$now"
+            elapsed=$((now-absent))
+            if [ "$elapsed" -ge "$DISCONNECT_GRACE" ]; then
+                portal_nft_del "$ip" "$mac"
+                when="${last:-$now}"; case "$when" in ''|*[!0-9]*) when="$now";; esac
+                event_enqueue disconnected "$cid" "$sid" "$when" || true
+                rm -f "$f"
+                : > "$HEARTBEAT_KICK" 2>/dev/null || true
+            else
+                IFS='|' read -r _m _c _s _i _cn authorized _l _ab < "$f" 2>/dev/null || true
+                client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "${last:-$now}" "$absent" || true
+            fi
+        fi
+    done
+done

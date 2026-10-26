@@ -59,9 +59,10 @@ function route() {
 	return null;
 }
 
-// Nothing here talks to the WiFi driver (no iwinfo, no iwpriv): the driver is
-// the router's most delicate part and LuCI owns it. The WiFi names come from
-// the configuration, the devices from the bridge forwarding table of the kernel.
+// The WiFi driver is the router's most delicate part and LuCI owns it, so it is
+// left alone. The WiFi names come from the configuration, the devices from the
+// bridge forwarding table of the kernel. The one exception is the signal of the
+// source WiFi: it is asked for (one call) only while the Wiflow App page is open.
 const SYSNET = getenv('WIFLOW_SYSNET') || '/sys/class/net';
 
 function enc_text(e) {
@@ -101,26 +102,28 @@ function wifi_conf() {
 	return { nets: nets, src: src };
 }
 
-// WiFi devices seen by the bridge: { MAC: band }. Entries come from
+// WiFi devices seen by the bridges (guests on br-wiflow): { MAC: band }. Entries come from
 // brforward (16 bytes each: MAC, port, is_local, age, port high byte, pad);
 // the ports named ra* / rax* are the WiFi interfaces (2.4 GHz / 5 GHz).
 function stations() {
 	const out = {};
-	const ports = {};
-	for (let n in lsdir(`${SYSNET}/br-lan/brif`) ?? []) {
-		const p = trim(readfile(`${SYSNET}/br-lan/brif/${n}/port_no`) ?? '');
-		if (p != '')
-			ports[hexdec(replace(p, /^0x/, ''))] = n;
-	}
-	const raw = readfile(`${SYSNET}/br-lan/brforward`) ?? '';
-	for (let o = 0; o + 16 <= length(raw); o += 16) {
-		const port = ord(raw, o + 6) + ord(raw, o + 12) * 256;
-		if (ord(raw, o + 7) != 0)
-			continue;
-		const name = ports[port];
-		if (!name || !match(name, /^ra/))
-			continue;
-		out[sprintf('%02X:%02X:%02X:%02X:%02X:%02X', ord(raw, o), ord(raw, o + 1), ord(raw, o + 2), ord(raw, o + 3), ord(raw, o + 4), ord(raw, o + 5))] = match(name, /^ra[0-9]/) ? '2g' : '5g';
+	for (let br in [ 'br-wiflow', 'br-lan' ]) {
+		const ports = {};
+		for (let n in lsdir(`${SYSNET}/${br}/brif`) ?? []) {
+			const p = trim(readfile(`${SYSNET}/${br}/brif/${n}/port_no`) ?? '');
+			if (p != '')
+				ports[int(replace(p, /^0x/, ''), 16)] = n;
+		}
+		const raw = readfile(`${SYSNET}/${br}/brforward`) ?? '';
+		for (let o = 0; o + 16 <= length(raw); o += 16) {
+			const port = ord(raw, o + 6) + ord(raw, o + 12) * 256;
+			if (ord(raw, o + 7) != 0)
+				continue;
+			const name = ports[port];
+			if (!name || !match(name, /^ra/))
+				continue;
+			out[sprintf('%02X:%02X:%02X:%02X:%02X:%02X', ord(raw, o), ord(raw, o + 1), ord(raw, o + 2), ord(raw, o + 3), ord(raw, o + 4), ord(raw, o + 5))] = match(name, /^ra[0-9]/) ? '2g' : '5g';
+		}
 	}
 	return out;
 }
@@ -172,6 +175,16 @@ function history(devices, latency) {
 	W.st_set('series', s);
 }
 
+// Signal of the source WiFi in dBm, only while the Wiflow App page is open.
+function source_signal(dev) {
+	const v = readfile(`${W.RUN}/viewed`);
+	if (v == null || W.uptime() - W.num(trim(v), 0) > 45 || !match(dev, /^apcli[a-z0-9]*$/))
+		return null;
+	const j = json(trim(W.sh(`ubus -t 3 call iwinfo info '{"device":"${dev}"}'`)) || '{}');
+	const s = j?.signal;
+	return (type(s) == 'int' && s < 0 && s > -120) ? s : null;
+}
+
 let tick = 0;
 
 export function sample(latency) {
@@ -187,11 +200,13 @@ export function sample(latency) {
 		const viaWifi = r && match(r.dev, /^(apcli|apclii|apclix)/);
 		st.source = {
 			ssid: viaWifi ? (src.ssid ?? '') : '', band: viaWifi ? (src.band ?? '') : '',
-			ip: r?.ip ?? '', gateway: r?.gateway ?? ''
+			dev: viaWifi ? r.dev : '', ip: r?.ip ?? '', gateway: r?.gateway ?? ''
 		};
 	}
 	tick++;
 
+	if (st.source?.ssid && st.source.dev)
+		st.source.signal = source_signal(st.source.dev);
 	W.st_set('stats', st);
 	history(st.clients?.now, latency);
 	return st;

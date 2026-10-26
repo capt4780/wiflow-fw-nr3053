@@ -1,0 +1,33 @@
+#!/usr/bin/ucode
+// Prints the MAC address of every device the given bridge has learned on a
+// WiFi port (ra*, rax*), one per line. It reads the kernel's bridge table only;
+// the WiFi driver is never asked (LuCI owns it).
+'use strict';
+
+import { readfile, lsdir } from 'fs';
+
+const SYSNET = getenv('WIFLOW_SYSNET') || '/sys/class/net';
+const br = ARGV[0] ?? 'br-wiflow';
+if (!match(br, /^[A-Za-z0-9_.-]{1,15}$/))
+	exit(2);
+
+const ports = {};
+for (let n in lsdir(`${SYSNET}/${br}/brif`) ?? []) {
+	const p = trim(readfile(`${SYSNET}/${br}/brif/${n}/port_no`) ?? '');
+	if (p != '')
+		ports[int(replace(p, /^0x/, ""), 16)] = n;
+}
+const raw = readfile(`${SYSNET}/${br}/brforward`) ?? '';
+const seen = {};
+for (let o = 0; o + 16 <= length(raw); o += 16) {
+	if (ord(raw, o + 7) != 0)
+		continue;
+	const name = ports[ord(raw, o + 6) + ord(raw, o + 12) * 256];
+	if (!name || !match(name, /^ra/))
+		continue;
+	const mac = sprintf('%02X:%02X:%02X:%02X:%02X:%02X', ord(raw, o), ord(raw, o + 1), ord(raw, o + 2), ord(raw, o + 3), ord(raw, o + 4), ord(raw, o + 5));
+	if (!seen[mac]) {
+		seen[mac] = 1;
+		print(mac, '\n');
+	}
+}
