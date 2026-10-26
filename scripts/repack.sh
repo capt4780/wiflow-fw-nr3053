@@ -60,10 +60,11 @@ sed -i 's/ipad=${ipaddr:-"192.168.1.1"}/ipad=${ipaddr:-"10.0.0.1"}/' "$F/bin/con
 # dropped pages.
 python3 "$ROOT/tools/prune-menu.py" "$F/usr/share/luci/menu.d" "$F/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json"
 V="$F/www/luci-static/resources/view"
-rm -rf "$V"/firewall "$V"/system/led-trigger
+rm -rf "$V"/system/led-trigger
+rm -f "$V"/firewall/ipsets.js "$V"/firewall/custom.js "$V"/firewall/snats.js
 for v in status/bandwidth status/channel_analysis status/connections status/dmesg status/iptables status/load status/nftables status/processes \
          status/routes status/routesj status/wireless system/crontab system/leds system/mounts system/startup system/uhttpd system/sshkeys \
-         system/repokeys network/diagnostics network/routes network/switch; do
+         system/repokeys network/routes network/switch; do
 	rm -f "$V/$v.js"
 done
 

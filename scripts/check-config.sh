@@ -14,13 +14,13 @@ devs="$(grep -E '^CONFIG_TARGET_(DEVICE_)?mediatek_filogic_DEVICE_[a-z0-9_]+=y$'
 
 need wiflow-setup kmod-mt_wifi kmod-warp kmod-conninfra wifi-dats mtwifi-cfg-ucode datconf ucode-mod-datconf \
      ucode-mod-l1parser l1util wireless-tools rpcd-mod-iwinfo libiwinfo luci-base luci-mod-admin-full \
-     luci-app-firewall luci-app-mtwifi-cfg luci-i18n-base-vi uhttpd uhttpd-mod-ubus dnsmasq-full firewall4 \
+     luci-app-firewall luci-app-mtwifi-cfg luci-i18n-base-vi luci-i18n-firewall-vi luci-proto-ppp ppp ppp-mod-pppoe kmod-ppp uhttpd uhttpd-mod-ubus dnsmasq-full firewall4 \
      dropbear fitblk uboot-envtools jsonfilter uclient-fetch ca-bundle
-deny luci luci-light luci-app-package-manager luci-proto-ipv6 luci-proto-ppp default-settings default-settings-chn \
+deny luci luci-light luci-app-package-manager luci-proto-ipv6 default-settings default-settings-chn \
      default-settings-vn luci-theme-aurora luci-app-aurora-config luci-app-turboacc-mtk luci-app-upnp miniupnpd \
      miniupnpd-nftables luci-app-ddns ddns-scripts wireguard-tools luci-proto-wireguard kmod-wireguard luci-app-adblock \
-     adblock blockd tailscale luci-app-tailscale-community block-mount odhcp6c odhcpd odhcpd-ipv6only ppp \
-     ppp-mod-pppoe kmod-ppp hnat-detect wpad-openssl wpad-basic-mbedtls luci-app-eqos-mtk mtkhqos_util zram-swap \
+     adblock blockd tailscale luci-app-tailscale-community block-mount odhcp6c odhcpd odhcpd-ipv6only \
+     hnat-detect wpad-openssl wpad-basic-mbedtls luci-app-eqos-mtk mtkhqos_util zram-swap \
      kmod-zram htop nano tcpdump curl coreutils ipset kmod-usb3 kmod-tun
 zh="$(grep -E '^CONFIG_PACKAGE_[^=]*zh[-_]c[nh][^=]*=y$' "$C" || true)"; [ -z "$zh" ] || { echo "NOT ALLOWED (Chinese): $zh"; bad=1; }
 ipt="$(grep -E '^CONFIG_PACKAGE_(iptables|ip6tables)[^=]*=y$' "$C" || true)"; [ -z "$ipt" ] || { echo "NOT ALLOWED (iptables): $ipt"; bad=1; }

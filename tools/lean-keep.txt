@@ -98,6 +98,18 @@ luci-mod-status
 luci-mod-system
 luci-app-mtwifi-cfg
 luci-app-package-manager
+luci-app-firewall
+luci-proto-ppp
+ppp
+ppp-mod-pppoe
+kmod-ppp
+kmod-pppoe
+kmod-pppox
+kmod-slhc
+luci-i18n-base-vi
+luci-i18n-firewall-vi
+luci-i18n-mtwifi-cfg-vi
+luci-i18n-package-manager-vi
 
 # --- package manager (LuCI > System > Software) ---
 apk-openssl

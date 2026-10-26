@@ -15,10 +15,13 @@ add_list system.ntp.server='pool.ntp.org'
 commit system
 EOF
 
-# --- LuCI: English, Wiflow theme as the only theme ---
+# --- LuCI: Vietnamese by default (English selectable), Wiflow theme as the only theme ---
 uci -q batch <<'EOF'
-set luci.main.lang='en'
+set luci.main.lang='vi'
 delete luci.languages
+set luci.languages='internal'
+set luci.languages.vi='Tiếng Việt'
+set luci.languages.en='English'
 set luci.main.mediaurlbase='/luci-static/wiflow'
 delete luci.themes
 set luci.themes='internal'

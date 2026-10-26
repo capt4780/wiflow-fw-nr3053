@@ -222,10 +222,16 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
-    "LuCI menu: Wiflow App, Status, Network, System only (no Firewall, Services, VPN, NAS)":
+    "LuCI menu: Wiflow App, Status, Network (incl. Firewall, Diagnostics), System only (no Services, VPN, NAS)":
         sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
         == ["admin/network", "admin/status", "admin/system", "admin/wiflow"]
-        and not any("firewall" in k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f))),
+        and all(any(k in json.load(open(f)) for f in glob.glob(F + "/usr/share/luci/menu.d/*.json"))
+                for k in ("admin/network/firewall/zones", "admin/network/firewall/rules", "admin/network/diagnostics")),
+    "PPPoE available (pppd, netifd proto, LuCI protocol page)":
+        all(os.path.exists(F + x) for x in ["/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh", "/www/luci-static/resources/protocol/ppp.js"]),
+    "Vietnamese is the default LuCI language, English selectable":
+        "set luci.main.lang='vi'" in open(F + "/etc/uci-defaults/98-wiflow-base").read()
+        and glob.glob(F + "/usr/lib/lua/luci/i18n/base.vi.lmo") and glob.glob(F + "/usr/lib/lua/luci/i18n/firewall.vi.lmo"),
     "LuCI menu copy that the first boot writes over menu.d is pruned too (dropped pages must not come back)":
         sorted(json.load(open(F + "/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json")))
         == ["admin/status/logs", "admin/status/logs/syslog", "admin/status/overview"],
@@ -278,14 +284,14 @@ deny = ["/usr/sbin/tailscaled", "/etc/init.d/adblock", "/etc/init.d/ddns", "/etc
         "/usr/sbin/odhcpd", "/usr/sbin/odhcp6c", "/usr/sbin/tcpdump", "/usr/bin/htop", "/usr/bin/nano",
         "/www/luci-static/aurora", "/www/luci-static/bootstrap", "/etc/hotplug.d/iface/99-hnat-detect",
         "/etc/init.d/viettel-apk-mirror", "/usr/sbin/iptables", "/etc/init.d/blockd",
-        "/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh",
-        "/usr/share/luci/menu.d/luci-app-firewall.json", "/www/luci-static/resources/view/firewall", "/www/luci-static/resources/view/status/processes.js"]
+        "/www/luci-static/resources/view/firewall/ipsets.js", "/www/luci-static/resources/view/firewall/custom.js",
+        "/www/luci-static/resources/view/status/processes.js"]
 left = [p for p in deny if os.path.lexists(F + p)]
-zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*.lmo") + glob.glob(F + "/usr/share/luci/i18n/*")
+zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*.zh*.lmo")
 if left or zh:
     fail("removed features still present: " + ", ".join(left + zh))
 else:
     ok("removed: Tailscale, WireGuard, Adblock, DDNS, UPnP, TurboACC/HNAT tools, EQoS, IPv6 DHCP/RA, "
-       "PPPoE, zram, iptables, debug tools, Aurora/Bootstrap themes, translations (English only)")
+       "zram, iptables, debug tools, Aurora/Bootstrap themes, Chinese translations")
 
 sys.exit(bad)

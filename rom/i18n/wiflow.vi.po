@@ -1,0 +1,384 @@
+# Wiflow: Vietnamese strings missing from the official LuCI catalogs
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: vi\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Indoor Only Channel Selected"
+msgstr "Đã chọn kênh chỉ dùng trong nhà"
+
+msgid "Restart"
+msgstr "Khởi động lại"
+
+msgid "Remove"
+msgstr "Xóa"
+
+msgid "Some channels may be restricted to Indoor Only use by your Regulatory Domain. Make sure to follow this advice if a channel is reported as such."
+msgstr "Một số kênh bị giới hạn chỉ dùng trong nhà theo quy định của quốc gia. Hãy tuân thủ nếu kênh được báo như vậy."
+
+msgid "Normal"
+msgstr "Bình thường"
+
+msgid "Enable 256-QAM"
+msgstr "Bật 256-QAM"
+
+msgid "802.11n 2.4Ghz Only"
+msgstr "Chỉ 802.11n 2,4 GHz"
+
+msgid "Rx LDPC"
+msgstr "LDPC thu"
+
+msgid "Tx LDPC"
+msgstr "LDPC phát"
+
+msgid "Isolate Bridge Port"
+msgstr "Cô lập cổng cầu nối"
+
+msgid "Force CCMP-256 (AES)"
+msgstr "Buộc CCMP-256 (AES)"
+
+msgid "Force GCMP (AES)"
+msgstr "Buộc GCMP (AES)"
+
+msgid "Force GCMP-256 (AES)"
+msgstr "Buộc GCMP-256 (AES)"
+
+msgid "QR Code"
+msgstr "Mã QR"
+
+msgid "Scan this QR code with the client device."
+msgstr "Quét mã QR này bằng thiết bị cần kết nối."
+
+msgid "SSID and passwords with URIencoded sequences (e.g. %20) may not work."
+msgstr "Tên WiFi và mật khẩu chứa chuỗi mã hóa URI (ví dụ %20) có thể không hoạt động."
+
+msgid "QR Error Correction Code Level"
+msgstr "Mức sửa lỗi mã QR"
+
+msgid "Low"
+msgstr "Thấp"
+
+msgid "Quartile"
+msgstr "Trung bình khá"
+
+msgid "Generate WiFi QR…"
+msgstr "Tạo mã QR WiFi…"
+
+msgid "Generate QR…"
+msgstr "Tạo mã QR…"
+
+msgid "Back to settings"
+msgstr "Quay lại cài đặt"
+
+msgid "Format:"
+msgstr "Định dạng:"
+
+msgid "string (UTF-8)"
+msgstr "chuỗi (UTF-8)"
+
+msgid "GCMP-256 pairwise cipher"
+msgstr "Mã hóa cặp GCMP-256"
+
+msgid "Transition Disable"
+msgstr "Tắt chuyển tiếp"
+
+msgid "Full TimeZone Name"
+msgstr "Tên đầy đủ của múi giờ"
+
+msgid "Unchecked means the timezone offset (E.g. GMT+1) is displayed"
+msgstr "Bỏ chọn sẽ hiển thị độ lệch múi giờ (ví dụ GMT+1)"
+
+msgid "Time Format"
+msgstr "Định dạng giờ"
+
+msgid "12-Hour Clock"
+msgstr "Đồng hồ 12 giờ"
+
+msgid "24-Hour Clock"
+msgstr "Đồng hồ 24 giờ"
+
+msgid "Table Filters"
+msgstr "Bộ lọc bảng"
+
+msgid "List of upstream NTP server candidates with which to synchronize."
+msgstr "Danh sách máy chủ NTP dùng để đồng bộ giờ."
+
+msgid "Bind to Interface"
+msgstr "Gắn với giao diện"
+
+msgid "Listen on up to 10 IPs on the given interface or, if unspecified, on all interfaces"
+msgstr "Lắng nghe tối đa 10 địa chỉ IP trên giao diện đã chọn, hoặc trên mọi giao diện nếu để trống"
+
+msgid "Show"
+msgstr "Hiện"
+
+msgid "Hide"
+msgstr "Ẩn"
+
+msgid "Temperature"
+msgstr "Nhiệt độ"
+
+msgid "DHCP Leases"
+msgstr "Thuê bao DHCP"
+
+msgid "No active leases found"
+msgstr "Không có thiết bị nào đang thuê địa chỉ"
+
+msgid "Reserve a specific IP address for this device"
+msgstr "Giữ cố định một địa chỉ IP cho thiết bị này"
+
+msgid "Reserve IP"
+msgstr "Giữ IP"
+
+msgid "TX Power"
+msgstr "Công suất phát"
+
+msgid "Online Users"
+msgstr "Người dùng trực tuyến"
+
+msgid "Speed: %d Mbit/s, Duplex: %s"
+msgstr "Tốc độ: %d Mbit/s, song công: %s"
+
+msgid "Received bytes"
+msgstr "Byte đã nhận"
+
+msgid "Received packets"
+msgstr "Gói đã nhận"
+
+msgid "Received multicast"
+msgstr "Multicast đã nhận"
+
+msgid "Receive errors"
+msgstr "Lỗi nhận"
+
+msgid "Receive dropped"
+msgstr "Gói nhận bị bỏ"
+
+msgid "Transmitted bytes"
+msgstr "Byte đã gửi"
+
+msgid "Transmitted packets"
+msgstr "Gói đã gửi"
+
+msgid "Transmit errors"
+msgstr "Lỗi gửi"
+
+msgid "Transmit dropped"
+msgstr "Gói gửi bị bỏ"
+
+msgid "Port is not part of any network"
+msgstr "Cổng không thuộc mạng nào"
+
+msgid "Port status"
+msgstr "Trạng thái cổng"
+
+msgid "Enable logging"
+msgstr "Bật ghi nhật ký"
+
+msgid "Log matched packets to syslog."
+msgstr "Ghi các gói khớp quy tắc vào nhật ký hệ thống."
+
+msgid "Enable FullCone NAT"
+msgstr "Bật FullCone NAT"
+
+msgid " Requires hardware NAT support."
+msgstr " Cần phần cứng hỗ trợ NAT."
+
+msgid "Intra zone forward"
+msgstr "Chuyển tiếp trong cùng vùng"
+
+msgid "Log matched packets on the selected tables to syslog."
+msgstr "Ghi các gói khớp trên các bảng đã chọn vào nhật ký hệ thống."
+
+msgid "Reflection zones"
+msgstr "Vùng phản xạ"
+
+msgid "Zones from which reflection rules shall be created. If unset, only the destination zone is used."
+msgstr "Các vùng tạo quy tắc phản xạ. Nếu để trống, chỉ dùng vùng đích."
+
+msgid "Checking…"
+msgstr "Đang kiểm tra…"
+
+msgid "Select directory…"
+msgstr "Chọn thư mục…"
+
+msgid "File"
+msgstr "Tệp"
+
+msgid "Directory name"
+msgstr "Tên thư mục"
+
+msgid "Directory name cannot be empty."
+msgstr "Tên thư mục không được để trống."
+
+msgid "Failed to create directory: %s"
+msgstr "Không tạo được thư mục: %s"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Create Directory"
+msgstr "Tạo thư mục"
+
+msgid "Select"
+msgstr "Chọn"
+
+msgid "Create"
+msgstr "Tạo"
+
+msgid "whitespace"
+msgstr "khoảng trắng"
+
+msgid "Reset filters"
+msgstr "Đặt lại bộ lọc"
+
+msgid "Theme fallback"
+msgstr "Giao diện dự phòng"
+
+msgid "Error loading theme"
+msgstr "Lỗi tải giao diện"
+
+msgid "A fallback is used since the configured theme failed to load with the error below."
+msgstr "Đang dùng giao diện dự phòng vì giao diện đã chọn không tải được, lỗi bên dưới."
+
+msgid "General"
+msgstr "Chung"
+
+msgid "Forwards"
+msgstr "Chuyển tiếp"
+
+msgid "Limits"
+msgstr "Giới hạn"
+
+msgid "DNS redirect"
+msgstr "Chuyển hướng DNS"
+
+msgid "Listen addresses"
+msgstr "Địa chỉ lắng nghe"
+
+msgid "Listen only on the specified addresses."
+msgstr "Chỉ lắng nghe trên các địa chỉ đã chỉ định."
+
+msgid "Syntax:"
+msgstr "Cú pháp:"
+
+msgid "Name already exists."
+msgstr "Tên đã tồn tại."
+
+msgid "Choose a unique name."
+msgstr "Hãy chọn tên không trùng."
+
+msgid "Carrier"
+msgstr "Tín hiệu liên kết"
+
+msgid "Present"
+msgstr "Có mặt"
+
+msgid "Absent"
+msgstr "Vắng mặt"
+
+msgid "Interface disabled"
+msgstr "Giao diện đã tắt"
+
+msgid "Stop"
+msgstr "Dừng"
+
+msgid "Start"
+msgstr "Bắt đầu"
+
+msgid "IPv4 Settings"
+msgstr "Cài đặt IPv4"
+
+msgid "DHCPv4 Service"
+msgstr "Dịch vụ DHCPv4"
+
+msgid "Enable or disable DHCPv4 services on this interface."
+msgstr "Bật hoặc tắt dịch vụ DHCPv4 trên giao diện này."
+
+msgid "Do not provide DHCPv4 services on this interface."
+msgstr "Không cung cấp dịch vụ DHCPv4 trên giao diện này."
+
+msgid "Provide DHCPv4 services on this interface."
+msgstr "Cung cấp dịch vụ DHCPv4 trên giao diện này."
+
+msgid "Invalid DHCP lease time format. Use integer values optionally followed by s, m, h, d, or w."
+msgstr "Định dạng thời gian thuê DHCP không hợp lệ. Dùng số nguyên, có thể kèm s, m, h, d hoặc w."
+
+msgid "Force DHCP-Options"
+msgstr "Buộc tùy chọn DHCP"
+
+msgid "Master"
+msgstr "Chính"
+
+msgid "On"
+msgstr "Bật"
+
+msgid "Off"
+msgstr "Tắt"
+
+msgid "Handover"
+msgstr "Bàn giao"
+
+msgid "Interface"
+msgstr "Giao diện"
+
+msgid "Remaining time"
+msgstr "Thời gian còn lại"
+
+msgid "DHCP"
+msgstr "DHCP"
+
+msgid "Files"
+msgstr "Tệp"
+
+msgid "Tags"
+msgstr "Thẻ"
+
+msgid "Leases"
+msgstr "Thuê bao"
+
+msgid "Hosts file"
+msgstr "Tệp hosts"
+
+msgid "Ignore"
+msgstr "Bỏ qua"
+
+msgid "Warning"
+msgstr "Cảnh báo"
+
+msgid "The hostname for this host (optional)."
+msgstr "Tên máy của thiết bị này (không bắt buộc)."
+
+msgid "MAC Addresses"
+msgstr "Địa chỉ MAC"
+
+msgid "The hardware address(es) of this host."
+msgstr "Địa chỉ phần cứng của thiết bị này."
+
+msgid "Force broadcast DHCP response."
+msgstr "Buộc phản hồi DHCP dạng broadcast."
+
+msgid "Host-specific lease time, e.g. <code>5m</code>, <code>3h</code>, <code>7d</code>."
+msgstr "Thời gian thuê riêng cho thiết bị, ví dụ <code>5m</code>, <code>3h</code>, <code>7d</code>."
+
+msgid "Forward/reverse DNS"
+msgstr "DNS xuôi/ngược"
+
+msgid "Resolve addresses locally"
+msgstr "Phân giải địa chỉ cục bộ"
+
+msgid "Lease trigger"
+msgstr "Tác vụ khi thuê bao đổi"
+
+msgid "Set Tag"
+msgstr "Gán thẻ"
+
+msgid "Edit tag"
+msgstr "Sửa thẻ"
+
+msgid "Add tag"
+msgstr "Thêm thẻ"
+
+msgid "Wiflow App"
+msgstr "Wiflow App"
