@@ -11,5 +11,31 @@
 				"luci-app-wiflow"
 			]
 		}
+	},
+	"admin/wifi": {
+		"title": "WiFi",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "wiflow/wifi"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-wiflow"
+			]
+		}
+	},
+	"admin/system": {
+		"title": "System",
+		"order": 3,
+		"action": {
+			"type": "view",
+			"path": "wiflow/system"
+		},
+		"depends": {
+			"acl": [
+				"luci-app-wiflow"
+			]
+		}
 	}
 }

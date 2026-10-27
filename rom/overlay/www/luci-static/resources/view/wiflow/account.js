@@ -3,100 +3,12 @@
 'require ui';
 'require poll';
 'require rpc';
+'require wiflow.kit as K';
+
+const svg = K.svg, chip = K.chip, card = K.card, band = K.band, signalBars = K.signalBars;
 
 /* Wiflow App: the router's link to the Wiflow account (WordPress) and a
    live summary of the router. WiFi and network are configured in LuCI. */
-
-const CSS = `
-.wa{max-width:1120px}
-.wa-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:18px;margin:0 0 18px}
-.wa-c3{grid-column:span 3}.wa-c4{grid-column:span 4}.wa-c5{grid-column:span 5}.wa-c6{grid-column:span 6}.wa-c7{grid-column:span 7}.wa-c8{grid-column:span 8}.wa-c12{grid-column:span 12}
-.wa-card{background:#fff;border-radius:28px;padding:22px 24px;min-width:0;box-shadow:var(--sh)}
-.wa-card>h3{display:flex;align-items:center;gap:12px;margin:0 0 16px;font-size:16px;font-weight:600;color:var(--ink)}
-.wa-card>h3 .wa-chip,.wa-card>h3 .wa-seg{margin-left:auto}
-.wa-ico{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--soft);color:var(--acc)}
-.wa-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.wa-chip{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;background:var(--bg);color:var(--ink2)}
-.wa-chip::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
-.wa-chip.ok{background:var(--oksoft);color:var(--okink)}.wa-chip.ok::before{background:var(--ok)}
-.wa-chip.warn{background:var(--warnsoft);color:var(--warn)}.wa-chip.bad{background:var(--badsoft);color:var(--bad)}
-.wa-chip.plain::before{display:none}
-.wa-tile{display:flex;flex-direction:column;gap:2px}
-.wa-tile .wa-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;color:var(--ink2);font-size:14px;font-weight:500}
-.wa-tile .wa-val{font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-.03em;color:var(--ink)}
-.wa-tile .wa-val small{font-size:15px;font-weight:500;color:var(--muted);margin-left:4px;letter-spacing:0}
-.wa-tile .wa-sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
-.wa-seg{display:inline-flex;padding:4px;gap:2px;background:var(--bg);border-radius:999px}
-.wa-seg button{all:unset;box-sizing:border-box;cursor:pointer;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:500;color:var(--ink2)}
-.wa-seg button.on{background:var(--acc);color:#fff;box-shadow:0 6px 14px var(--glow)}
-.wa-seg button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.wa-stats{display:flex;gap:30px;flex-wrap:wrap;margin:0 0 8px}
-.wa-stats div{font-size:13px;color:var(--muted)}
-.wa-stats b{display:block;font-size:22px;letter-spacing:-.01em;color:var(--ink);font-weight:600}
-.wa-plot{position:relative;margin:6px 0 0 34px}
-.wa-plot svg{display:block;width:100%;height:150px;overflow:visible}
-.wa-yl{position:absolute;left:-34px;width:28px;text-align:right;font-size:11px;color:var(--muted);transform:translateY(-50%)}
-.wa-empty{display:grid;place-items:center;height:150px;color:var(--muted);font-size:13px}
-.wa-xl{display:flex;justify-content:space-between;margin:6px 0 0 34px;font-size:11px;color:var(--muted)}
-.wa-kv{display:grid;grid-template-columns:minmax(96px,auto) minmax(0,1fr);gap:0;margin:0;font-size:14px}
-.wa-kv dt,.wa-kv dd{padding:10px 0;border-top:1px solid var(--line)}
-.wa-kv dt:first-of-type,.wa-kv dd:first-of-type{border-top:0;padding-top:0}
-.wa-kv dt{color:var(--muted)}.wa-kv dd{margin:0;padding-left:16px;font-weight:600;color:var(--ink);overflow-wrap:anywhere;text-align:right}
-.wa-id{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:20px;background:var(--soft)}
-.wa-id img{width:36px;height:36px;border-radius:10px;flex:none}
-.wa-id .wa-l{font-size:12px;color:var(--ink2)}
-.wa-id .wa-v{font-weight:600;font-size:15px;color:var(--accink);letter-spacing:.03em;overflow-wrap:anywhere}
-.wa-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
-.wa-btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 20px;border-radius:999px;background:var(--soft);color:var(--accink);font-weight:500;font-size:14px;transition:background .2s,transform .15s}
-.wa-btn:hover{background:var(--soft2)}
-.wa-btn:active{transform:scale(.97)}
-.wa-btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.wa-btn.pri{color:#fff;background:var(--acc);box-shadow:0 10px 22px var(--glow)}
-.wa-btn.pri:hover{background:var(--acc2)}
-.wa-btn.neg{color:var(--bad);background:var(--badsoft)}
-.wa-btn.neg:hover{background:#FADADD}
-.wa-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.wa-tbl{width:100%;border-collapse:collapse;font-size:14px}
-.wa-tbl th{text-align:left;font-size:13px;font-weight:500;color:var(--muted);padding:0 10px 10px 0;border-bottom:1px solid var(--line)}
-.wa-tbl td{padding:12px 10px 12px 0;border-bottom:1px solid var(--line);color:var(--ink);vertical-align:middle}
-.wa-tbl tr:last-child td{border-bottom:0;padding-bottom:0}
-.wa-tbl td b{font-weight:600}
-.wa-band{display:inline-block;min-width:44px;text-align:center;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--accink);font-size:12px;font-weight:600}
-.wa-band.g5{background:#DDF3FB;color:#075B7A}
-.wa-meter{margin:0 0 16px}
-.wa-meter:last-of-type{margin-bottom:0}
-.wa-meter .wa-row{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;margin:0 0 7px;color:var(--muted)}
-.wa-meter .wa-row b{color:var(--ink);font-weight:600}
-.wa-bar{height:8px;border-radius:999px;background:var(--bg);overflow:hidden}
-.wa-bar i{display:block;height:100%;border-radius:999px;background:var(--acc)}
-.wa-bar i.hot{background:#E08A00}
-.wa-mini{display:flex;gap:10px;margin-top:18px}
-.wa-mini div{flex:1;min-width:0;padding:12px 14px;border-radius:20px;background:var(--bg);font-size:12.5px;color:var(--muted)}
-.wa-mini b{display:block;font-size:18px;color:var(--ink);font-weight:600}
-.wa-log{list-style:none;margin:0;padding:0}
-.wa-log li{display:flex;gap:14px;padding:10px 0;border-top:1px solid var(--line);font-size:14px;color:var(--ink)}
-.wa-log li:first-child{border-top:0;padding-top:0}
-.wa-log li:last-child{padding-bottom:0}
-.wa-log time{flex:none;width:92px;color:var(--muted);font-size:13px}
-.wa-log span{min-width:0;overflow-wrap:anywhere}
-.wa-bars{display:inline-flex;align-items:flex-end;gap:2px;height:15px;vertical-align:-2px}
-.wa-bars i{display:block;width:4px;border-radius:1px;background:#CBD3E6}
-.wa-bars i:nth-child(1){height:5px}.wa-bars i:nth-child(2){height:8px}.wa-bars i:nth-child(3){height:11px}.wa-bars i:nth-child(4){height:15px}
-.wa-bars i.on{background:var(--acc)}
-.wa-link{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.wa-link .wa-t{flex:1;min-width:200px;font-weight:600;color:var(--ink)}
-.wa-link .wa-t span{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:2px}
-.wa-field{margin:0 0 4px}
-.wa-field label{display:block;font-size:13px;font-weight:500;margin:0 0 6px;color:var(--ink2)}
-.wa-field input{width:100%;max-width:360px;height:50px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
-.wa-steps{margin:0 0 18px;padding:0;list-style:none;display:grid;gap:12px;counter-reset:s}
-.wa-steps li{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink);counter-increment:s}
-.wa-steps li::before{content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--accink);font-weight:600;font-size:13px}
-.wa-sys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px}
-@media (max-width:1100px){.wa-c3{grid-column:span 6}.wa-c4,.wa-c5,.wa-c6,.wa-c7,.wa-c8{grid-column:span 12}}
-@media (max-width:720px){.wa-grid{gap:14px}.wa-card{padding:18px;border-radius:24px}.wa-tile .wa-val{font-size:26px}.wa-stats{gap:20px}.wa-log time{width:72px}.wa-tbl .wa-hide{display:none}.wa-sys{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:380px){.wa-c3{grid-column:span 12}}
-`;
 
 const callStatus = rpc.declare({ object: 'wiflow', method: 'status', expect: { '': {} } });
 const callPair = rpc.declare({ object: 'wiflow', method: 'pair', params: [ 'code' ] });
@@ -111,28 +23,6 @@ function ago(t) {
 	if (d < 3600) return _('%d min ago').format(Math.floor(d / 60));
 	if (d < 86400) return _('%d h ago').format(Math.floor(d / 3600));
 	return _('%d d ago').format(Math.floor(d / 86400));
-}
-
-const IC = {
-	globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-	users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M16 4.5a3.2 3.2 0 0 1 0 6M18 14.5a6 6 0 0 1 3 5.5"/>',
-	clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-	cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18Z"/>',
-	chip: '<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
-	wifi: '<path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
-	pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
-	list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-	ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-	unlink: '<path d="M9 15l6-6M11 6l1-1a4.2 4.2 0 0 1 6 6l-1 1M13 18l-1 1a4.2 4.2 0 0 1-6-6l1-1"/>',
-	link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
-};
-
-function svg(name) {
-	const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-	s.setAttribute('viewBox', '0 0 24 24');
-	s.setAttribute('aria-hidden', 'true');
-	s.innerHTML = IC[name] || IC.globe;
-	return s;
 }
 
 function dur(sec) {
@@ -150,27 +40,12 @@ function logText(m) {
 	return _(m);
 }
 
-function band(b) { return b == '5g' ? '5 GHz' : '2.4 GHz'; }
-
-function chip(kind, text) { return E('span', { 'class': 'wa-chip ' + kind }, text); }
-
-function card(cls, icon, title, right, body) {
-	const h = [ E('span', { 'class': 'wa-ico' }, svg(icon)), title ];
-	if (right) h.push(right);
-	return E('section', { 'class': 'wa-card ' + cls }, [ E('h3', {}, h) ].concat(body));
-}
-
 function tile(icon, label, value, unit, sub, right) {
 	return E('section', { 'class': 'wa-card wa-tile wa-c3' }, [
 		E('div', { 'class': 'wa-top' }, [ E('span', { 'class': 'wa-ico' }, svg(icon)), label, right || '' ]),
 		E('div', { 'class': 'wa-val' }, unit ? [ value, E('small', {}, unit) ] : value),
 		E('div', { 'class': 'wa-sub' }, sub)
 	]);
-}
-
-function signalBars(dbm) {
-	const q = dbm >= -55 ? 4 : dbm >= -65 ? 3 : dbm >= -75 ? 2 : 1;
-	return E('span', { 'class': 'wa-bars', 'title': dbm + ' dBm' }, [ 1, 2, 3, 4 ].map(i => E('i', { 'class': i <= q ? 'on' : '' })));
 }
 
 function meter(label, text, pct) {
@@ -272,32 +147,14 @@ return view.extend({
 
 	sourceCard(s) {
 		const src = s.source || {}, inet = s.internet || {};
-		const ok = inet.online;
-		return card('wa-c4', 'globe', _('Internet source'), ok ? chip('ok', _('Online')) : chip('bad', _('Offline')), [
+		const wifi = !!src.ssid;
+		const btn = E('a', { 'class': 'wa-btn sm wa-r', 'href': L.url('admin/wifi'), 'style': 'text-decoration:none' }, _('Change'));
+		return card('wa-c4', wifi ? 'wifi' : 'cable', _('Internet source'), btn, [
 			E('dl', { 'class': 'wa-kv' }, [
-				E('dt', {}, _('Network')), E('dd', {}, src.ssid || _('Cable (WAN)')),
-				src.band ? E('dt', {}, _('WiFi band')) : '', src.band ? E('dd', {}, band(src.band)) : '',
-				src.signal ? E('dt', {}, _('Signal')) : '', src.signal ? E('dd', {}, [ signalBars(src.signal), ' ' + src.signal + ' dBm' ]) : '',
+				E('dt', {}, _('Source')), E('dd', {}, wifi ? src.ssid + (src.band ? ' · ' + band(src.band) : '') : _('WAN cable')),
+				wifi && src.signal ? E('dt', {}, _('Signal')) : '', wifi && src.signal ? E('dd', {}, [ signalBars(src.signal), ' ' + src.signal + ' dBm' ]) : '',
 				E('dt', {}, _('IP address')), E('dd', {}, src.ip || '—'),
 				E('dt', {}, _('Gateway')), E('dd', {}, src.gateway || '—')
-			]),
-			E('div', { 'class': 'wa-btns' }, [ E('a', { 'class': 'wa-btn', 'href': L.url('admin/network/wireless'), 'style': 'text-decoration:none' }, [ _('Open Wireless'), svg('ext') ]) ])
-		]);
-	},
-
-	netCard(s) {
-		const nets = s.networks || [];
-		const rows = nets.map(n => E('tr', {}, [
-			E('td', {}, E('b', {}, n.ssid)),
-			E('td', {}, E('span', { 'class': 'wa-band' + (n.band == '5g' ? ' g5' : '') }, band(n.band))),
-			E('td', { 'class': 'wa-hide' }, _('Ch %s').format(n.channel)),
-			E('td', {}, String(n.clients)),
-			E('td', { 'class': 'wa-hide' }, n.enc)
-		]));
-		return card('wa-c8', 'wifi', _('Your WiFi networks'), chip('plain', _('%d active').format(nets.length)), [
-			E('table', { 'class': 'wa-tbl' }, [
-				E('thead', {}, E('tr', {}, [ E('th', {}, _('Name')), E('th', {}, _('WiFi band')), E('th', { 'class': 'wa-hide' }, _('Channel')), E('th', {}, _('Devices')), E('th', { 'class': 'wa-hide' }, _('Security')) ])),
-				E('tbody', {}, rows)
 			])
 		]);
 	},
@@ -315,7 +172,7 @@ return view.extend({
 
 	logCard(s) {
 		const rows = (s.log || []).map(r => E('li', {}, [ E('time', {}, ago(r.t)), E('span', {}, logText(String(r.m))) ]));
-		return card('wa-c8', 'list', _('Activity'), null, [ E('ul', { 'class': 'wa-log' }, rows) ]);
+		return card('wa-c12', 'list', _('Activity'), null, [ E('ul', { 'class': 'wa-log' }, rows) ]);
 	},
 
 	/* Why the router started, what the automatic recovery is doing, guest limit. */
@@ -332,16 +189,11 @@ return view.extend({
 		else if (r.stage == 2) st = [ 'warn', _('Restarting the WiFi') ];
 		else if (r.stage == 1) st = [ 'warn', _('Renewing the WAN connection') ];
 		else if (min >= 1) st = [ 'warn', _('No Internet for %d min').format(min) ];
-		return card('wa-c12', 'pulse', _('Stability'), chip(st[0], st[1]), [
-			E('div', { 'class': 'wa-sys' }, [
-				E('dl', { 'class': 'wa-kv' }, [
-					E('dt', {}, _('Last start')), E('dd', {}, why),
-					E('dt', {}, _('Automatic restarts in a row')), E('dd', {}, String(y.recovery_reboots ?? 0))
-				]),
-				E('dl', { 'class': 'wa-kv' }, [
-					E('dt', {}, _('Automatic recovery')), E('dd', {}, _('3 min · 15 min · 30 min')),
-					E('dt', {}, _('Guests at most')), E('dd', {}, y.guest_max > 0 ? String(y.guest_max) : _('No limit'))
-				])
+		return card('wa-c4', 'pulse', _('Stability'), chip(st[0], st[1]), [
+			E('dl', { 'class': 'wa-kv' }, [
+				E('dt', {}, _('Last start')), E('dd', {}, why),
+				E('dt', {}, _('Automatic restarts in a row')), E('dd', {}, String(y.recovery_reboots ?? 0)),
+				E('dt', {}, _('Guests at most')), E('dd', {}, y.guest_max > 0 ? String(y.guest_max) : _('No limit'))
 			])
 		]);
 	},
@@ -382,9 +234,8 @@ return view.extend({
 				tile('clock', _('Uptime'), dur(d.uptime), null, `Wiflow OS ${d.os || ''}`)
 			]),
 			E('div', { 'class': 'wa-grid' }, [ this.chartCard(s), this.accountCard(s) ]),
-			E('div', { 'class': 'wa-grid' }, [ this.netCard(s), this.sourceCard(s) ]),
-			E('div', { 'class': 'wa-grid' }, [ this.logCard(s), this.healthCard(s) ]),
-			E('div', { 'class': 'wa-grid' }, [ this.systemCard(s) ]),
+			E('div', { 'class': 'wa-grid' }, [ this.sourceCard(s), this.healthCard(s), this.systemCard(s) ]),
+			E('div', { 'class': 'wa-grid' }, [ this.logCard(s) ]),
 			E('div', { 'class': 'wa-grid' }, [ this.portalCard(s) ])
 		]);
 	},
@@ -446,7 +297,6 @@ return view.extend({
 	},
 
 	render(s) {
-		document.head.appendChild(E('style', {}, CSS));
 		const linked = !!(s.wp && s.wp.paired);
 		const body = E('div', {}, linked ? this.linked(s) : this.unlinked(s));
 		if (linked)

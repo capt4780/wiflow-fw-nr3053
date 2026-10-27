@@ -192,7 +192,7 @@ need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc
         "/www/luci-static/wiflow/wiflow.css", "/www/luci-static/wiflow/cascade.css",
         "/www/luci-static/wiflow/wiflow-logo.png", "/www/luci-static/wiflow/favicon.png", "/www/favicon.ico", "/etc/wiflow_release", "/www/luci-static/wiflow/fonts/inter-400.woff2",
         "/www/luci-static/resources/menu-wiflow.js", "/www/luci-static/resources/view/wiflow/sysauth.js",
-        "/www/luci-static/resources/view/wiflow/account.js",
+        "/www/luci-static/resources/view/wiflow/account.js", "/www/luci-static/resources/view/wiflow/wifi.js", "/www/luci-static/resources/view/wiflow/system.js", "/www/luci-static/resources/wiflow/kit.js",
         "/etc/init.d/wiflow", "/etc/rc.d/S96wiflow", "/usr/libexec/wiflow/agent", "/usr/libexec/wiflow/job", "/usr/libexec/wiflow/provision",
         "/usr/share/ucode/wiflow/setup.uc", "/usr/share/ucode/wiflow/stats.uc", "/usr/share/rpcd/ucode/wiflow", "/usr/share/rpcd/acl.d/luci-app-wiflow.json",
         "/usr/sbin/uhttpd", "/usr/sbin/dnsmasq", "/sbin/fw4", "/usr/sbin/dropbear",
@@ -222,13 +222,14 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
-    "LuCI menu: Wiflow App, Overview, Wireless, Password, Firmware, Reboot only":
-        sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
-        == ["admin/network", "admin/status", "admin/system", "admin/wiflow"]
-        and all(any(k in json.load(open(f)) for f in glob.glob(F + "/usr/share/luci/menu.d/*.json"))
-                for k in ("admin/network/wireless", "admin/status/overview", "admin/system/admin/password", "admin/system/flash", "admin/system/reboot"))
-        and not any(k in json.load(open(f)) for f in glob.glob(F + "/usr/share/luci/menu.d/*.json")
-                    for k in ("admin/network/firewall", "admin/network/network", "admin/network/dhcp", "admin/system/system", "admin/status/logs")),
+    "LuCI menu: Wiflow App, WiFi, System only (three pages, no sub-menus)":
+        sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k not in ("admin", "admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
+        == ["admin/system", "admin/wifi", "admin/wiflow"]
+        and all(os.path.exists(F + "/www/luci-static/resources/view/wiflow/%s.js" % v) for v in ("account", "wifi", "system"))
+        and not os.path.exists(F + "/www/luci-static/resources/view/network") and not os.path.exists(F + "/www/luci-static/resources/view/status"),
+    "cable first, source WiFi second (wan metric 10, wwan metric 20)":
+        "network.wan.metric='10'" in open(F + "/etc/uci-defaults/98-wiflow-base").read()
+        and "'metric', '20'" in open(F + "/www/luci-static/resources/view/wiflow/wifi.js").read(),
     "PPPoE available (pppd, netifd proto, LuCI protocol page)":
         all(os.path.exists(F + x) for x in ["/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh", "/www/luci-static/resources/protocol/ppp.js"]),
     "stability: guest WiFi isolation, stable channels, DNS cache with fallback servers, tiered uplink recovery":
@@ -240,7 +241,7 @@ checks = {
         and glob.glob(F + "/usr/lib/lua/luci/i18n/base.vi.lmo") and glob.glob(F + "/usr/lib/lua/luci/i18n/firewall.vi.lmo"),
     "LuCI menu copy that the first boot writes over menu.d is pruned too (dropped pages must not come back)":
         sorted(json.load(open(F + "/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json")))
-        == ["admin/status/overview"],
+        == [],
     "guest portal: scripts executable, valid shell, web pages, service starts the loops":
         all(os.access(F + x, os.X_OK) for x in ["/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
             "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
@@ -298,8 +299,7 @@ deny = ["/usr/sbin/tailscaled", "/etc/init.d/adblock", "/etc/init.d/ddns", "/etc
         "/usr/sbin/odhcpd", "/usr/sbin/odhcp6c", "/usr/sbin/tcpdump", "/usr/bin/htop", "/usr/bin/nano",
         "/www/luci-static/aurora", "/www/luci-static/bootstrap", "/etc/hotplug.d/iface/99-hnat-detect",
         "/etc/init.d/viettel-apk-mirror", "/usr/sbin/iptables", "/etc/init.d/blockd",
-        "/www/luci-static/resources/view/firewall/ipsets.js", "/www/luci-static/resources/view/firewall/custom.js",
-        "/www/luci-static/resources/view/status/processes.js"]
+        "/www/luci-static/resources/view/firewall", "/www/luci-static/resources/view/status", "/www/luci-static/resources/view/system"]
 left = [p for p in deny if os.path.lexists(F + p)]
 zh = glob.glob(F + "/usr/lib/lua/luci/i18n/*.zh*.lmo")
 if left or zh:

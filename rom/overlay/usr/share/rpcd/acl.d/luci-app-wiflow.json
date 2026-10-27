@@ -1,21 +1,117 @@
 {
 	"luci-app-wiflow": {
-		"description": "Wiflow App",
+		"description": "Wiflow App, WiFi and System pages",
 		"read": {
+			"cgi-io": [
+				"exec"
+			],
+			"file": {
+				"/dev/mtdblock[0-9]*": [
+					"read"
+				],
+				"/lib/upgrade/platform.sh": [
+					"list"
+				],
+				"/proc/mounts": [
+					"read"
+				],
+				"/proc/*/mounts": [
+					"read"
+				],
+				"/proc/mtd": [
+					"read"
+				],
+				"/proc/partitions": [
+					"read"
+				],
+				"/proc/sys/kernel/hostname": [
+					"read"
+				]
+			},
 			"ubus": {
 				"wiflow": [
 					"status"
+				],
+				"file": [
+					"exec",
+					"read",
+					"stat"
+				],
+				"iwinfo": [
+					"assoclist",
+					"countrylist",
+					"freqlist",
+					"txpowerlist"
 				]
-			}
+			},
+			"uci": [
+				"wireless",
+				"network",
+				"firewall",
+				"rpcd"
+			]
 		},
 		"write": {
+			"cgi-io": [
+				"upload"
+			],
+			"file": {
+				"/sbin/firstboot -r -y": [
+					"exec"
+				],
+				"/sbin/reboot": [
+					"exec"
+				],
+				"/sbin/wifi": [
+					"exec"
+				],
+				"/sbin/ifup": [
+					"exec"
+				],
+				"/sbin/ifdown": [
+					"exec"
+				],
+				"/tmp/firmware.bin": [
+					"write"
+				],
+				"/sbin/sysupgrade /tmp/firmware.bin": [
+					"exec"
+				],
+				"/sbin/sysupgrade -n /tmp/firmware.bin": [
+					"exec"
+				],
+				"/sbin/sysupgrade --test /tmp/firmware.bin": [
+					"exec"
+				]
+			},
 			"ubus": {
 				"wiflow": [
 					"pair",
 					"unpair",
 					"job_clear"
+				],
+				"file": [
+					"exec",
+					"remove",
+					"write"
+				],
+				"iwinfo": [
+					"scan"
+				],
+				"luci": [
+					"setPassword"
+				],
+				"system": [
+					"reboot",
+					"validate_firmware_image"
 				]
-			}
+			},
+			"uci": [
+				"wireless",
+				"network",
+				"firewall",
+				"rpcd"
+			]
 		}
 	}
 }

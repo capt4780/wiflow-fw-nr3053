@@ -8,7 +8,8 @@
    (luci-theme-bootstrap, Apache-2.0). */
 
 const ICONS = {
-	wiflow: '<path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+	wiflow: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="4" rx="2"/><rect x="13.5" y="10.5" width="7" height="10" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/>',
+	wifi: '<path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
 	status: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
 	system: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
 	services: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
@@ -98,7 +99,7 @@ return baseclass.extend({
 		const at1 = L.env.dispatchpath[1], at2 = L.env.dispatchpath[2];
 		const rail = window.matchMedia('(max-width:1179px)');
 		// the pages people use most come first on the phone bar
-		const first = [ 'wiflow', 'status', 'network' ];
+		const first = [ 'wiflow', 'wifi', 'system' ];
 		const groups = ui.menu.getChildren(tree).filter(g => g.name != 'logout').sort((a, b) => {
 			const ia = first.indexOf(a.name), ib = first.indexOf(b.name);
 			return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);

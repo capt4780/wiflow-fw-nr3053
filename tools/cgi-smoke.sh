@@ -93,7 +93,7 @@ for p in $pages admin/menu admin/translations/en; do
 done
 [ -z "$bad" ] && ok "$n pages, menu and translations render (logged in)" || no "pages with errors:$bad"
 
-r="$(req /admin/status/overview "$sess")"
+r="$(req /admin/wiflow "$sess")"
 has "$r" 'wf-logo' && has "$r" 'wf-brand' && ok "Wiflow theme frame (logo, device) on inside pages" || no "theme frame missing"
 
 exit $fail

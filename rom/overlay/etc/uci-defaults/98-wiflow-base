@@ -36,6 +36,8 @@ uci -q add_list network.lan.ipaddr='10.0.0.1/24'
 uci -q delete network.lan.ip6assign
 uci -q delete network.wan6
 uci -q delete network.globals.ula_prefix
+# the cable comes first, the source WiFi (wwan, metric 20) is the fallback
+uci -q set network.wan.metric='10'
 uci -q commit network
 
 uci -q batch <<'EOF'

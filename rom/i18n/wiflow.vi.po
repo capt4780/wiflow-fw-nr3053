@@ -706,3 +706,96 @@ msgstr "Đồng hồ router đã được chỉnh theo máy chủ Wiflow"
 
 msgid "The router was removed from the Wiflow account in the app"
 msgstr "Router đã được gỡ khỏi tài khoản Wiflow trong ứng dụng"
+
+msgid "All settings are erased and the router restarts."
+msgstr "Toàn bộ cài đặt sẽ bị xóa và router khởi động lại."
+
+msgid "Erase all"
+msgstr "Xóa tất cả"
+
+msgid "Back"
+msgstr "Quay lại"
+
+msgid "Change"
+msgstr "Đổi"
+
+msgid "Change network"
+msgstr "Đổi mạng"
+
+msgid "Checking the file…"
+msgstr "Đang kiểm tra tệp…"
+
+msgid "Choose network"
+msgstr "Chọn mạng"
+
+msgid "Confirm password"
+msgstr "Nhập lại mật khẩu"
+
+msgid "Connecting…"
+msgstr "Đang kết nối…"
+
+msgid "Could not change the password."
+msgstr "Không đổi được mật khẩu."
+
+msgid "Do not turn the router off. This takes a few minutes."
+msgstr "Không tắt nguồn router. Quá trình mất vài phút."
+
+msgid "Factory reset"
+msgstr "Khôi phục cài đặt gốc"
+
+msgid "Keep settings"
+msgstr "Giữ lại cài đặt"
+
+msgid "Login password"
+msgstr "Mật khẩu đăng nhập"
+
+msgid "New password"
+msgstr "Mật khẩu mới"
+
+msgid "No networks found"
+msgstr "Không tìm thấy mạng nào"
+
+msgid "Password changed."
+msgstr "Đã đổi mật khẩu."
+
+msgid "Restarting…"
+msgstr "Đang khởi động lại…"
+
+msgid "Router"
+msgstr "Router"
+
+msgid "Scan again"
+msgstr "Quét lại"
+
+msgid "Scanning…"
+msgstr "Đang quét…"
+
+msgid "Source WiFi"
+msgstr "WiFi nguồn"
+
+msgid "The password needs at least 6 characters."
+msgstr "Mật khẩu cần ít nhất 6 ký tự."
+
+msgid "The router restarts when finished."
+msgstr "Router sẽ khởi động lại khi xong."
+
+msgid "The two passwords do not match."
+msgstr "Hai mật khẩu không khớp."
+
+msgid "This file is not a firmware for this router."
+msgstr "Tệp này không phải firmware của router này."
+
+msgid "Update firmware"
+msgstr "Cập nhật firmware"
+
+msgid "Updating…"
+msgstr "Đang cập nhật…"
+
+msgid "WAN cable"
+msgstr "Cáp WAN"
+
+msgid "Waiting for the router…"
+msgstr "Đang chờ router…"
+
+msgid "WiFi"
+msgstr "WiFi"

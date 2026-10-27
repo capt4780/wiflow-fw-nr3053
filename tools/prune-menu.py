@@ -11,10 +11,7 @@ first boot.
 """
 import glob, json, os, sys
 
-KEEP = {"admin", "admin/status", "admin/status/overview",
-        "admin/system", "admin/system/admin", "admin/system/admin/password", "admin/system/flash", "admin/system/reboot",
-        "admin/network", "admin/network/wireless",
-        "admin/wiflow"}
+KEEP = {"admin", "admin/wiflow", "admin/wifi", "admin/system"}
 TECH = {"translations", "ubus", "uci", "logout", "menu"}
 
 

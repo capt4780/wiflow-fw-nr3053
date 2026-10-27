@@ -59,19 +59,9 @@ sed -i 's/ipad=${ipaddr:-"192.168.1.1"}/ipad=${ipaddr:-"10.0.0.1"}/' "$F/bin/con
 # files of luci-base / luci-mod-* is dropped, and so are the view files of the
 # dropped pages.
 python3 "$ROOT/tools/prune-menu.py" "$F/usr/share/luci/menu.d" "$F/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json"
+# Views of the dropped pages: the Wiflow App, WiFi and System pages are all that is left
 V="$F/www/luci-static/resources/view"
-rm -rf "$V"/system/led-trigger
-rm -f "$V"/firewall/ipsets.js "$V"/firewall/custom.js "$V"/firewall/snats.js
-for v in status/bandwidth status/channel_analysis status/connections status/dmesg status/iptables status/load status/nftables status/processes \
-         status/routes status/routesj status/wireless system/crontab system/leds system/mounts system/startup system/uhttpd system/sshkeys \
-         system/repokeys network/routes network/switch; do
-	rm -f "$V/$v.js"
-done
-
-# Status overview: no DHCPv6 lease table (IPv6 DHCP/RA is off in Wiflow OS)
-D="$F/www/luci-static/resources/view/status/include/40_dhcp.js"
-grep -qF "table,E('h3',_('Active DHCPv6 Leases')),table6]" "$D" || die "40_dhcp.js: DHCPv6 lease table not found"
-sed -i "s/table,E('h3',_('Active DHCPv6 Leases')),table6\]/table]/" "$D"
+rm -rf "$V"/status "$V"/system "$V"/network "$V"/firewall
 
 # Access gate before the LuCI login (rom/overlay/usr/share/ucode/wiflow/gate.uc):
 # the dispatcher only checks username/password once the gate is passed, and
