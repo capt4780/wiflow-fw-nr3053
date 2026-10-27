@@ -292,9 +292,11 @@ checks = {
     "anonymous ubus cannot call session.login":
         "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }
-print("menu keys:", sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1))
+_mk = (sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1))
 for k, v in checks.items():
     (ok if v else fail)(k)
+    if not v and k.startswith("LuCI menu"):
+        fail("   menu keys found: %s" % _mk)
 
 deny = ["/usr/sbin/tailscaled", "/etc/init.d/adblock", "/etc/init.d/ddns", "/etc/init.d/miniupnpd",
         "/etc/init.d/turboacc", "/etc/init.d/eqos", "/etc/init.d/mtkhqos", "/usr/bin/wg", "/etc/init.d/zram",
