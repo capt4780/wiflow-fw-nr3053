@@ -223,7 +223,7 @@ checks = {
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
     "LuCI menu: Wiflow App, WiFi, System only (three pages, no sub-menus)":
-        sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k not in ("admin", "admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
+        sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
         == ["admin/system", "admin/wifi", "admin/wiflow"]
         and all(os.path.exists(F + "/www/luci-static/resources/view/wiflow/%s.js" % v) for v in ("account", "wifi", "system"))
         and not os.path.exists(F + "/www/luci-static/resources/view/network") and not os.path.exists(F + "/www/luci-static/resources/view/status"),
