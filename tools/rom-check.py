@@ -224,8 +224,9 @@ checks = {
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
     "LuCI menu: Wiflow App, WiFi, System only (three pages, no sub-menus)":
         sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
-        == ["admin/system", "admin/wifi", "admin/wiflow"]
-        and all(os.path.exists(F + "/www/luci-static/resources/view/wiflow/%s.js" % v) for v in ("account", "wifi", "system"))
+        == ["admin/system", "admin/wifi", "admin/wiflow"],
+    "LuCI views: Wiflow App, WiFi, System; the views of dropped pages are gone":
+        all(os.path.exists(F + "/www/luci-static/resources/view/wiflow/%s.js" % v) for v in ("account", "wifi", "system"))
         and not os.path.exists(F + "/www/luci-static/resources/view/network") and not os.path.exists(F + "/www/luci-static/resources/view/status"),
     "cable first, source WiFi second (wan metric 10, wwan metric 20)":
         "network.wan.metric='10'" in open(F + "/etc/uci-defaults/98-wiflow-base").read()
