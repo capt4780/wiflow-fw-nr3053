@@ -12,13 +12,18 @@ first boot.
 import glob, json, os, sys
 
 KEEP = {"admin", "admin/wiflow", "admin/wifi", "admin/system"}
+# The three pages come from luci-app-wiflow.json only; the stock "admin/system" node
+# (a first-child folder) must not be merged over it.
+OWN = {"admin/wiflow", "admin/wifi", "admin/system"}
 TECH = {"translations", "ubus", "uci", "logout", "menu"}
 
 
-def keep(m):
+def keep(m, own=False):
     out = {}
     for k, v in m.items():
         top = k.split("/")[1] if "/" in k else ""
+        if k in OWN and not own:
+            continue
         if k in KEEP or top in TECH:
             out[k] = v
     return out
@@ -27,7 +32,7 @@ def keep(m):
 d, extra = sys.argv[1], sys.argv[2:]
 seen = set()
 for f in sorted(glob.glob(d + "/*.json")):
-    out = keep(json.load(open(f)))
+    out = keep(json.load(open(f)), os.path.basename(f) == "luci-app-wiflow.json")
     seen.update(out)
     if out:
         open(f, "w").write(json.dumps(out, indent="\t") + "\n")
