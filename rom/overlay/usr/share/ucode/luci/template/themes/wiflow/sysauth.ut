@@ -74,7 +74,6 @@
 </section>
 {% endif %}
 
-<div class="wf-login-foot"><div class="wf-sup"><span class="wf-sup-t">{{ _('Support') }}</span><span class="wf-sup-l"><a href="tel:0833880100"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>0833 880 100</a><a href="mailto:wiflow@projifylab.com"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3 8 9 6 9-6"/></svg>wiflow@projifylab.com</a></span></div></div>
 
 <div id="view">
 	<div class="spinning">{{ _('Loading view…') }}</div>

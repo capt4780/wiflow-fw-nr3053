@@ -799,3 +799,9 @@ msgstr "Đang chờ router…"
 
 msgid "WiFi"
 msgstr "WiFi"
+
+msgid "Wiflow support"
+msgstr "Hỗ trợ Wiflow"
+
+msgid "Contact us when you need help"
+msgstr "Liên hệ khi cần"
