@@ -49,19 +49,10 @@ h4{font-size:15px}
 .wf-nav ul a{display:flex;align-items:center;height:38px;padding:0 16px 0 48px;border-radius:var(--c);color:var(--ink2)!important;font-size:14px;font-weight:400;text-decoration:none!important}
 .wf-nav ul a:hover{background:rgba(27,32,54,.05)}
 .wf-nav ul li.active>a{color:var(--acc)!important;font-weight:600}
-.wf-side-foot{margin-top:auto;padding:18px 0 0}
-.wf-sp{background:#fff;border-radius:var(--r);padding:16px;box-shadow:var(--sh);text-align:left}
-.wf-sp-h{display:flex;align-items:center;gap:12px;margin:0 0 14px}
-.wf-sp-h b{display:block;font-size:15px;line-height:1.2;color:var(--ink);font-weight:600}
-.wf-sp-h small{font-size:12px;color:var(--muted)}
-.wf-sp-i{width:38px;height:38px;border-radius:var(--c);background:var(--soft);color:var(--acc);display:grid;place-items:center;flex:none}
-.wf-sp svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.wf-sp-p,.wf-sp-s{display:flex;align-items:center;justify-content:center;gap:8px;height:42px;border-radius:var(--c);font-weight:600;white-space:nowrap}
-.wf-sp-p{background:var(--acc);color:#fff!important;font-size:14px;margin:0 0 8px}
-.wf-sp-p:hover{background:var(--acc2)}
-.wf-sp-s{background:var(--soft);color:var(--accink)!important;font-size:12.5px}
-.wf-sp-s:hover{background:var(--soft2)}
-.wf-sp-s svg{width:16px;height:16px}
+.wf-side-foot{margin-top:auto;padding:18px 12px 4px;display:flex;flex-direction:column;gap:5px}
+.wf-side-foot a{display:flex;align-items:center;gap:10px;padding:3px 0;font-size:12.5px;color:var(--muted)}
+.wf-side-foot a:hover{color:var(--acc)}
+.wf-side-foot svg{width:16px;height:16px;flex:none;fill:none;stroke:var(--acc);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .wf-main{flex:1;min-width:0;display:flex;flex-direction:column}
 header.wf-top{position:sticky;top:0;z-index:800;display:flex;align-items:center;gap:14px;min-height:76px;margin:0;padding:18px 32px 10px;background:rgba(242,244,248,.88);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);box-shadow:none;border:0;color:var(--ink)}
 .wf-mlogo{display:none}
