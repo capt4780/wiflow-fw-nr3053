@@ -292,6 +292,7 @@ checks = {
     "anonymous ubus cannot call session.login":
         "login" not in json.load(open(F + "/usr/share/rpcd/acl.d/unauthenticated.json"))["unauthenticated"]["read"]["ubus"]["session"],
 }
+print("menu keys:", sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1))
 for k, v in checks.items():
     (ok if v else fail)(k)
 
