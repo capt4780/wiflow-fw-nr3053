@@ -278,6 +278,23 @@ body.wf-login #modal_overlay::before{content:"";flex:none;width:130px;height:114
 .wf-sheet-card a:hover{background:rgba(27,32,54,.05)}
 .wf-sheet-card a.on{background:var(--soft);color:var(--accink)!important;font-weight:600}
 
+/* PC 1180 px and wider: the sidebar is a floating card; contact and sign out at its foot */
+@media (min-width:1180px){
+ .wf-shell{padding:16px;gap:20px}
+ .wf-side{background:#fff;border-radius:var(--r);box-shadow:var(--sh);height:calc(100vh - 32px);height:calc(100dvh - 32px);top:16px;padding:24px 14px 14px;width:248px}
+ .wf-nav>li.active>a{background:var(--soft);color:var(--accink)!important;box-shadow:none}
+ .wf-nav>li.active>a svg{color:var(--acc)}
+ .wf-side-foot{padding:14px 10px 6px;border-top:1px solid var(--line)}
+ .wf-side-foot .wf-logout-side{display:flex;margin:6px 0 0;width:100%;justify-content:flex-start;background:none;color:var(--bad)!important;height:34px;padding:0;gap:10px;font-size:12.5px;font-weight:500}
+ .wf-side-foot .wf-logout-side:hover{background:none;opacity:.8}
+ .wf-side-foot .wf-logout-side svg{width:16px;height:16px;stroke:currentColor}
+ header.wf-top{position:static;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:6px 0 14px;min-height:0}
+ header.wf-top .wf-logout{display:none}
+ #maincontent.container{padding:0 0 32px;max-width:1120px;margin:0}
+ footer{padding:16px 0 8px}
+}
+@media (max-width:1179px){.wf-logout-side{display:none!important}}
+
 /* Tablet 721–1179 px: the sidebar narrows to an icon rail, pages open in a card next to it */
 @media (max-width:1179px){
  .wf-side{width:96px;padding:20px 8px 16px;align-items:center}
@@ -487,3 +504,5 @@ body.wf-login #modal_overlay::before{content:"";flex:none;width:130px;height:114
 .wa-opt.neg,.wa-opt.neg .wa-ico{color:var(--bad)}
 .wa-opt.neg:hover{background:var(--badsoft)}
 .wa-opt.neg .wa-ico{background:var(--badsoft)}
+
+.wa-card>h3 .wa-btn{white-space:nowrap}
