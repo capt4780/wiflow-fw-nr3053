@@ -26,7 +26,7 @@ Wiflow firmware for Viettel NR3053 — licensing
    licensed for use outside Wiflow devices without written permission.
    Third-party parts inside it keep their own licenses:
    - Inter fonts: SIL Open Font License 1.1.
-   - LuCI theme base styles (www/luci-static/wiflow/cascade.css, mobile.css)
+   - LuCI theme base styles (www/luci-static/wiflow/cascade.css)
      and the LuCI templates it derives from: Apache License 2.0
      (see www/luci-static/wiflow/NOTICE).
 

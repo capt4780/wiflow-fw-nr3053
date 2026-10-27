@@ -33,7 +33,6 @@
 		<meta name="viewport" content="initial-scale=1.0,width=device-width">
 		<meta name="theme-color" content="#F2F4F8">
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
-		<link rel="stylesheet" media="only screen and (max-width: 854px)" href="{{ media }}/mobile.css" />
 		<link rel="stylesheet" href="{{ media }}/wiflow.css">
 		<link rel="icon" type="image/png" href="{{ media }}/favicon.png">
 		<link rel="apple-touch-icon" href="{{ media }}/apple-touch-icon.png">

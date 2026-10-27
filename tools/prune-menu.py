@@ -11,11 +11,9 @@ first boot.
 """
 import glob, json, os, sys
 
-KEEP = {"admin", "admin/status", "admin/status/overview", "admin/status/logs", "admin/status/logs/syslog",
-        "admin/system", "admin/system/system", "admin/system/admin", "admin/system/admin/password", "admin/system/admin/dropbear",
-        "admin/system/package-manager", "admin/system/flash", "admin/system/reboot",
-        "admin/network", "admin/network/network", "admin/network/wireless", "admin/network/dhcp", "admin/network/diagnostics", "admin/network/firewall", "admin/network/firewall/zones",
-        "admin/network/firewall/forwards", "admin/network/firewall/rules", "admin/network/remote_addr/*",
+KEEP = {"admin", "admin/status", "admin/status/overview",
+        "admin/system", "admin/system/admin", "admin/system/admin/password", "admin/system/flash", "admin/system/reboot",
+        "admin/network", "admin/network/wireless",
         "admin/wiflow"}
 TECH = {"translations", "ubus", "uci", "logout", "menu"}
 

@@ -222,11 +222,13 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
-    "LuCI menu: Wiflow App, Status, Network (incl. Firewall, Diagnostics), System only (no Services, VPN, NAS)":
+    "LuCI menu: Wiflow App, Overview, Wireless, Password, Firmware, Reboot only":
         sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
         == ["admin/network", "admin/status", "admin/system", "admin/wiflow"]
         and all(any(k in json.load(open(f)) for f in glob.glob(F + "/usr/share/luci/menu.d/*.json"))
-                for k in ("admin/network/firewall/zones", "admin/network/firewall/rules", "admin/network/diagnostics")),
+                for k in ("admin/network/wireless", "admin/status/overview", "admin/system/admin/password", "admin/system/flash", "admin/system/reboot"))
+        and not any(k in json.load(open(f)) for f in glob.glob(F + "/usr/share/luci/menu.d/*.json")
+                    for k in ("admin/network/firewall", "admin/network/network", "admin/network/dhcp", "admin/system/system", "admin/status/logs")),
     "PPPoE available (pppd, netifd proto, LuCI protocol page)":
         all(os.path.exists(F + x) for x in ["/usr/sbin/pppd", "/lib/netifd/proto/ppp.sh", "/www/luci-static/resources/protocol/ppp.js"]),
     "stability: guest WiFi isolation, stable channels, DNS cache with fallback servers, tiered uplink recovery":
@@ -238,7 +240,7 @@ checks = {
         and glob.glob(F + "/usr/lib/lua/luci/i18n/base.vi.lmo") and glob.glob(F + "/usr/lib/lua/luci/i18n/firewall.vi.lmo"),
     "LuCI menu copy that the first boot writes over menu.d is pruned too (dropped pages must not come back)":
         sorted(json.load(open(F + "/usr/share/luci-app-mtwifi-cfg/luci-mod-status.json")))
-        == ["admin/status/logs", "admin/status/logs/syslog", "admin/status/overview"],
+        == ["admin/status/overview"],
     "guest portal: scripts executable, valid shell, web pages, service starts the loops":
         all(os.access(F + x, os.X_OK) for x in ["/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
             "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
@@ -278,9 +280,10 @@ checks = {
         '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
     "LuCI pages are not offered for machine translation":
         'translate="no"' in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
-    "phone/tablet layout by viewport width (tables become cards up to 900 px)":
-        "max-device-width" not in open(F + "/www/luci-static/wiflow/mobile.css").read()
-        and "(max-width: 854px)" in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read(),
+    "LuCI look: one Wiflow stylesheet over cascade.css (no mobile.css); tables are lists, dialogs fit the screen":
+        not os.path.exists(F + "/www/luci-static/wiflow/mobile.css")
+        and "mobile.css" not in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
+        and "#modal_overlay{inset:0" in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
     "5 GHz scans and uses channels 100-140 (country VN, A-band region 7)":
         json.load(open(F + "/usr/share/schema/mtwifi/dat-defs.json"))["COUNTRY_REGIONS"]["VN"] == [1, 7]
         and "country='VN'" in open(F + "/etc/uci-defaults/98-wiflow-base").read(),
