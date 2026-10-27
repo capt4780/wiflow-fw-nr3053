@@ -14,6 +14,7 @@ on:
       - "tools/fit-rootfs.py"
       - "tools/fitx.py"
       - "tools/rom-check.py"
+      - "tools/prune-menu.py"
       - "tools/cgi-smoke.sh"
       - "tools/ucode-stubs/**"
       - "tools/nr3053-golden.json"
