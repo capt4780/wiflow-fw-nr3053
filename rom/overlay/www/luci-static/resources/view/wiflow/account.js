@@ -121,7 +121,7 @@ return view.extend({
 	},
 
 	accountCard(s) {
-		const w = s.wp || {}, d = s.device || {};
+		const w = s.wp || {};
 		const unlink = E('button', { 'class': 'wa-btn neg', 'type': 'button' }, [ svg('unlink'), _('Unlink account') ]);
 		unlink.addEventListener('click', () => ui.showModal(_('Unlink account'), [
 			E('p', {}, _('This router stops sending data to the Wiflow account. You can link it again at any time.')),
@@ -136,10 +136,9 @@ return view.extend({
 				E('div', { 'style': 'min-width:0' }, [ E('div', { 'class': 'wa-l' }, _('Account ID')), E('div', { 'class': 'wa-v' }, w.account || '—') ])
 			]),
 			E('dl', { 'class': 'wa-kv' }, [
+				E('dt', {}, _('Location')), E('dd', {}, w.location || '—'),
 				E('dt', {}, _('Linked')), E('dd', {}, ago(w.since)),
-				E('dt', {}, _('Last contact')), E('dd', {}, ago(w.last_ok)),
-				E('dt', {}, _('Server')), E('dd', {}, 'wiflow.projifylab.com'),
-				E('dt', {}, _('Device ID')), E('dd', {}, d.id || '—')
+				E('dt', {}, _('Last contact')), E('dd', {}, ago(w.last_ok))
 			]),
 			E('div', { 'class': 'wa-btns' }, [ unlink ])
 		]);
@@ -242,17 +241,17 @@ return view.extend({
 
 	unlinked(s) {
 		const d = s.device || {};
-		const code = E('input', { 'type': 'text', 'maxlength': '14', 'placeholder': 'XXXX XXXX XXXX', 'autocomplete': 'off', 'spellcheck': 'false', 'aria-label': _('Link code') });
-		const go = E('button', { 'class': 'wa-btn pri', 'type': 'button' }, [ svg('link'), _('Link account') ]);
+		const code = E('input', { 'type': 'text', 'maxlength': '14', 'placeholder': 'WIFAPI XXXXXX', 'autocomplete': 'off', 'spellcheck': 'false', 'aria-label': _('Connection code') });
+		const go = E('button', { 'class': 'wa-btn pri', 'type': 'button' }, [ svg('link'), _('Link') ]);
 		go.addEventListener('click', () => this.follow(_('Linking…'), () => callPair(code.value)));
 		return E('div', { 'class': 'wa-grid' }, [
 			card('wa-c7', 'link', _('Link to your Wiflow account'), chip('', _('Not linked')), [
 				E('ol', { 'class': 'wa-steps' }, [
-					E('li', {}, _('Open the Wiflow app and go to Devices › Add device.')),
-					E('li', {}, _('Copy the 12-character code it shows.')),
-					E('li', {}, _('Enter the code below.'))
+					E('li', {}, _('Open Wiflow, go to Locations and choose the location.')),
+					E('li', {}, _('Copy the connection code WIFAPI… of that location.')),
+					E('li', {}, _('Enter the code in the box below.'))
 				]),
-				E('div', { 'class': 'wa-field' }, [ E('label', {}, _('Link code')), code ]),
+				E('div', { 'class': 'wa-field' }, [ E('label', {}, _('Connection code')), code ]),
 				E('div', { 'class': 'wa-btns' }, [ go ])
 			]),
 			card('wa-c5', 'chip', _('This router'), s.internet?.online ? chip('ok', _('Online')) : chip('warn', _('No Internet')), [

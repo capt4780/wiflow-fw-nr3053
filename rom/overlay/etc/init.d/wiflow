@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# Wiflow Setup: the agent that links the router to a Wiflow account.
+# Wiflow App: the agent that links the router to a Wiflow account.
 
 START=96
 STOP=10

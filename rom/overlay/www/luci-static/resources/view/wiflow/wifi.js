@@ -34,14 +34,18 @@ return view.extend({
 	sourceCard() {
 		const sta = ifaces().find(i => i.mode == 'sta');
 		const src = this.st.source || {}, inet = this.st.internet || {};
-		const on = !!(sta && src.ssid && src.ssid == sta.ssid && inet.online);
-		const btn = E('button', { 'class': 'wa-btn sm wa-r', 'type': 'button' }, sta ? _('Change network') : _('Choose network'));
+		const btn = E('button', { 'class': 'wa-btn sm', 'type': 'button' }, sta ? _('Change network') : _('Choose network'));
 		btn.addEventListener('click', () => this.scan());
-		return card('wa-c4', 'wifi', _('Source WiFi'), btn, [
-			E('dl', { 'class': 'wa-kv' }, [
-				E('dt', {}, _('Network')), E('dd', {}, sta ? sta.ssid : '—'),
-				E('dt', {}, _('Status')), E('dd', {}, sta ? (on ? _('Connected') : _('Not connected')) : '—'),
-				E('dt', {}, _('Signal')), E('dd', {}, on && src.signal ? [ signalBars(src.signal), ' ' + src.signal + ' dBm' ] : '—')
+		const row = (k, v) => E('div', {}, [ E('span', { 'class': 'k' }, k), E('b', {}, v) ]);
+		return card('wa-c12 wa-src', 'globe', _('Internet source'), E('span', { 'class': 'wa-r wa-hr' }, [
+			inet.online ? chip('ok', _('Online')) : chip('warn', _('No Internet')), btn
+		]), [
+			K.flow({ via: src.via, ssid: src.ssid, saved: sta ? sta.ssid : '', band: src.band, cable: src.cable, online: inet.online, clients: this.st.clients }),
+			E('div', { 'class': 'wa-sts' }, [
+				row(_('Latency'), inet.latency > 0 ? inet.latency + ' ms' : '—'),
+				row(_('Signal'), src.via == 'wifi' && src.signal ? [ signalBars(src.signal), ' ' + src.signal + ' dBm' ] : '—'),
+				row(_('IP address'), src.ip || '—'),
+				row(_('Gateway'), src.gateway || '—')
 			])
 		]);
 	},
@@ -61,7 +65,7 @@ return view.extend({
 				ui.addNotification(null, E('p', {}, String(e)), 'danger');
 			}).finally(() => { sw.disabled = false; });
 		});
-		return card('wa-c4', 'wifi', band(b), E('label', { 'class': 'wa-r' }, sw), [
+		return card('wa-c6', 'wifi', band(b), E('label', { 'class': 'wa-r' }, sw), [
 			E('dl', { 'class': 'wa-kv' }, [
 				E('dt', {}, _('Network')), E('dd', {}, ap.ssid),
 				E('dt', {}, _('Devices')), E('dd', {}, String(net.clients ?? 0)),

@@ -198,9 +198,13 @@ export function sample(latency) {
 		st.clients = { now: w.n2 + w.n5, band2g: w.n2, band5g: w.n5, today: today(w.macs) };
 		const src = w.src ?? {};
 		const viaWifi = r && match(r.dev, /^(apcli|apclii|apclix)/);
+		const wdev = W.uci_get('network', 'wan', 'device') ?? 'wan';
 		st.source = {
 			ssid: viaWifi ? (src.ssid ?? '') : '', band: viaWifi ? (src.band ?? '') : '',
-			dev: viaWifi ? r.dev : '', ip: r?.ip ?? '', gateway: r?.gateway ?? ''
+			dev: viaWifi ? r.dev : '', ip: r?.ip ?? '', gateway: r?.gateway ?? '',
+			via: r ? (viaWifi ? 'wifi' : 'lan') : 'none',
+			cable: trim(readfile(`${SYSNET}/${wdev}/carrier`) ?? '0') == '1',
+			saved: src?.ssid ?? ''
 		};
 	}
 	tick++;

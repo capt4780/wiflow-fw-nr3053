@@ -1,4 +1,4 @@
-// Wiflow Setup for Viettel NR3053 (Wiflow OS): links the router to a Wiflow
+// Wiflow App for Viettel NR3053 (Wiflow OS): links the router to a Wiflow
 // (WordPress) account. Shared code for the LuCI rpcd plugin (ubus "wiflow"),
 // the background job runner (/usr/libexec/wiflow/job) and the agent
 // (/usr/libexec/wiflow/agent). It never touches the WiFi or network setup:
@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = '2.0.0';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '1.0.0';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -133,6 +133,14 @@ export function core_set(vals) {
 	}
 	c.commit('wiflow');
 	run('chmod 600 /etc/config/wiflow');
+};
+
+// Text from the server for the display: no control characters, at most n bytes.
+export function clip_text(v, n) {
+	if (type(v) != 'string')
+		return null;
+	const t = trim(replace(v, /[\x01-\x1f\x7f]/g, ''));
+	return t == '' ? null : substr(t, 0, n);
 };
 
 /* -------------------------------------------------------------- identity */
@@ -299,6 +307,7 @@ export function status() {
 		wp: {
 			paired: core('paired', '0') == '1' && !!core('device_token'),
 			account: core('account_public_id'),
+			location: core('location_name'),
 			online: !!st_get('wp_online', false),
 			last_ok: st_get('wp_last_ok', 0),
 			since: num(core('paired_at', '0'), 0),
@@ -328,7 +337,7 @@ export function status() {
 export function diag_text() {
 	const lines = [];
 	const add = (t) => push(lines, t);
-	add(`Wiflow Setup ${VERSION} / Wiflow OS ${os_version()} / ${MODEL} / ${device_id() ?? '-'}`);
+	add(`Wiflow OS ${os_version()} / ${MODEL} / ${device_id() ?? '-'}`);
 	add(`time ${time()} uptime ${uptime()}s`);
 	add('');
 	add('== status');
@@ -405,7 +414,7 @@ export function auth() {
 
 export function clear_pairing() {
 	core_set({
-		paired: '0', paired_at: null, device_token: null, account_public_id: null,
+		paired: '0', paired_at: null, device_token: null, account_public_id: null, location_name: null,
 		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
 	});
 	st_set('wp_online', false);

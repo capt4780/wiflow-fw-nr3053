@@ -1,6 +1,6 @@
 {
 	"admin/wiflow": {
-		"title": "Wiflow App",
+		"title": "Overview",
 		"order": 1,
 		"action": {
 			"type": "view",

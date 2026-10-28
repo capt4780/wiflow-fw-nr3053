@@ -13,7 +13,7 @@ PORTAL_ACTIVE=$PORTAL_RUNTIME/active
 WIFLOW_REST_ROOT="${WIFLOW_REST:-https://wiflow.projifylab.com/wp-json}"
 WIFLOW_DEVICE_API="$WIFLOW_REST_ROOT/devices"
 WIFLOW_PORTAL_API="$WIFLOW_REST_ROOT/portal"
-WIFLOW_AGENT_VERSION='2.1.0'
+WIFLOW_AGENT_VERSION="$(tr -d ' \r\n' < /etc/wiflow_release 2>/dev/null)"; WIFLOW_AGENT_VERSION="${WIFLOW_AGENT_VERSION:-1.0.0}"
 WIFLOW_MODEL_CODE='NR3053'; WIFLOW_MODEL_NAME='Viettel NR3053'
 WIFLOW_GATE_MASTER="WIFDID$WIFLOW_MODEL_CODE"
 WIFLOW_DATA_GENERATION='4'
@@ -319,7 +319,7 @@ sched_week_open(){
     return 1
 }
 SCHED_CLOSED=/tmp/wiflow-sched-closed
-# Outside opening hours guests stay on the WiFi (Wiflow Setup at 10.0.0.1 keeps
+# Outside opening hours guests stay on the WiFi (the router page at 10.0.0.1 keeps
 # working) and see the portal with the opening hours; the Internet is paused.
 guest_sched_tick(){
     portal_nft_ready || return 0

@@ -256,6 +256,8 @@ function heartbeat(online) {
 		if (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)
 		    && b.account_public_id != W.core('account_public_id'))
 			W.core_set({ account_public_id: b.account_public_id });
+		if (type(b.location_name) == 'string' && b.location_name != W.core('location_name'))
+			W.core_set({ location_name: W.clip_text(b.location_name, 200) });
 		const st = +b.server_time;
 		if (st > 1600000000) {
 			if (W.now() - st <= 300 && st - W.now() <= 300) W.st_set('time_ok', true);

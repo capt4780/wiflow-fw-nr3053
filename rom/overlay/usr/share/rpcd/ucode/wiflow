@@ -1,4 +1,4 @@
-// ubus object "wiflow" for the Wiflow Setup page (luci-app-wiflow ACL).
+// ubus object "wiflow" for the Wiflow App page (luci-app-wiflow ACL).
 // Quick calls answer directly; pairing and unpairing run as a background job
 // followed through status().job.
 'use strict';

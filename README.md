@@ -27,7 +27,6 @@ Nạp và cứu router: [docs/HUONG-DAN-NAP.md](docs/HUONG-DAN-NAP.md). File fir
 | `tools/rom-check.py` | Kiểm tra rootfs: WiFi giống v2.3.6, đủ thư viện, đủ module kernel, liên kết, mặc định, gói đã bỏ |
 | `tools/fit-rootfs.py` | Thay rootfs trong file FIT, giữ nguyên kernel và device tree |
 | `.github/workflows/repack.yml` | Build trên GitHub Actions (vài phút), phát hành khi đẩy lên `main` |
-| `package/`, `config/`, `scripts/prepare.sh`, `build.yml` | Bản build từ mã nguồn trước đây (1.0.x), chỉ để tham khảo |
 
 ## Build
 

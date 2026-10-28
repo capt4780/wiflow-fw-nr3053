@@ -123,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           V="$(tr -d ' \n' < rom/VERSION)"
-          TAG="nr3053-os-v$V-b${{ github.run_number }}"
+          TAG="wiflow-os-$V"
           {
             echo "Wiflow OS $V cho Viettel NR3053: ImmortalWrt v2.3.6 làm gọn, kernel và driver WiFi giữ nguyên."
             echo
@@ -131,16 +131,16 @@ jobs:
             echo "- WiFi: \`Wiflow\` trên cả 2.4G và 5G (mở)"
             echo "- Quốc gia Việt Nam (5 GHz dùng cả kênh 100–140), múi giờ UTC+7 (Hồ Chí Minh / Hà Nội)"
             echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
-            echo "- Wiflow App (mục đầu menu LuCI): liên kết tài khoản Wiflow, xem tình trạng router và portal cho khách (nội dung từ WordPress), nằm sẵn trong firmware. WiFi nguồn cài thẳng ở LuCI → Network → Wireless → Scan → Join Network. Hướng dẫn: docs/HUONG-DAN-WIFLOW-APP.md"
+            echo "- Trang Tổng quan (mục đầu menu LuCI): liên kết tài khoản Wiflow, xem tình trạng router và portal cho khách (nội dung từ WordPress), nằm sẵn trong firmware. WiFi nguồn chọn ở trang WiFi → Nguồn Internet. Hướng dẫn: docs/HUONG-DAN-WIFLOW-APP.md"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
           } > notes.md
           # one release per Wiflow OS version: an earlier build of the same version is replaced
-          for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep "^nr3053-os-v$V-b" || true); do
+          for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep -x "wiflow-os-$V" || true); do
             gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           done
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Wiflow OS $V — Viettel NR3053 (build ${{ github.run_number }})" \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Wiflow OS $V — Viettel NR3053" \
             --notes-file notes.md --target "$GITHUB_SHA" \
             dist/wiflow-os-*-sysupgrade.itb dist/SHA256SUMS \
             dist/report/rom-check.txt dist/report/packages-kept.txt dist/report/packages-removed.txt

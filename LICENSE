@@ -21,7 +21,7 @@ Wiflow firmware for Viettel NR3053 — licensing
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 
-2. The Wiflow application (package/wiflow-setup/), including the Wiflow name,
+2. The Wiflow application (rom/overlay/ and rom/i18n/), including the Wiflow name,
    logo and images: Copyright (c) 2026 Wiflow. All rights reserved. Not
    licensed for use outside Wiflow devices without written permission.
    Third-party parts inside it keep their own licenses:

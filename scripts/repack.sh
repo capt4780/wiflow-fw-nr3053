@@ -90,7 +90,7 @@ open(p, "w").write(json.dumps(d, indent="\t") + "\n")
 PY
 
 # LuCI > System > Software, "Upload package": a package file chosen by the
-# admin (e.g. the Wiflow Setup .apk) installs without the ImmortalWrt feed
+# admin (e.g. a custom .apk) installs without the ImmortalWrt feed
 # signature and without contacting the feeds; online feed packages are
 # still verified.
 P="$F/usr/libexec/package-manager-call"

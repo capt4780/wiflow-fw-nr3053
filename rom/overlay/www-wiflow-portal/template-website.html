@@ -33,13 +33,14 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-audio-toggle[data-audio-state="on"] .cp-audio-icon--on{display:grid}
 .cp-audio-toggle[data-audio-state="on"] .cp-audio-icon--off{display:none}
 /*@ui-css*/
-/* v1.1.0 portal UI: white pill bar docked at the bottom; open, a white sheet
-   (phone) or a centred dialog (tablet, computer) with the shop line (logo, name,
-   verified tick), one 3:2 banner slider (swipe or tap a dot) and one connect
-   button. Terms open inside the same panel. The brand colour only tints buttons. */
+/* Wiflow OS 1.0.0 guest page UI: a white pill bar docked at the bottom; open, a
+   floating card (phone) or a centred dialog (tablet, computer) with the banner
+   slider (4:3, slides every 3 s; tap a banner for its detail), the shop line (logo,
+   name, verified tick) and two equal buttons, Hủy and Xác nhận. Terms and banner
+   detail open inside the same card. The brand colour only tints the buttons. */
 @media (prefers-reduced-motion:reduce){.cp-audio-toggle::before{animation:none;opacity:0}}
 .cp-stage{--ink:#1B2036;--ink-2:#6A7189;--ink-3:#4A5170;--line:#E6E9F0;--soft:#F2F4F8;--soft-2:#F7F8FB;--acc:#0054F0;--acc-ink:#FFFFFF;--acc-soft:#E8F0FE;--acc-text:#0054F0;--dot:#CBD2E3;
- --pad:20px;--gap:16px;--r-card:20px;--r-big:28px}
+ --pad:16px;--gap:16px;--r-card:24px;--r-big:32px}
 .cp-stage button{-webkit-tap-highlight-color:transparent}
 .cp-sheet,.cp-sheet button,.cp-runtime-error{font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-synthesis:none}
 .cp-veil{position:fixed;inset:0;z-index:18;background:rgba(27,32,54,0);pointer-events:none;transition:background .35s ease}
@@ -66,44 +67,46 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-bar-go i{font-style:normal}
 /* Open: the panel. */
 .cp-panel[hidden],.cp-view[hidden],.cp-hero[hidden],.cp-dots[hidden],.cp-vf[hidden]{display:none}
-.cp-panel{position:relative;width:100%;margin:0 auto;border-radius:var(--r-big) var(--r-big) 0 0;background:#fff;color:var(--ink);overflow:hidden;box-shadow:0 -10px 40px rgba(27,32,54,.22);animation:cp-rise .45s cubic-bezier(.2,.9,.2,1)}
+.cp-panel{position:relative;width:calc(100% - 24px);max-width:560px;margin:0 auto max(12px,env(safe-area-inset-bottom));border-radius:var(--r-big);background:#fff;color:var(--ink);overflow:hidden;box-shadow:0 18px 48px rgba(27,32,54,.32);animation:cp-rise .45s cubic-bezier(.2,.9,.2,1)}
 @keyframes cp-rise{from{transform:translateY(40px);opacity:0}}
 @keyframes cp-pop{from{transform:translateY(16px) scale(.98);opacity:0}}
-.cp-view{display:flex;flex-direction:column;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.cp-view{display:flex;flex-direction:column;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cp-view::-webkit-scrollbar{display:none}
-.cp-main{padding:22px var(--pad) max(22px,env(safe-area-inset-bottom))}
-.cp-head{display:flex;align-items:center;gap:12px;min-width:0;margin-bottom:16px}
-.cp-head .cp-logo{width:44px;height:44px}
+.cp-main{padding:var(--pad) var(--pad) 20px}
+.cp-head{display:flex;align-items:center;gap:12px;min-width:0;margin:4px 0 0}
+.cp-head .cp-logo{width:48px;height:48px}
 .cp-head-t{flex:1;min-width:0}
 .cp-head-t b{display:flex;align-items:center;gap:6px;min-width:0;font-weight:600;font-size:18px;line-height:24px;letter-spacing:-.01em}
 .cp-head-t b>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-vf{flex:none;display:block;width:20px;height:20px}
-.cp-x,.cp-round{appearance:none;flex:none;width:40px;height:40px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink-3);cursor:pointer}
-.cp-x svg,.cp-round svg{width:18px;height:18px}
-.cp-x .i-x{display:none}
-.cp-x:focus-visible,.cp-round:focus-visible,.cp-go:focus-visible,.cp-dot:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
-/* Banner: always 3:2; swipe, or tap a dot below. */
-.cp-hero{position:relative;flex:none;aspect-ratio:3/2;border-radius:var(--r-card);overflow:hidden;background:var(--soft)}
+.cp-round{appearance:none;flex:none;width:40px;height:40px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink-3);cursor:pointer}
+.cp-round svg{width:18px;height:18px}
+.cp-round:focus-visible,.cp-no:focus-visible,.cp-go:focus-visible,.cp-dot:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+/* Banner: always 4:3; swipe or tap a dot; a tap on the picture opens its detail. */
+.cp-hero{position:relative;flex:none;aspect-ratio:4/3;border-radius:var(--r-card);overflow:hidden;background:var(--soft)}
 .cp-hero-track{display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cp-hero-track::-webkit-scrollbar{display:none}
 .cp-hero-slide{flex:0 0 100%;width:100%;height:100%;scroll-snap-align:start}
 .cp-hero-slide img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-drag:none}
-.cp-dots{display:flex;justify-content:center;align-items:center;gap:2px;margin-top:6px}
+.cp-hero-slide.has-detail{cursor:pointer}
+.cp-dots{display:flex;justify-content:center;align-items:center;gap:2px;margin:2px 0 6px}
 .cp-dot{appearance:none;display:grid;place-items:center;margin:0;padding:9px 4px;border:0;background:none;cursor:pointer}
 .cp-dot i{display:block;width:8px;height:8px;border-radius:999px;background:var(--dot);transition:width .2s ease,background .2s ease}
 .cp-dot.on i{width:24px;background:var(--acc)}
-.cp-cta{display:flex;flex-direction:column;gap:12px;margin-top:10px}
-.cp-hero[hidden]+.cp-dots+.cp-cta,.no-hero .cp-cta{margin-top:0}
+.cp-cta{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.cp-two{display:flex;gap:12px}
+.cp-two>button{flex:1 1 0;min-width:0}
 /* Buttons. */
-.cp-go{appearance:none;flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:56px;margin:0;padding:0 20px;border:0;border-radius:999px;background:var(--acc);color:var(--acc-ink);font-family:inherit;font-weight:600;font-size:16px;line-height:1;cursor:pointer;box-shadow:0 10px 22px color-mix(in srgb,var(--acc) 30%,transparent);transition:transform .15s ease,opacity .15s ease}
-.cp-go svg{width:18px;height:18px}
-.cp-go:active{transform:scale(.985)}
+.cp-go,.cp-no{appearance:none;flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:56px;margin:0;padding:0 20px;border:0;border-radius:999px;background:var(--acc);color:var(--acc-ink);font-family:inherit;font-weight:600;font-size:17px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 8px 18px color-mix(in srgb,var(--acc) 28%,transparent);transition:transform .15s ease,opacity .15s ease}
+.cp-no{background:var(--soft);color:var(--ink-3);box-shadow:none}
+.cp-go svg,.cp-no svg{width:20px;height:20px}
+.cp-go:active,.cp-no:active{transform:scale(.985)}
 .cp-go:disabled{opacity:.7;cursor:default;transform:none}
 .cp-go:focus{outline:none}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms. */
-.cp-terms{padding:22px 0 0;overflow:hidden}
+.cp-terms{padding:var(--pad) 0 0;overflow:hidden}
 .cp-terms-head{flex:none;display:flex;align-items:center;gap:12px;padding:0 var(--pad) 8px}
 .cp-terms-head b{display:block;font-weight:600;font-size:18px;line-height:24px}
 .cp-terms-head small{display:block;font-size:12.5px;line-height:17px;color:var(--ink-2)}
@@ -113,8 +116,14 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-terms-body h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-weight:600;font-size:15px;line-height:1.4;color:var(--ink)}
 .cp-terms-body h3 em{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-style:normal;font-size:12px}
 .cp-terms-body p{margin:0 0 0 34px;white-space:pre-line}
-.cp-terms-foot{flex:none;display:flex;flex-direction:column;gap:4px;padding:8px var(--pad) max(16px,env(safe-area-inset-bottom))}
-.cp-later{appearance:none;display:block;margin:0 auto;padding:10px 14px;border:0;background:none;color:var(--ink-2);font-family:inherit;font-weight:600;font-size:14px;line-height:1.2;cursor:pointer}
+.cp-terms-foot{flex:none;display:flex;gap:12px;padding:12px var(--pad) 20px}
+.cp-terms-foot>button{flex:1 1 0;min-width:0}
+/* Banner detail: the picture, its title and text, one button back. */
+.cp-detail{padding:var(--pad) var(--pad) 20px;overflow:hidden}
+.cp-dbody{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 4px 0}
+.cp-dt{margin:0 0 6px;font-weight:600;font-size:20px;line-height:1.3;letter-spacing:-.01em;overflow-wrap:anywhere}
+.cp-dp{margin:0;font-size:15px;line-height:1.6;color:var(--ink-3);white-space:pre-line;overflow-wrap:anywhere}
+.cp-dfoot{flex:none;margin-top:16px}
 .cp-runtime-error{position:fixed;z-index:21;left:16px;right:16px;bottom:calc(92px + env(safe-area-inset-bottom,0px));width:max-content;max-width:min(calc(100vw - 32px),440px);margin:0 auto;padding:10px 14px;border-radius:14px;background:rgba(27,32,54,.94);color:#fff;font-weight:600;font-size:13px;line-height:1.5;text-align:center;box-shadow:0 8px 26px rgba(0,0,0,.22)}
 .cp-runtime-error[hidden]{display:none}
 .cp-stage.is-open .cp-runtime-error{top:max(16px,env(safe-area-inset-top));bottom:auto}
@@ -124,36 +133,31 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
  .cp-bar .cp-logo{width:54px;height:54px}
  .cp-bar-t b{font-size:18px;line-height:24px}.cp-bar-t span{font-size:14px;line-height:20px}
  .cp-bar-go{height:54px;padding:0 26px 0 28px;font-size:16px}
- .cp-hero{border-radius:24px}
  .cp-runtime-error{bottom:calc(112px + env(safe-area-inset-bottom,0px))}
 }
 @media (min-width:640px) and (min-height:560px){
- .cp-stage{--pad:24px;--r-big:32px}
+ .cp-stage{--pad:20px}
  .cp-sheet{top:0;display:flex;flex-direction:column;justify-content:flex-end}
  .cp-stage.is-open .cp-sheet{justify-content:center;padding:24px}
- .cp-panel{width:560px;max-width:100%;border-radius:32px;box-shadow:0 30px 80px rgba(27,32,54,.38);animation-name:cp-pop}
- .cp-view{max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px)}
- .cp-main{padding:24px var(--pad)}
- .cp-head{margin-bottom:18px}
- .cp-x .i-down{display:none}.cp-x .i-x{display:block}
- .cp-terms{padding-top:var(--pad)}
- .cp-terms-foot{padding-bottom:24px}
-}
-@media (min-width:1100px) and (min-height:700px){
- .cp-panel{width:640px}
+ .cp-panel{width:520px;max-width:100%;margin:0 auto;box-shadow:0 30px 80px rgba(27,32,54,.38);animation-name:cp-pop}
 }
 /* Short landscape phones: banner left, shop line and button right. */
 @media (orientation:landscape) and (max-height:520px){
  .cp-stage{--pad:20px}
- .cp-panel{width:min(760px,calc(100% - 24px));border-radius:24px 24px 0 0}
- .cp-view{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px)}
- .cp-main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:20px;padding:16px var(--pad) max(14px,env(safe-area-inset-bottom))}
- .cp-head{grid-column:2;grid-row:1;margin-bottom:12px}
+ .cp-panel{width:min(760px,calc(100% - 24px));margin-bottom:8px}
+ .cp-view{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}
+ .cp-main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:auto auto 1fr;column-gap:20px;padding:14px var(--pad)}
+ .cp-head{grid-column:2;grid-row:1;margin:0 0 12px}
  .cp-hero{grid-column:1;grid-row:1/3;align-self:start}
- .cp-dots{grid-column:1;grid-row:3;align-self:start;margin-top:0}
- .cp-cta{grid-column:2;grid-row:2/4;align-self:end;margin-top:0;gap:8px}
+ .cp-dots{grid-column:1;grid-row:3;align-self:start;margin:2px 0 0}
+ .cp-cta{grid-column:2;grid-row:2/4;align-self:end;margin-top:0;gap:10px}
  .no-hero .cp-head,.no-hero .cp-cta{grid-column:1/3}
- .cp-go{height:50px}
+ .cp-go,.cp-no{height:50px;font-size:16px;gap:6px;padding:0 12px}
+ .cp-go svg,.cp-no svg{width:18px;height:18px}
+ .cp-detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:20px;grid-template-rows:1fr auto}
+ .cp-dhero{grid-column:1;grid-row:1/3;align-self:start}
+ .cp-dbody{grid-column:2;grid-row:1;padding-top:0}
+ .cp-dfoot{grid-column:2;grid-row:2;margin-top:12px}
  .cp-runtime-error{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
 /* Website mode: the bar is a white strip across the bottom edge and the
@@ -184,7 +188,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
  .cp-stage[data-portal-mode="website"] .cp-bar .cp-logo{width:40px;height:40px}
  .cp-stage[data-portal-mode="website"] .cp-bar-go{height:46px}
 }
-@media (prefers-reduced-motion:reduce){.cp-panel{animation:none}.cp-veil{transition:none}.cp-dot i,.cp-go{transition:none}}
+@media (prefers-reduced-motion:reduce){.cp-panel{animation:none}.cp-veil{transition:none}.cp-dot i,.cp-go,.cp-no{transition:none}}
 html,body{overscroll-behavior:none}
 /*@/ui-css*/
 </style>
@@ -201,24 +205,31 @@ html,body{overscroll-behavior:none}
   <section class="cp-sheet" aria-label="Kết nối WiFi">
     <button class="cp-bar" type="button" data-action="internet-access" aria-label="Kết nối Internet" aria-expanded="false">
       <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
-      <span class="cp-bar-t"><b class="s">WiFi miễn phí</b><b class="l" data-bar-long>WiFi miễn phí</b><span class="s" data-shop-sub>Chạm để kết nối Internet</span><span class="l">Khi kết nối, bạn đồng ý với điều khoản sử dụng</span></span>
-      <span class="cp-bar-go" aria-hidden="true"><i class="s">Kết nối</i><i class="l">Kết nối Internet</i><svg class="up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg><svg class="fw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <span class="cp-bar-t"><b class="s">WiFi miễn phí</b><b class="l" data-bar-long>WiFi miễn phí</b><span class="s" data-shop-sub>Chạm để kết nối Internet</span><span class="l">Khi xác nhận, bạn đồng ý với điều khoản sử dụng</span></span>
+      <span class="cp-bar-go" aria-hidden="true"><i class="s">Kết nối</i><i class="l">Kết nối</i><svg class="up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg><svg class="fw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
     </button>
     <div class="cp-panel no-hero" data-access-dialog hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Kết nối Internet">
       <div class="cp-view cp-main" data-view-main>
-        <div class="cp-head">
-          <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
-          <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b></span>
-          <button class="cp-x" type="button" data-dialog-cancel aria-label="Thu gọn"><svg class="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><svg class="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-        </div>
         <div class="cp-hero" data-dialog-slider hidden>
           <div class="cp-hero-track" data-dialog-track></div>
         </div>
         <div class="cp-dots" data-dialog-dots role="group" aria-label="Chọn ảnh" hidden></div>
-        <div class="cp-cta">
-          <button class="cp-go" type="button" data-dialog-confirm><span>Kết nối Internet</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          <p class="cp-fine">Khi kết nối, bạn đồng ý với <button type="button" data-terms-open>điều khoản sử dụng</button>.</p>
+        <div class="cp-head">
+          <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor" stroke="none"/></svg></span>
+          <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b></span>
         </div>
+        <div class="cp-cta">
+          <div class="cp-two">
+            <button class="cp-no" type="button" data-dialog-cancel><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Hủy</span></button>
+            <button class="cp-go" type="button" data-dialog-confirm><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Xác nhận</span></button>
+          </div>
+          <p class="cp-fine">Khi xác nhận, bạn đồng ý với <button type="button" data-terms-open>điều khoản sử dụng</button>.</p>
+        </div>
+      </div>
+      <div class="cp-view cp-detail" data-detail-view hidden aria-hidden="true">
+        <div class="cp-hero cp-dhero"><div class="cp-hero-track"><div class="cp-hero-slide"><img data-detail-img alt="" decoding="async" draggable="false"></div></div></div>
+        <div class="cp-dbody" data-detail-body><h2 class="cp-dt" data-detail-title></h2><p class="cp-dp" data-detail-text></p></div>
+        <div class="cp-dfoot"><button class="cp-go" type="button" data-detail-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button></div>
       </div>
       <div class="cp-view cp-terms" data-terms-dialog hidden aria-hidden="true" role="document" aria-labelledby="cp-terms-title">
         <div class="cp-terms-head"><button class="cp-round" type="button" data-terms-close aria-label="Quay lại"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button><div><b id="cp-terms-title">Điều khoản sử dụng</b><small data-terms-sub>WiFi miễn phí</small></div></div>
@@ -233,7 +244,7 @@ html,body{overscroll-behavior:none}
           <section><h3><em>8</em>Tạm ngừng và chất lượng kết nối</h3><p>Dịch vụ có thể bị gián đoạn do bảo trì, sự cố kỹ thuật, lỗi hạ tầng, mất điện, sự cố của nhà mạng, yêu cầu an ninh hoặc sự kiện ngoài khả năng kiểm soát hợp lý. Bên cung cấp sẽ xử lý trong phạm vi kiểm soát của mình nhưng không cam kết kết nối luôn liên tục hoặc không có lỗi.</p></section>
           <section><h3><em>9</em>Luật áp dụng và giải quyết vấn đề phát sinh</h3><p>Các điều khoản này được điều chỉnh bởi pháp luật Việt Nam. Mọi vấn đề phát sinh trước hết được ưu tiên giải quyết thông qua trao đổi và hợp tác thiện chí; trường hợp không giải quyết được sẽ thực hiện theo trình tự, thẩm quyền và quy định của pháp luật Việt Nam.</p></section>
         </div>
-        <div class="cp-terms-foot"><button class="cp-go" type="button" data-dialog-confirm>Đồng ý &amp; kết nối</button><button class="cp-later" type="button" data-terms-close>Quay lại</button></div>
+        <div class="cp-terms-foot"><button class="cp-no" type="button" data-terms-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button><button class="cp-go" type="button" data-dialog-confirm><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Xác nhận</span></button></div>
       </div>
     </div>
   </section>
@@ -523,6 +534,8 @@ html,body{overscroll-behavior:none}
   const termsCloses=[...stage.querySelectorAll('[data-terms-close]')];
   const termsBody=stage.querySelector('[data-terms-body]');
   const mainView=stage.querySelector('[data-view-main]');
+  const detailView=stage.querySelector('[data-detail-view]');
+  const detailBody=stage.querySelector('[data-detail-body]');
   /* iOS (Safari and the WiFi sign-in window): a swipe that starts on a scroll box already at its
      top or bottom edge is handed to the page behind, which cannot move, and the screen freezes or
      reloads. Such swipes are cancelled here; every other swipe scrolls the box normally. */
@@ -533,7 +546,7 @@ html,body{overscroll-behavior:none}
       const dy=y-py;px=x;py=y;if(ax==='x')return;
       const max=el.scrollHeight-el.clientHeight;
       if(max<=1||(dy>0&&el.scrollTop<=0)||(dy<0&&el.scrollTop>=max-1)){if(e.cancelable)e.preventDefault();}},{passive:false});};
-  edgeGuard(termsBody);edgeGuard(mainView);
+  edgeGuard(termsBody);edgeGuard(mainView);edgeGuard(detailBody);
   const preview=stage.dataset.preview==='1';
   const sessionId=String(stage.dataset.localSessionId||'');
   const authorizeUrl=String(stage.dataset.localAuthorizeUrl||'');
@@ -542,6 +555,9 @@ html,body{overscroll-behavior:none}
   /* v1.1.0: brand (name, logo, verified tick, accent) + terms come from the shop file of the
      active revision. Text is only ever set through textContent and images only
      from files of that revision, so shop data can never inject markup. */
+  const sliderBox=stage.querySelector('[data-dialog-slider]');
+  const sliderTrack=stage.querySelector('[data-dialog-track]');
+  const dotsBox=stage.querySelector('[data-dialog-dots]');
   const make=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
   const clip=(v,max)=>String(typeof v==='string'||typeof v==='number'?v:'').trim().slice(0,max);
   const assetUrl=(base,v)=>{
@@ -562,33 +578,20 @@ html,body{overscroll-behavior:none}
     stage.style.setProperty('--acc',hex);stage.style.setProperty('--acc-ink',lum>0.62?'#16161A':'#FFFFFF');
     stage.style.setProperty('--acc-soft',soft);stage.style.setProperty('--acc-text',lum>0.55?'#1B2036':hex);
   };
-  /* v1.0.26: banner schedule (shop.popup_rules: [{i,from,to,days}]) on the phone's clock. */
-  const hmMin=v=>{const m=/^([01]\d|2[0-4]):([0-5]\d)$/.exec(String(v||''));return m?(+m[1])*60+(+m[2]):-1;};
-  const ruleOpen=(rule,now)=>{
-    if(!rule||typeof rule!=='object')return true;
-    const days=typeof rule.days==='string'&&/^[1-7]{1,7}$/.test(rule.days)?rule.days:'1234567';
-    const dow=String(now.getDay()===0?7:now.getDay());if(days.indexOf(dow)<0)return false;
-    const f=hmMin(rule.from),t=hmMin(rule.to),m=now.getHours()*60+now.getMinutes();
-    if(f<0||t<0||f===t)return true;
-    return f<t?(m>=f&&m<t):(m>=f||m<t);
-  };
-  const filterPopups=(list,shop)=>{
-    const rules=shop&&Array.isArray(shop.popup_rules)?shop.popup_rules:[];if(!rules.length)return list;
-    const now=new Date();
-    return list.filter((_src,i)=>ruleOpen(rules.find(r=>r&&Number(r.i)===i+1),now));
-  };
-  /* money-like ("7200000", "35.000đ") -> "7.200.000₫"; anything else ("Liên hệ") is shown as typed. */
-  const priceText=v=>{let price=clip(v,32);if(/\d/.test(price)&&/^[\d.,\s]+(?:đ|₫|vnđ|vnd)?$/iu.test(price)){const d=price.replace(/\D/g,'').replace(/^0+(?=\d)/,'');if(d.length<=12)price=d.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'₫';}return price;};
   const panelLayout=()=>{};
   const setLogo=src=>{stage.querySelectorAll('[data-shop-logo]').forEach(box=>{const img=make('img');img.alt='';img.decoding='async';img.draggable=false;
     img.addEventListener('load',()=>{box.textContent='';box.appendChild(img);box.classList.add('has-img');},{once:true});img.src=src;});};
+  let shopBanners=[];
+  const markBannerDetails=()=>{if(!sliderTrack)return;[...sliderTrack.children].forEach((el,i)=>{const b=shopBanners[i];el.classList.toggle('has-detail',Boolean(b&&(b.title||b.detail)));});};
   const renderShop=(shop,base)=>{
     if(!shop||typeof shop!=='object')return;
     applyAccent(shop.accent);
     const name=clip(shop.name,80);
     const sub=stage.querySelector('[data-shop-sub]');if(sub&&name)sub.textContent=name;
+    shopBanners=(Array.isArray(shop.banners)?shop.banners:[]).slice(0,5).map(x=>({title:clip(x&&x.title,120),detail:clip(x&&x.detail,2000)}));
+    markBannerDetails();
     const long=stage.querySelector('[data-bar-long]');if(long&&name)long.textContent='WiFi miễn phí tại '+name;
-    if(name){const hn=stage.querySelector('[data-shop-name]'),hs=stage.querySelector('[data-shop-head-sub]');if(hn)hn.textContent=name;if(hs)hs.hidden=false;}
+    if(name){const hn=stage.querySelector('[data-shop-name]');if(hn)hn.textContent=name;}
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const termsSub=stage.querySelector('[data-terms-sub]');if(termsSub&&name)termsSub.textContent='WiFi miễn phí tại '+name;
     const vf=stage.querySelector('[data-shop-verified]');if(vf){if(shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false')vf.setAttribute('hidden','');else vf.removeAttribute('hidden');}
@@ -612,14 +615,12 @@ html,body{overscroll-behavior:none}
   })();
 
   /* Banner slider (up to 5 images from the active revision). */
-  const sliderBox=stage.querySelector('[data-dialog-slider]');
-  const sliderTrack=stage.querySelector('[data-dialog-track]');
-  const dotsBox=stage.querySelector('[data-dialog-dots]');
   let slideCount=0,sliderTimer=0,dotFrame=0,shownPopups=[];
   const buildSlider=list=>{
     shownPopups=list;
     if(sliderBox&&sliderTrack&&list.length){
       list.forEach((src,index)=>{const slide=make('div','cp-hero-slide'),img=make('img');img.alt='';img.decoding='async';img.draggable=false;img.loading=index===0?'eager':'lazy';img.src=src;slide.appendChild(img);sliderTrack.appendChild(slide);});
+      markBannerDetails();
       slideCount=list.length;
       if(dotsBox&&slideCount>1){list.forEach((_s,index)=>{const d=make('button','cp-dot'+(index===0?' on':'')),dot=make('i');d.type='button';d.setAttribute('aria-label','Ảnh '+(index+1)+' / '+list.length);d.appendChild(dot);d.addEventListener('click',()=>{track('content_interaction','banner');goSlide(index);});dotsBox.appendChild(d);});dotsBox.hidden=false;}
       sliderBox.hidden=false;dialog.classList.remove('no-hero');
@@ -633,10 +634,11 @@ html,body{overscroll-behavior:none}
   const syncDots=()=>{bannerSeen();if(!dotsBox)return;const i=Math.min(slideCount-1,Math.max(0,slideIndex()));[...dotsBox.children].forEach((d,k)=>{d.classList.toggle('on',k===i);if(k===i)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current');});};
   const stopAutoSlider=()=>{if(sliderTimer){window.clearTimeout(sliderTimer);sliderTimer=0;}};
   const termsShown=()=>Boolean(termsDialog&&!termsDialog.hidden);
+  const modalViewShown=()=>termsShown()||Boolean(detailView&&!detailView.hidden);
   const scheduleAutoSlider=()=>{
     stopAutoSlider();
-    if(slideCount<2||dialog.hidden||termsShown()||document.hidden)return;
-    sliderTimer=window.setTimeout(()=>{sliderTimer=0;const next=(slideIndex()+1)%slideCount;sliderTrack.scrollTo({left:next*sliderTrack.clientWidth,behavior:'smooth'});scheduleAutoSlider();},3200);
+    if(slideCount<2||dialog.hidden||modalViewShown()||document.hidden)return;
+    sliderTimer=window.setTimeout(()=>{sliderTimer=0;const next=(slideIndex()+1)%slideCount;sliderTrack.scrollTo({left:next*sliderTrack.clientWidth,behavior:'smooth'});scheduleAutoSlider();},3000);
   };
   const goSlide=index=>{if(!sliderTrack||slideCount<1)return;stopAutoSlider();sliderTrack.scrollTo({left:(((index%slideCount)+slideCount)%slideCount)*sliderTrack.clientWidth,behavior:'smooth'});scheduleAutoSlider();};
   if(sliderTrack){
@@ -644,7 +646,9 @@ html,body{overscroll-behavior:none}
     sliderTrack.addEventListener('pointerdown',()=>{track('content_interaction','banner');trackItem('content_interaction',itemOf(shownPopups[Math.min(slideCount-1,Math.max(0,slideIndex()))]));stopAutoSlider();},{passive:true});
     sliderTrack.addEventListener('pointerup',scheduleAutoSlider,{passive:true});
     sliderTrack.addEventListener('pointercancel',scheduleAutoSlider,{passive:true});
-    let tx=0,ti=0;
+    let tx=0,ti=0,px=0,py=0,pt=0;
+    sliderTrack.addEventListener('pointerdown',e=>{px=e.clientX;py=e.clientY;pt=Date.now();},{passive:true});
+    sliderTrack.addEventListener('click',e=>{if(Math.abs(e.clientX-px)>8||Math.abs(e.clientY-py)>8||Date.now()-pt>600)return;openDetail(slideIndex());});
     sliderTrack.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ti=slideIndex();},{passive:true});
     sliderTrack.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=tx-t.clientX;if(t&&Math.abs(dx)>=28&&slideCount>1&&slideIndex()===ti)goSlide(ti+(dx>0?1:-1));},{passive:true});
   }
@@ -671,8 +675,24 @@ html,body{overscroll-behavior:none}
   const setOpen=open=>{stage.classList.toggle('is-open',open);access.setAttribute('aria-expanded',open?'true':'false');};
   const showMain=()=>{
     if(termsDialog){termsDialog.hidden=true;termsDialog.setAttribute('aria-hidden','true');}
+    if(detailView){detailView.hidden=true;detailView.setAttribute('aria-hidden','true');}
     if(mainView)mainView.hidden=false;
   };
+  const detailShown=()=>Boolean(detailView&&!detailView.hidden);
+  const openDetail=i=>{
+    const b=shopBanners[i],src=shownPopups[i];
+    if(!detailView||!b||!src||!(b.title||b.detail)||dialog.hidden||state!=='ready')return;
+    stopAutoSlider();
+    track('content_interaction','banner_detail');
+    detailView.querySelector('[data-detail-img]').src=src;
+    detailView.querySelector('[data-detail-title]').textContent=b.title;
+    detailView.querySelector('[data-detail-text]').textContent=b.detail;
+    if(mainView)mainView.hidden=true;
+    detailView.hidden=false;detailView.setAttribute('aria-hidden','false');
+    if(detailBody)detailBody.scrollTop=0;
+    window.setTimeout(()=>{const back=detailView.querySelector('[data-detail-back]');if(back)back.focus({preventScroll:true});},0);
+  };
+  const closeDetail=()=>{if(!detailShown())return;showMain();scheduleAutoSlider();};
   const openDialog=(transitionMode='default')=>{
     if(state!=='ready'||!dialog.hidden)return;
     if(runtimeError&&state==='ready'){runtimeError.hidden=true;runtimeError.textContent='';}
@@ -707,6 +727,7 @@ html,body{overscroll-behavior:none}
     stopAutoSlider();
     track('content_interaction','terms');
     if(mainView)mainView.hidden=true;
+    if(detailView)detailView.hidden=true;
     termsDialog.hidden=false;
     termsDialog.setAttribute('aria-hidden','false');
     if(termsBody)termsBody.scrollTop=0;
@@ -791,10 +812,11 @@ html,body{overscroll-behavior:none}
   access.addEventListener('touchstart',e=>{swipeY=e.touches&&e.touches[0]?e.touches[0].clientY:null;},{passive:true});
   access.addEventListener('touchend',e=>{const t=e.changedTouches&&e.changedTouches[0];if(swipeY!==null&&t&&swipeY-t.clientY>24&&!access.disabled){track('content_interaction','cta');openDialog();}swipeY=null;},{passive:true});
   if(termsOpen)termsOpen.addEventListener('click',openTerms);
+  const detailBack=stage.querySelector('[data-detail-back]');if(detailBack)detailBack.addEventListener('click',closeDetail);
   termsCloses.forEach(button=>button.addEventListener('click',()=>closeTerms(true)));
   confirms.forEach(button=>button.addEventListener('click',commit));
   cancels.forEach(button=>button.addEventListener('click',cancelDialog));
-  document.addEventListener('keydown',event=>{if(!dialog.hidden&&!termsShown()&&slideCount>1&&(event.key==='ArrowRight'||event.key==='ArrowLeft')){goSlide(slideIndex()+(event.key==='ArrowRight'?1:-1));return;}if(event.key!=='Escape')return;if(termsShown()){closeTerms(true);return;}if(!dialog.hidden)cancelDialog();});
+  document.addEventListener('keydown',event=>{if(!dialog.hidden&&!termsShown()&&slideCount>1&&(event.key==='ArrowRight'||event.key==='ArrowLeft')){goSlide(slideIndex()+(event.key==='ArrowRight'?1:-1));return;}if(event.key!=='Escape')return;if(termsShown()){closeTerms(true);return;}if(detailShown()){closeDetail();return;}if(!dialog.hidden)cancelDialog();});
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
       stopAutoSlider();
@@ -814,7 +836,7 @@ html,body{overscroll-behavior:none}
     if(!dialog.hidden)scheduleAutoSlider();
   });
   if(portalMode!=='website')startBackgroundMedia();
-  {const shop=await Promise.race([shopLoad,new Promise(r=>window.setTimeout(()=>r(null),1200))]);buildSlider(filterPopups(localPopups,shop));}
+  {await Promise.race([shopLoad,new Promise(r=>window.setTimeout(()=>r(null),1200))]);buildSlider(localPopups);}
   prepare();
   if(earlyCta)earlyCta.removeEventListener('click',onEarlyTap);
   if(earlyTap&&state==='ready'){track('content_interaction','cta');openDialog();}

@@ -32,7 +32,7 @@ Wiflow App (liên kết WordPress, tình trạng router) nằm sẵn trong firmw
 | SSH | `root@10.0.0.1`, mật khẩu `1234` |
 
 - Internet nguồn: cắm cáp vào cổng **WAN** (DHCP), hoặc cài ở LuCI → **Network → Interfaces**.
-- Liên kết tài khoản Wiflow: mở **Wiflow App** ở đầu menu LuCI (xem docs/HUONG-DAN-WIFLOW-APP.md).
+- Liên kết tài khoản Wiflow: mở **Tổng quan** ở đầu menu LuCI (xem docs/HUONG-DAN-WIFLOW-APP.md).
 
 ## Reset
 
@@ -54,7 +54,7 @@ Giữ nút **Reset** khoảng 10 giây khi router đang chạy. Router về mặ
 | | |
 |---|---|
 | Nền | ImmortalWrt v2.3.6 (quytttb/immortalwrt-mt798x-rebase `495af17`), kernel 6.12.94, driver WiFi MediaTek mt_wifi 7.6.7.3 |
-| Giữ | Mạng lõi, tường lửa nftables, DHCP/DNS, driver và công cụ WiFi MediaTek, curl/HTTPS, LuCI tiếng Anh gốc OpenWrt rút gọn (Wiflow App, Status, Network, System, Software), SSH, apk |
+| Giữ | Mạng lõi, tường lửa nftables, DHCP/DNS, driver và công cụ WiFi MediaTek, curl/HTTPS, LuCI tiếng Anh gốc OpenWrt rút gọn (Tổng quan, WiFi, Hệ thống), SSH, apk |
 | Giao diện | Theme LuCI Wiflow, theme duy nhất, không đổi được; một logo Wiflow đầy đủ duy nhất (trang Gate, đăng nhập, sidebar, favicon); sidebar nền trắng |
 | Gate | Nhập sai 5 lần thì địa chỉ đó bị khóa 60 giây. Router chỉ kiểm tra tài khoản sau khi qua Gate |
 | Đã bỏ | PPPoE, Tailscale, WireGuard, chặn quảng cáo, DDNS, UPnP, TurboACC, EQoS, IPv6 (DHCPv6/RA), zram, iptables cũ, htop/nano/tcpdump, theme Aurora/Bootstrap, mọi gói dịch (chỉ tiếng Anh) |

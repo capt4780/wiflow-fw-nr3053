@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wiflow Setup test bench (needs root): the real package code with the real
+# Wiflow App test bench (needs root): the real package code with the real
 # ubusd, rpcd (ucode plugin), uci and ucode, inside a network namespace with
 # veth "radios". netifd, the MediaTek WiFi driver and WordPress are mocks:
 #   netsim.py  rebuilds uplink state (addresses, routes) from uci + world.json

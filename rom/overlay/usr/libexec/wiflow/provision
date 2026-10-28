@@ -14,9 +14,7 @@ function boot() {
 	P.ensure_gate_code();
 	if (W.core('last_command_status') == 'rebooting')
 		W.core_set({ last_command_status: 'success', last_command_message: 'The router restarted' });
-	P.migrate();
 	P.ensure_guest_network();
-	P.reload(P.merge_ssid());
 }
 
 function remove() {

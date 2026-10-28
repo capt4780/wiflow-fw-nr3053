@@ -222,7 +222,7 @@ checks = {
         os.path.isfile(F + "/usr/share/ucode/wiflow/gate.uc")
         and "WIFDIDNR3053" in open(F + "/etc/config/wiflow_gate").read()
         and "wiflow_gate_passed(http)" in open(F + "/usr/share/ucode/luci/dispatcher.uc").read(),
-    "LuCI menu: Wiflow App, WiFi, System only (three pages, no sub-menus)":
+    "LuCI menu: Overview, WiFi, System only (three pages, no sub-menus)":
         sorted(k for f in glob.glob(F + "/usr/share/luci/menu.d/*.json") for k in json.load(open(f)) if k.count("/") == 1 and k not in ("admin/logout", "admin/ubus", "admin/uci", "admin/menu"))
         == ["admin/system", "admin/wifi", "admin/wiflow"],
     "LuCI views: Wiflow App, WiFi, System; the views of dropped pages are gone":
@@ -271,7 +271,7 @@ checks = {
             "firewall.wiflow_guest.name='wiflow_guest'", "listen_http='10.10.10.1:2080'", "dest_port='2080'"]),
     "Wiflow App is part of the firmware (service enabled, native LuCI page, no standalone web app)":
         os.path.islink(F + "/etc/rc.d/S96wiflow") and not os.path.exists(F + "/www/wiflow")
-        and json.load(open(F + "/usr/share/luci/menu.d/luci-app-wiflow.json"))["admin/wiflow"]["title"] == "Wiflow App",
+        and json.load(open(F + "/usr/share/luci/menu.d/luci-app-wiflow.json"))["admin/wiflow"]["title"] == "Overview",
     "Wiflow UI: solid buttons (no gradient fill on buttons)":
         "linear-gradient" not in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
     "Wiflow UI: one stylesheet, phone bar + tablet rail + Vietnamese gate":

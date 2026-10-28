@@ -380,9 +380,6 @@ msgstr "Sửa thẻ"
 msgid "Add tag"
 msgstr "Thêm thẻ"
 
-msgid "Wiflow App"
-msgstr "Wiflow App"
-
 msgid "Sign out"
 msgstr "Đăng xuất"
 
@@ -666,7 +663,7 @@ msgid "Unlink"
 msgstr "Hủy liên kết"
 
 msgid "Unlink account"
-msgstr "Hủy liên kết tài khoản"
+msgstr "Hủy liên kết"
 
 msgid "Unlinking…"
 msgstr "Đang hủy liên kết…"
@@ -805,3 +802,96 @@ msgstr "Hỗ trợ Wiflow"
 
 msgid "Contact us when you need help"
 msgstr "Liên hệ khi cần"
+
+msgid "Overview"
+msgstr "Tổng quan"
+
+msgid "Location"
+msgstr "Địa điểm"
+
+msgid "Connection code"
+msgstr "Mã kết nối"
+
+msgid "Link"
+msgstr "Liên kết"
+
+msgid "Open Wiflow, go to Locations and choose the location."
+msgstr "Mở Wiflow, vào Địa điểm và chọn địa điểm."
+
+msgid "Copy the connection code WIFAPI… of that location."
+msgstr "Sao chép mã kết nối WIFAPI… của địa điểm."
+
+msgid "Enter the code in the box below."
+msgstr "Nhập mã vào ô bên dưới."
+
+msgid "The code starts with WIFAPI and has 12 letters and digits."
+msgstr "Mã bắt đầu bằng WIFAPI và gồm 12 chữ cái, chữ số."
+
+msgid "WiFi · %s"
+msgstr "WiFi · %s"
+
+msgid "%s · Connected"
+msgstr "%s · Đã kết nối"
+
+msgid "Not connected"
+msgstr "Chưa kết nối"
+
+msgid "No network chosen"
+msgstr "Chưa chọn mạng"
+
+msgid "In use"
+msgstr "Đang dùng"
+
+msgid "Standby"
+msgstr "Dự phòng"
+
+msgid "Lost"
+msgstr "Mất kết nối"
+
+msgid "Empty"
+msgstr "Trống"
+
+msgid "LAN cable"
+msgstr "Cáp LAN"
+
+msgid "WAN port · Connected"
+msgstr "Cổng WAN · Đã kết nối"
+
+msgid "WAN port · Cable plugged in"
+msgstr "Cổng WAN · Đã cắm cáp"
+
+msgid "WAN port · No cable"
+msgstr "Cổng WAN · Chưa cắm cáp"
+
+msgid "Plugged in"
+msgstr "Đã cắm"
+
+msgid "Router Wiflow"
+msgstr "Router Wiflow"
+
+msgid "Devices"
+msgstr "Thiết bị"
+
+msgid "Cable plugged in"
+msgstr "Đã cắm cáp"
+
+msgid "No cable"
+msgstr "Chưa cắm cáp"
+
+msgid "Connected"
+msgstr "Đã kết nối"
+
+msgid "%d devices"
+msgstr "%d thiết bị"
+
+msgid "Latency"
+msgstr "Độ trễ"
+
+msgid "Signal"
+msgstr "Tín hiệu"
+
+msgid "IP address"
+msgstr "Địa chỉ IP"
+
+msgid "Gateway"
+msgstr "Cổng"

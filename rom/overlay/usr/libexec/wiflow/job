@@ -1,5 +1,5 @@
 #!/usr/bin/ucode
-// Wiflow Setup background job: job <kind> <request.json>
+// Wiflow App background job: job <kind> <request.json>
 //   pair    connect the router to a Wiflow account
 //   unpair  disconnect it
 //   diag    collect (and optionally send) a diagnostics report
@@ -72,7 +72,7 @@ const PAIR_ERRORS = {
 	PAIR_CODE_NOT_FOUND: 'The code is not correct. Check it in the Wiflow app.',
 	PAIR_CODE_ALREADY_USED: 'This code was already used. Create a new one in the app.',
 	PAIR_CODE_EXPIRED: 'The code has expired. Create a new one in the app.',
-	PAIR_CODE_FORMAT: 'The code has 12 letters and digits.',
+	PAIR_CODE_FORMAT: 'The code starts with WIFAPI and has 12 letters and digits.',
 	PAIR_ACCOUNT_INACTIVE: 'This Wiflow account is locked.',
 	PAIR_RATE_LIMIT: 'Too many attempts. Wait a moment and try again.',
 	PAIR_GENERATION_MISMATCH: 'The Wiflow server and this router use different data versions.'
@@ -80,7 +80,7 @@ const PAIR_ERRORS = {
 
 function pair() {
 	const code = replace(uc(req.code ?? ''), /[^A-Z0-9]/g, '');
-	if (!match(code, /^[A-Z0-9]{12}$/))
+	if (!match(code, /^WIFAPI[A-Z0-9]{6}$/))
 		done(false, PAIR_ERRORS.PAIR_CODE_FORMAT);
 	const id = W.device_id();
 	if (!id)
@@ -92,7 +92,7 @@ function pair() {
 		done(false, h.http ? `The Wiflow server returned HTTP ${h.http}.` : 'Cannot reach the Wiflow server. Check the router\'s Internet.');
 	const hb = h.body;
 	if (!hb.ok || +hb.api_version != 1 || `${hb.data_generation}` != W.GEN || (hb.rest_root && hb.rest_root != W.REST))
-		done(false, 'The Wiflow server and this router use different versions. Update Wiflow Setup.');
+		done(false, 'The Wiflow server and this router use different versions. Update Wiflow OS.');
 
 	step('Linking the account…');
 	const r = W.http('POST', '/devices/pair', {
@@ -110,7 +110,7 @@ function pair() {
 
 	const acct = (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)) ? b.account_public_id : null;
 	W.core_set({
-		paired: '1', paired_at: W.now(), device_token: b.device_token, account_public_id: acct,
+		paired: '1', paired_at: W.now(), device_token: b.device_token, account_public_id: acct, location_name: W.clip_text(b.location_name, 200),
 		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
 	});
 	W.st_set('wp_error', null);

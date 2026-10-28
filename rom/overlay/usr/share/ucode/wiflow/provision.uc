@@ -1,9 +1,8 @@
-// Wiflow Setup: what the package keeps on the router.
+// Wiflow App: what the firmware keeps on the router.
 // - /etc/config/wiflow (account link state);
-// - the device code as an extra Security Gate code.
-// WiFi, network and firewall are never changed here: that is LuCI's job.
-// The one exception is migrate(), which tidies up what Wiflow Setup 1.x
-// created (guest network, rules) so the router follows its LuCI settings.
+// - the device code as an extra Security Gate code;
+// - the guest network (br-wiflow), written on first boot and checked at every start.
+// Source WiFi and the WiFi names are never changed here: that is LuCI's job.
 'use strict';
 
 import { readfile, writefile, access } from 'fs';
@@ -56,33 +55,6 @@ export function remove_gate_code() {
 export function ensure_guest_network() {
 	const r = W.run('/usr/libexec/wiflow/guest-net ensure');
 	return { reloaded: match(r.out ?? '', /changed/) != null };
-};
-
-// Old marker of Wiflow Setup 1.x clean-up: nothing is removed any more.
-export function migrate() {
-	if (W.core('migrated') != '2')
-		W.core_set({ migrated: '2', activated: null, internet_mode: null, guest_ssid: null, source_ssid: null,
-			setup_username: null, tz_set: null });
-	return {};
-};
-
-// 1.2.4: both bands use one WiFi name, "Wiflow". Only the two factory names
-// are changed, and only once: a name set in LuCI stays as it is.
-export function merge_ssid() {
-	if (W.core('ssid_merged') == '1')
-		return {};
-	const c = cursor();
-	c.load('wireless');
-	let wl = false;
-	c.foreach('wireless', 'wifi-iface', s => {
-		if (s.mode == 'ap' && (s.ssid == 'Wiflow 2.4G' || s.ssid == 'Wiflow 5G')) {
-			c.set('wireless', s['.name'], 'ssid', 'Wiflow');
-			wl = true;
-		}
-	});
-	if (wl) c.commit('wireless');
-	W.core_set({ ssid_merged: '1' });
-	return { wireless: wl };
 };
 
 export function reload(what) {

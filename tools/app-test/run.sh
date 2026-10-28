@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wiflow Setup regression tests on the bench (see bench.sh). Exit 1 on failure.
+# Wiflow App regression tests on the bench (see bench.sh). Exit 1 on failure.
 #   sudo -E tools/app-test/run.sh        (PFX / UCODE_DIR as for bench.sh)
 T="$(cd "$(dirname "$0")" && pwd)"
 B="$T/bench.sh"
@@ -29,32 +29,17 @@ wait_for(){ # wait_for <secs> <python expr on status>
 $B start >/dev/null || exit 1
 U(){ LD_LIBRARY_PATH=${PFX:-/opt/pfx}/lib ${PFX:-/opt/pfx}/bin/uci -q "$@"; }
 
-# A router that kept its settings from an older build: WiFi on the LAN, no guest network,
-# a custom-named AP on the LAN and a joined source
-for c in "network.wiflow_wwan=interface" "wireless.wiflow_guest_2g=wifi-iface" "wireless.wiflow_uplink=wifi-iface"; do U set "$c"; done
-U set network.wiflow_wwan.proto=dhcp
-U set wireless.wiflow_guest_2g.device=MT7981_1_1; U set wireless.wiflow_guest_2g.mode=ap; U set wireless.wiflow_guest_2g.network=lan
-U set wireless.wiflow_guest_2g.ssid='Wiflow Quan'
-U set wireless.wiflow_uplink.device=MT7981_1_1; U set wireless.wiflow_uplink.mode=sta; U set wireless.wiflow_uplink.network=wiflow_wwan
-U set wireless.wiflow_uplink.ssid='Cafe Sua Da'; U set wireless.wiflow_uplink.encryption=psk2; U set wireless.wiflow_uplink.key=cafe1234
-U set wiflow.core=core 2>/dev/null
-U commit
-
 $B x /usr/libexec/wiflow/provision boot
 expect "install: device id" "$(cat /etc/wiflow/device-id)" '^WIFDID-NR3053-[0-9]{6}$'
 expect "install: gate code added" "$(U get wiflow_gate.main.code)" "WIFDIDNR3053 $(cut -c15-20 /etc/wiflow/device-id)"
-expect "kept settings: guest network created (10.10.10.1, DHCP, firewall zone, portal web server)" "$(U get network.wiflow_guest.ipaddr)|$(U get network.wiflow_guest_dev.name)|$(U get dhcp.wiflow_guest.interface)|$(U get firewall.wiflow_guest.name)|$(U get firewall.wiflow_guest_portal.dest_port)|$(U get uhttpd.wiflow_portal.home)" '^10\.10\.10\.1\|br-wiflow\|wiflow_guest\|wiflow_guest\|2080\|/www-wiflow-portal$'
-expect "kept settings: factory WiFi moved to the guest network and named Wiflow" "$(U get wireless.default_MT7981_1_1.network)|$(U get wireless.default_MT7981_1_2.network)|$(U get wireless.default_MT7981_1_1.ssid)|$(U get wireless.default_MT7981_1_2.ssid)" '^wiflow_guest\|wiflow_guest\|Wiflow\|Wiflow$'
-expect "kept settings: a WiFi with a custom name stays where it was" "$(U get wireless.wiflow_guest_2g.network)|$(U get wireless.wiflow_guest_2g.ssid)" '^lan\|Wiflow Quan$'
-expect "kept settings: joined source untouched" "$(U get wireless.wiflow_uplink.ssid)|$(U get wireless.wiflow_uplink.key)|$(U get network.wiflow_wwan.proto)" '^Cafe Sua Da\|cafe1234\|dhcp$'
-expect "kept settings: marked done" "$(U get wiflow.core.migrated)|$(U get wiflow.core.guest_moved)|$(U get wiflow.core.ssid_merged)" '^2\|1\|1$'
+expect "install: guest network created (10.10.10.1, DHCP, firewall zone, portal web server)" "$(U get network.wiflow_guest.ipaddr)|$(U get network.wiflow_guest_dev.name)|$(U get dhcp.wiflow_guest.interface)|$(U get firewall.wiflow_guest.name)|$(U get firewall.wiflow_guest_portal.dest_port)|$(U get uhttpd.wiflow_portal.home)" '^10\.10\.10\.1\|br-wiflow\|wiflow_guest\|wiflow_guest\|2080\|/www-wiflow-portal$'
 cp -r /etc/config /tmp/cfg.before
 $B x /usr/libexec/wiflow/provision boot
 diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no config rewrite)" || fail "boot rewrote configs"
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^job_clear pair status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '2\.0\.0'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '1\.0\.0'\)$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
 $B world 'w["wan_cable"]=True'

@@ -34,8 +34,4 @@ Số liệu được router lưu trong RAM, mất khi khởi động lại (bi�
 
 ## Menu LuCI
 
-Wiflow App · Status (Overview, System Log) · System (System, Administration, Software, Backup / Flash Firmware, Reboot) · Network (Interfaces, Wireless, DHCP and DNS) · Log out. Thanh bên gập lại: chỉ nhóm đang chọn được mở. Các mục khác đã gỡ khỏi firmware.
-
-## Nâng từ Wiflow Setup 1.x
-
-Nạp firmware mới và bỏ chọn Keep settings. Nếu giữ cấu hình, lần chạy đầu Wiflow App dọn mạng khách của bản 1.x (WiFi khách quay về mạng LAN, WiFi nguồn đang kết nối được giữ nguyên).
+Tổng quan (Overview) · WiFi · Hệ thống (System) · Đăng xuất. Thanh bên gập lại: chỉ nhóm đang chọn được mở. Các mục khác đã gỡ khỏi firmware.
