@@ -895,3 +895,288 @@ msgstr "Địa chỉ IP"
 
 msgid "Gateway"
 msgstr "Cổng"
+
+msgid "%d unsaved changes"
+msgstr "%d thay đổi chưa lưu"
+
+msgid "12 h"
+msgstr "12 giờ"
+
+msgid "18 h"
+msgstr "18 giờ"
+
+msgid "6 h"
+msgstr "6 giờ"
+
+msgid "2.4 GHz: %d · 5 GHz: %d"
+msgstr "2.4 GHz: %d · 5 GHz: %d"
+
+msgid "Admin password"
+msgstr "Mật khẩu quản trị"
+
+msgid "Applying the configuration"
+msgstr "Đang áp dụng cấu hình"
+
+msgid "Automatic (lost Internet)"
+msgstr "Tự động (mất Internet)"
+
+msgid "Backup"
+msgstr "Sao lưu"
+
+msgid "Band"
+msgstr "Băng tần"
+
+msgid "Broadcasting"
+msgstr "Đang phát"
+
+msgid "Choose file"
+msgstr "Chọn tệp"
+
+msgid "Client"
+msgstr "Máy khách"
+
+msgid "Connected now"
+msgstr "Đang kết nối"
+
+msgid "Connection path"
+msgstr "Đường kết nối"
+
+msgid "Contact"
+msgstr "Thông tin liên hệ"
+
+msgid "Content"
+msgstr "Nội dung"
+
+msgid "Content not received"
+msgstr "Chưa nhận nội dung"
+
+msgid "Continue"
+msgstr "Tiếp tục"
+
+msgid "Delete"
+msgstr "Xóa"
+
+msgid "Developer"
+msgstr "Nhà phát triển"
+
+msgid "Device information"
+msgstr "Thông tin thiết bị"
+
+msgid "Device name"
+msgstr "Tên thiết bị"
+
+msgid "Devices in 24 hours"
+msgstr "Thiết bị trong 24 giờ"
+
+msgid "Disable"
+msgstr "Vô hiệu hóa"
+
+msgid "Disabled"
+msgstr "Đã tắt"
+
+msgid "Download"
+msgstr "Tải về"
+
+msgid "Edit"
+msgstr "Chỉnh sửa"
+
+msgid "Enable"
+msgstr "Bật"
+
+msgid "Enter the device code to continue"
+msgstr "Nhập mã của thiết bị để tiếp tục"
+
+msgid "Flash firmware"
+msgstr "Nạp phần mềm"
+
+msgid "From the Wiflow app"
+msgstr "Từ ứng dụng Wiflow"
+
+msgid "Guest WiFi"
+msgstr "WiFi khách"
+
+msgid "Guest page"
+msgstr "Trang chào khách"
+
+msgid "Guests"
+msgstr "Khách"
+
+msgid "Images"
+msgstr "Hình ảnh"
+
+msgid "Join"
+msgstr "Hòa mạng"
+
+msgid "Join: %s"
+msgstr "Hòa mạng: %s"
+
+msgid "Language"
+msgstr "Ngôn ngữ"
+
+msgid "Leave empty to keep it"
+msgstr "Để trống nếu giữ nguyên"
+
+msgid "MAC address"
+msgstr "Địa chỉ MAC"
+
+msgid "Maintenance"
+msgstr "Bảo trì thiết bị"
+
+msgid "Manual"
+msgstr "Thủ công"
+
+msgid "Memory"
+msgstr "Bộ nhớ"
+
+msgid "Network"
+msgstr "Mạng"
+
+msgid "No content yet"
+msgstr "Chưa có nội dung"
+
+msgid "No source WiFi"
+msgstr "Chưa có WiFi nguồn"
+
+msgid "Open"
+msgstr "Mở"
+
+msgid "Paused"
+msgstr "Tạm dừng"
+
+msgid "Platform"
+msgstr "Nền tảng"
+
+msgid "Please wait… %d seconds"
+msgstr "Vui lòng chờ… %d giây"
+
+msgid "Protected"
+msgstr "Có mật khẩu"
+
+msgid "Remove the source WiFi %s from this router?"
+msgstr "Xóa WiFi nguồn %s khỏi router này?"
+
+msgid "Reset"
+msgstr "Đặt lại"
+
+msgid "Restore"
+msgstr "Khôi phục"
+
+msgid "Restoring…"
+msgstr "Đang khôi phục…"
+
+msgid "Save"
+msgstr "Lưu"
+
+msgid "Save & apply"
+msgstr "Lưu & áp dụng"
+
+msgid "Save password"
+msgstr "Lưu mật khẩu"
+
+msgid "Scan"
+msgstr "Quét"
+
+msgid "Scan WiFi %s"
+msgstr "Quét WiFi %s"
+
+msgid "Scan source WiFi"
+msgstr "Quét WiFi nguồn"
+
+msgid "Show password"
+msgstr "Hiện mật khẩu"
+
+msgid "Size"
+msgstr "Kích thước"
+
+msgid "Skip"
+msgstr "Bỏ qua"
+
+msgid "Source WiFi name"
+msgstr "Tên WiFi nguồn"
+
+msgid "Starting the scan…"
+msgstr "Bắt đầu quét mạng…"
+
+msgid "Status"
+msgstr "Trạng thái"
+
+msgid "Stop refreshing"
+msgstr "Dừng làm mới"
+
+msgid "Storage"
+msgstr "Lưu trữ"
+
+msgid "System"
+msgstr "Hệ thống"
+
+msgid "The password needs at least 8 characters."
+msgstr "Mật khẩu cần ít nhất 8 ký tự."
+
+msgid "The router restarts. Guests lose Internet for about a minute."
+msgstr "Router sẽ khởi động lại. Khách mất Internet khoảng một phút."
+
+msgid "The settings in the file replace the settings of this router, then the router restarts."
+msgstr "Cài đặt trong tệp sẽ thay thế cài đặt của router này, sau đó router khởi động lại."
+
+msgid "Time zone"
+msgstr "Múi giờ"
+
+msgid "UTC+7 · Vietnam"
+msgstr "UTC+7 · Việt Nam"
+
+msgid "Up to date"
+msgstr "Đã cập nhật"
+
+msgid "Update"
+msgstr "Cập nhật"
+
+msgid "Updating"
+msgstr "Đang cập nhật"
+
+msgid "Uptime"
+msgstr "Hoạt động"
+
+msgid "Version"
+msgstr "Phiên bản"
+
+msgid "Version %s"
+msgstr "Phiên bản %s"
+
+msgid "Video"
+msgstr "Video"
+
+msgid "WAN port"
+msgstr "Cổng WAN"
+
+msgid "WPA password"
+msgstr "Mật khẩu WPA"
+
+msgid "Waiting for Internet"
+msgstr "Chờ Internet"
+
+msgid "Waiting to save"
+msgstr "Chờ lưu"
+
+msgid "Website"
+msgstr "Website"
+
+msgid "Wireless network: %s"
+msgstr "Mạng không dây: %s"
+
+msgid "different devices"
+msgstr "thiết bị khác nhau"
+
+msgid "Cancel"
+msgstr "Hủy"
+
+msgid "Password"
+msgstr "Mật khẩu"
+
+msgid "Username"
+msgstr "Tên đăng nhập"
+
+msgid "Log in"
+msgstr "Đăng nhập"
+
+msgid "Logging in…"
+msgstr "Đang đăng nhập…"

@@ -13,7 +13,7 @@
 		}
 	},
 	"admin/wifi": {
-		"title": "WiFi",
+		"title": "Network",
 		"order": 2,
 		"action": {
 			"type": "view",

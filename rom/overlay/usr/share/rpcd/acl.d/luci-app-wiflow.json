@@ -1,8 +1,9 @@
 {
 	"luci-app-wiflow": {
-		"description": "Wiflow App, WiFi and System pages",
+		"description": "Wiflow Overview, Network and System pages",
 		"read": {
 			"cgi-io": [
+				"backup",
 				"exec"
 			],
 			"file": {
@@ -26,6 +27,12 @@
 				],
 				"/proc/sys/kernel/hostname": [
 					"read"
+				],
+				"/sys/class/net/br-lan/address": [
+					"read"
+				],
+				"/etc/wiflow_release": [
+					"read"
 				]
 			},
 			"ubus": {
@@ -42,13 +49,17 @@
 					"countrylist",
 					"freqlist",
 					"txpowerlist"
+				],
+				"system": [
+					"board"
 				]
 			},
 			"uci": [
-				"wireless",
-				"network",
 				"firewall",
-				"rpcd"
+				"luci",
+				"network",
+				"rpcd",
+				"wireless"
 			]
 		},
 		"write": {
@@ -82,6 +93,15 @@
 				],
 				"/sbin/sysupgrade --test /tmp/firmware.bin": [
 					"exec"
+				],
+				"/tmp/backup.tar.gz": [
+					"write"
+				],
+				"/sbin/sysupgrade --restore-backup /tmp/backup.tar.gz": [
+					"exec"
+				],
+				"/sbin/sysupgrade -r /tmp/backup.tar.gz": [
+					"exec"
 				]
 			},
 			"ubus": {
@@ -107,10 +127,11 @@
 				]
 			},
 			"uci": [
-				"wireless",
-				"network",
 				"firewall",
-				"rpcd"
+				"luci",
+				"network",
+				"rpcd",
+				"wireless"
 			]
 		}
 	}

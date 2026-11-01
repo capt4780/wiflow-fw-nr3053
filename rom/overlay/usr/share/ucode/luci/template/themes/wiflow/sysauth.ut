@@ -20,63 +20,42 @@
 
 {% include('header', { blank_page: true, wf_login: true }) %}
 
-{% if (!gate_ok): %}
-<section hidden data-title="{{ entityencode(_('Security code'), true) }}" data-gate="1">
-	<form method="post" class="cbi-map" autocomplete="off">
-		<div class="cbi-section">
-			<div class="cbi-section-node">
-				<div class="cbi-value">
-					<div class="cbi-value-field">
-						<input name="wf_gate_code" id="wf_gate_code" type="text" aria-label="{{ entityencode(_('Security code'), true) }}" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text">
-					</div>
-				</div>
-			</div>
+<div class="w-gate">
+	<img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">
+	{% if (!gate_ok): %}
+	<div class="w-tt"><h1>{{ _('Security code') }}</h1><p>{{ _('Enter the device code to continue') }}</p></div>
+	<form class="w-f" method="post" autocomplete="off">
+		<div class="w-fld">
+			<label for="wf_gate_code">{{ _('Security code') }}</label>
+			<div class="w-in"><input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text"></div>
 		</div>
+		{% if (gate_try?.error == 'locked'): %}
+		<p class="w-err">{{ sprintf(_('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</p>
+		{% elif (gate_try?.error == 'invalid'): %}
+		<p class="w-err">{{ sprintf(_('Wrong security code. %d attempts left.'), gate_try.left) }}</p>
+		{% endif %}
+		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(_('Checking…'), true) }}">{{ _('Continue') }}</button>
 	</form>
-
-	{% if (gate_try?.error == 'locked'): %}
-	<div class="alert-message error">{{ sprintf(_('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</div>
-	{% elif (gate_try?.error == 'invalid'): %}
-	<div class="alert-message error">{{ sprintf(_('Wrong security code. %d attempts left.'), gate_try.left) }}</div>
-	{% endif %}
-
-	<button class="btn cbi-button-positive important">{{ _('Continue') }}</button>
-</section>
-{% else %}
-<section hidden data-title="{{ entityencode(_('Sign in'), true) }}">
-	<p class="wf-login-sub">{{ _('Wiflow router administration') }}</p>
-	<form method="post" class="cbi-map">
-		<div class="cbi-section">
-			<div class="cbi-section-node">
-				<div class="cbi-value">
-					<label class="cbi-value-title" for="luci_username">{{ _('Username') }}</label>
-					<div class="cbi-value-field">
-						<input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}">
-					</div>
-				</div>
-				<div class="cbi-value">
-					<label class="cbi-value-title" for="luci_password">{{ _('Password') }}</label>
-					<div class="cbi-value-field">
-						<input name="luci_password" id="luci_password" type="password" autocomplete="current-password">
-					</div>
-				</div>
-			</div>
+	{% else %}
+	<div class="w-tt"><h1>{{ _('Sign in') }}</h1><p>{{ _('Wiflow router administration') }}</p></div>
+	<form class="w-f" method="post">
+		<div class="w-fld">
+			<label for="luci_username">{{ _('Username') }}</label>
+			<div class="w-in"><input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}"></div>
 		</div>
+		<div class="w-fld">
+			<label for="luci_password">{{ _('Password') }}</label>
+			<div class="w-in"><input name="luci_password" id="luci_password" type="password" autocomplete="current-password"></div>
+		</div>
+		{% if (fuser && gate_passed(http)): %}
+		<p class="w-err">{{ _('Invalid username and/or password! Please try again.') }}</p>
+		{% endif %}
+		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(_('Logging in…'), true) }}">{{ _('Log in') }}</button>
 	</form>
-
-	{% if (fuser && gate_passed(http)): %}
-	<div class="alert-message error">
-		{{ _('Invalid username and/or password! Please try again.') }}
-	</div>
 	{% endif %}
-
-	<button class="btn cbi-button-positive important">{{ _('Log in') }}</button>
-</section>
-{% endif %}
-
+</div>
 
 <div id="view">
-	<div class="spinning">{{ _('Loading view…') }}</div>
 	<script>
 		L.require('ui').then(function(ui) {
 			ui.instantiateView('wiflow.sysauth');

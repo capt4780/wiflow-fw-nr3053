@@ -270,6 +270,13 @@ function series_out() {
 	return { devices: dev, latency: lat };
 };
 
+// Content type of the active guest page: image, video or website ('' when none).
+function portal_mode() {
+	const t = readfile('/www-wiflow-portal/runtime/active/portal.json');
+	const j = t ? json(t) : null;
+	return (j && (j.mode == 'image' || j.mode == 'video' || j.mode == 'website')) ? j.mode : '';
+}
+
 // Guest portal state for the page: where the WiFi sits and what the portal is doing.
 function portal_state() {
 	const c = cursor();
@@ -290,7 +297,7 @@ function portal_state() {
 	else if (core('portal_enabled', '0') == '1') state = 'on';
 	else if (core('portal_sync_status') == 'syncing') state = 'syncing';
 	else if (core('portal_sync_status') == 'failed') state = 'error';
-	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net };
+	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net, mode: portal_mode() };
 };
 
 export function status() {

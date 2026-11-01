@@ -15,11 +15,18 @@
 	const wiflow_os = trim(readfile('/etc/wiflow_release') ?? '');
 	const device_id = trim(readfile('/etc/wiflow/device-id') ?? '');
 
-	// Online chip: some interface that is up carries a default route
-	let wf_online = false;
-	for (let i in ubus.call('network.interface', 'dump')?.interface ?? [])
-		if (i.up && length(filter(i.route ?? [], (r) => r.target == '0.0.0.0' || r.target == '::')))
-			wf_online = true;
+	const at = ctx.request_path?.[1];
+	const cur_lang = (dispatcher.lang == 'vi') ? 'vi' : 'en';
+	const nav = [
+		[ 'wiflow', _('Overview'), '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>' ],
+		[ 'wifi', _('Network'), '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>' ],
+		[ 'system', _('System'), '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>' ]
+	];
+	const out_icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9"/></svg>';
+	const flag = {
+		vi: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#DA251D"/><path d="M12.00 5.40 L13.65 10.13 L18.66 10.24 L14.66 13.27 L16.11 18.06 L12.00 15.20 L7.89 18.06 L9.34 13.27 L5.34 10.24 L10.35 10.13z" fill="#FFCD00"/></svg>',
+		en: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#1F3A93"/><path d="M0 0L24 24M24 0L0 24" stroke="#fff" stroke-width="4.5"/><path d="M0 0L24 24M24 0L0 24" stroke="#D52B3A" stroke-width="1.6"/><path d="M12 0v24M0 12h24" stroke="#fff" stroke-width="7"/><path d="M12 0v24M0 12h24" stroke="#D52B3A" stroke-width="4"/></svg>'
+	};
 
 	http.prepare_content('text/html; charset=UTF-8');
 -%}
@@ -46,26 +53,41 @@
 		<script src="{{ resource }}/cbi.js"></script>
 	</head>
 
-	<body class="lang_{{ dispatcher.lang }} {{ entityencode(striptags(node?.title ?? ''), true) }}{{ wf_login ? ' wf-login' : '' }}" data-page="{{ entityencode(join('-', ctx.request_path), true) }}">
+	<body class="lang_{{ dispatcher.lang }}{{ wf_login ? ' wf-login' : '' }}" data-page="{{ entityencode(join('-', ctx.request_path), true) }}">
 		{% if (!blank_page): %}
-		<div class="wf-shell">
-		<aside class="wf-side" id="wf-side">
-			<a class="wf-brand" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img class="wf-logo" src="{{ media }}/wiflow-logo.png" alt="Wiflow">{% if (device_id): %}<span class="wf-id" title="{{ model }}">{{ device_id }}</span>{% endif %}</a>
-			<ul class="wf-nav" id="topmenu" style="display:none"></ul>
-			<div class="wf-side-foot"><a href="tel:0833880100"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>0833 880 100</a><a href="mailto:wiflow@projifylab.com"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3 8 9 6 9-6"/></svg>wiflow@projifylab.com</a><a class="wf-logout wf-logout-side" href="{{ dispatcher.build_url('admin') }}/logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg><span>{{ _('Sign out') }}</span></a></div>
-		</aside>
-		<div class="wf-main">
-		<header class="wf-top">
-			<a class="wf-mlogo" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img src="{{ media }}/wiflow-logo.png" alt="Wiflow"></a>
-			<div class="wf-head">
-				<h1 id="wf-crumb"></h1>
-				<span class="wf-chip{{ wf_online ? '' : ' off' }}"><i></i>{{ wf_online ? _('Online') : _('Offline') }}</span>
+		<div class="w-app">
+		<aside class="w-side">
+			<a class="w-lg" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">{% if (device_id): %}<span class="w-code" title="{{ model }}">{{ device_id }}</span>{% endif %}</a>
+			<nav class="w-nv">
+				{% for (let n in nav): %}
+				<a class="{{ at == n[0] ? 'w-on' : '' }}" href="{{ dispatcher.build_url('admin', n[0]) }}">{! n[2] !}<span class="w-l">{{ n[1] }}</span></a>
+				{% endfor %}
+			</nav>
+			<div class="w-lang" data-lang="{{ cur_lang }}">
+				<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{! flag[cur_lang] !}<span class="w-ln">{{ cur_lang == 'vi' ? 'Tiếng Việt' : 'English' }}</span><svg class="w-cv2" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+				<div class="w-lm">
+					<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{! flag.vi !}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+					<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{! flag.en !}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+				</div>
 			</div>
-			<div id="indicators" class="pull-right"></div>
-			<a class="wf-logout" href="{{ dispatcher.build_url('admin') }}/logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg><span>{{ _('Sign out') }}</span></a>
+			<a class="w-out" href="{{ dispatcher.build_url('admin') }}/logout">{! out_icon !}<span class="w-l">{{ _('Sign out') }}</span></a>
+		</aside>
+		<div class="w-main">
+		<header class="w-topm">
+			<a class="w-lg" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img src="{{ media }}/wiflow-mark.webp" alt="Wiflow"></a>
+			<div class="w-tr">
+				<div class="w-lang" data-lang="{{ cur_lang }}">
+					<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{! flag[cur_lang] !}</button>
+					<div class="w-lm">
+						<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{! flag.vi !}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+						<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{! flag.en !}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+					</div>
+				</div>
+				<a class="w-ib" href="{{ dispatcher.build_url('admin') }}/logout" aria-label="{{ _('Sign out') }}">{! out_icon !}</a>
+			</div>
 		</header>
 
-		<div id="maincontent" class="container">
+		<main id="maincontent" class="w-pg"><div class="w-col">
 			{% if (getuid() == 0 && getspnam('root')?.pwdp === ''): %}
 				<div class="alert-message warning">
 					<h4>{{ _('No password set!') }}</h4>
