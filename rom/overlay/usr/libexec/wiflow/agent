@@ -72,7 +72,7 @@ function link_expected() {
 // A WiFi source is saved but the router is not joined to it (typically after a power cut: the router
 // starts before the source does, and the WiFi client of this driver does not scan again by itself).
 // The WiFi is restarted early and again with a back-off, long before the 15 minute step below.
-const WS_STEPS = [ 100, 200, 400, 600 ].map(x => x / RS);
+const WS_STEPS = map([ 100, 200, 400, 600 ], x => x / RS);
 let ws_n = 0, ws_next = null;
 
 function wifi_source_tick(now, off) {
