@@ -23,7 +23,7 @@
 <div class="w-gate">
 	<img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">
 	{% if (!gate_ok): %}
-	<div class="w-tt"><h1>{{ _('Security code') }}</h1><p>{{ _('Enter the device code to continue') }}</p></div>
+	<div class="w-tt" data-title="Security code"><h1>{{ _('Security code') }}</h1><p>{{ _('Enter the device code to continue') }}</p></div>
 	<form class="w-f" method="post" autocomplete="off">
 		<div class="w-fld">
 			<label for="wf_gate_code">{{ _('Security code') }}</label>
@@ -37,7 +37,7 @@
 		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(_('Checking…'), true) }}">{{ _('Continue') }}</button>
 	</form>
 	{% else %}
-	<div class="w-tt"><h1>{{ _('Sign in') }}</h1><p>{{ _('Wiflow router administration') }}</p></div>
+	<div class="w-tt" data-title="Sign in"><h1>{{ _('Sign in') }}</h1><p>{{ _('Wiflow router administration') }}</p></div>
 	<form class="w-f" method="post">
 		<div class="w-fld">
 			<label for="luci_username">{{ _('Username') }}</label>

@@ -94,6 +94,6 @@ done
 [ -z "$bad" ] && ok "$n pages, menu and translations render (logged in)" || no "pages with errors:$bad"
 
 r="$(req /admin/wiflow "$sess")"
-has "$r" 'wf-logo' && has "$r" 'wf-brand' && ok "Wiflow theme frame (logo, device) on inside pages" || no "theme frame missing"
+has "$r" 'class="w-side"' && has "$r" 'w-tabbar' && ok "Wiflow theme frame (logo, device) on inside pages" || no "theme frame missing"
 
 exit $fail
