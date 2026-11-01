@@ -10,8 +10,8 @@ expect "portal is off before content" "$(U get wiflow.core.portal_enabled || ech
 mkdir -p /tmp/mock/wp/media
 head -c 3000 /dev/urandom > /tmp/mock/wp/media/bg.jpg
 echo '{"v":1,"brand":"Quan Test"}' > /tmp/mock/wp/media/shop.json
-wp "s['codes']['PORT00001111']={'account':'WIFUID777000'}; s['commands']=[]"
-r="$(job pair '{"code":"PORT00001111"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
+wp "s['codes']['WIFAPIPORT01']={'account':'WIFUID777000'}; s['commands']=[]"
+r="$(job pair '{"code":"WIFAPIPORT01"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
 wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'}]}"
 # the mode loop is NOT started: the content download alone must switch the portal on
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 7 ] && $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && break; sleep 2; done

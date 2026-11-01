@@ -12,7 +12,7 @@ SF = D + '/state.json'
 def load():
     if os.path.exists(SF):
         return json.load(open(SF))
-    return {'codes': {'ABCD1234EFGH': {'account': 'WIFUID482913'}}, 'devices': {}, 'revoked': [], 'commands': [], 'results': {}}
+    return {'codes': {'WIFAPIABCD12': {'account': 'WIFUID482913'}}, 'devices': {}, 'revoked': [], 'commands': [], 'results': {}}
 
 def save(s):
     json.dump(s, open(SF + '.tmp', 'w'), indent=1); os.replace(SF + '.tmp', SF)

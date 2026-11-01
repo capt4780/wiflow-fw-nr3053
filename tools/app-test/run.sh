@@ -46,8 +46,8 @@ $B world 'w["wan_cable"]=True'
 $B agent
 wait_for 30 "s['internet']['online']" && pass "agent: Internet check" || fail "online: $(st "s['internet']")"
 
-r="$(job pair '{"code":"ZZZZ-1111-2222"}')"; expect "pair: unknown code" "$r" '^failed\|The code is not correct'
-r="$(job pair '{"code":"abcd-1234-efgh"}')"; expect "pair" "$r" '^success\|Linked to account WIFUID482913'
+r="$(job pair '{"code":"WIFAPIZZZZZZ"}')"; expect "pair: unknown code" "$r" '^failed\|The code is not correct'
+r="$(job pair '{"code":"WIFAPI-ABCD12"}')"; expect "pair" "$r" '^success\|Linked to account WIFUID482913'
 wait_for 20 "s['wp']['online']" && pass "heartbeat accepted" || fail "heartbeat: $(st "s['wp']")"
 wait_for 60 "s['clients']['now']==3" && pass "dashboard: 3 WiFi devices from the bridge table (2 on 2.4G, 1 on 5G; cable and the router itself not counted)" || fail "clients: $(st "s['clients']")"
 expect "dashboard: devices per band, today" "$(st "(s['clients']['band2g'], s['clients']['band5g'], s['clients']['today'])")" '^\(2, 1, 3\)$'
@@ -85,8 +85,8 @@ grep -q '^reboot' /tmp/mock/calls.log && pass "reboot command reboots" || fail "
 wp "
 for hw,d in list(s['devices'].items()): s['revoked'].append([hw,d['token']]); del s['devices'][hw]"
 wait_for 60 "not s['wp']['paired']" && pass "owner unpair in app: router forgets account (after confirmations)" || fail "server unpair: $(st "s['wp']")"
-wp "s['codes']['QWER5678TYUI']={'account':'WIFUID555111'}; s['commands']=[]"
-r="$(job pair '{"code":"QWER5678TYUI"}')"; expect "pair again" "$r" 'WIFUID555111'
+wp "s['codes']['WIFAPIQWER56']={'account':'WIFUID555111'}; s['commands']=[]"
+r="$(job pair '{"code":"WIFAPIQWER56"}')"; expect "pair again" "$r" 'WIFUID555111'
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
 echo '{}' > /tmp/rq.json; $B x /usr/libexec/wiflow/job diag /tmp/rq.json
 r="$(st "(s['job'] or {}).get('state','')")"; expect "diagnostic report (keys hidden)" "$r|$(grep -c '== wireless' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234' /tmp/wiflow/diag.txt)" '^success\|1\|0$'
