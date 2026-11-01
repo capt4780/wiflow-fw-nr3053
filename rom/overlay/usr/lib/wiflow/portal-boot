@@ -12,5 +12,12 @@ done
 tcp_listening 010A0A0A 0820 || /etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 uci -q get wiflow.core >/dev/null 2>&1 || { uci set wiflow.core=core; uci commit wiflow; }
 portal_storage_gc
-restored="$(session_restore 2>/dev/null || echo 0)"; wlog system "Khôi phục ${restored:-0} phiên khách"
+# v1.1.9: after a router start (power cut or reboot) every guest has to confirm again on the portal. A restart of the
+# wiflow service on a running router (uptime above 5 minutes) keeps the guests as before. Statistics and history are kept.
+if [ "$(uptime_s)" -lt 300 ]; then
+    rm -f "$SESSION_SNAP" 2>/dev/null || true
+    wlog system 'Router khởi động lại: khách cũ qua cổng chào từ đầu'
+else
+    restored="$(session_restore 2>/dev/null || echo 0)"; wlog system "Khôi phục ${restored:-0} phiên khách"
+fi
 portal_activate || wlog portal 'Không bật được tường lửa cổng chào'

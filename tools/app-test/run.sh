@@ -39,7 +39,7 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^job_clear pair status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '1\.1\.8'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '1\.1\.9'\)$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
 $B world 'w["wan_cable"]=True'
@@ -62,7 +62,7 @@ n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
 [ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^1\.1\.8 4  Wiflow 2\.4G (lan|wifi) \[\]$'
+expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^1\.1\.9 4  Wiflow 2\.4G (lan|wifi) \[\]$'
 
 wp "s['commands']=[
  {'id':'c1','action':'change_guest_ssid','payload':{'guest_ssid':'X'}},
@@ -133,7 +133,7 @@ $B x ip link set wan down
 $B x sh -c "uci set wireless.wfsrc=wifi-iface; uci set wireless.wfsrc.device=MT7981_1_2; uci set wireless.wfsrc.mode=sta; uci set wireless.wfsrc.network=wwan; uci set wireless.wfsrc.ssid=SRC; uci commit wireless"
 $B agent
 wait_for 25 "s['system']['recovery']['offline_s']>=0" >/dev/null 2>&1; sleep 14
-expect "WiFi source not joined: the WiFi restarts early, the 15 min step not reached" "$(grep -c '^wifi reload' /tmp/mock/calls.log | sed 's/^0$/none/;s/^[1-9].*$/reloaded/')|$(st "s['system']['recovery']['stage']<2")" '^reloaded\|True$'
+expect "WiFi source not joined: the WiFi restarts early and again every 2 minutes, the 15 min step not reached" "$(grep -c '^wifi reload' /tmp/mock/calls.log | sed 's/^[01]$/few/;s/^[2-9].*$/repeated/')|$(st "s['system']['recovery']['stage']<2")" '^repeated\|True$'
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 $B x sh -c "uci delete wireless.wfsrc; uci commit wireless"
 $B x ip link set wan up

@@ -55,7 +55,7 @@ function internet_tick() {
 // reboot reason and the counter) and when the counter is cleared again.
 // The test bench runs the same steps WIFLOW_REC_SCALE times faster.
 const RS = +(getenv('WIFLOW_REC_SCALE') ?? 1) || 1;
-const REC_T1 = 180 / RS, REC_T2 = 900 / RS, REC_T3 = 1800 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 240 / RS;
+const REC_T1 = 180 / RS, REC_T2 = 900 / RS, REC_T3 = 1800 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 60 / RS;
 let off_since = null, on_since = null, rec_stage = 0;
 
 function sta_configured() {
@@ -69,25 +69,27 @@ function link_expected() {
 	return wan_carrier() || sta_configured();
 }
 
-// A WiFi source is saved but the router is not joined to it (typically after a power cut: the router
-// starts before the source does, and the WiFi client of this driver does not scan again by itself).
-// The WiFi is restarted early and again with a back-off, long before the 15 minute step below.
-const WS_STEPS = map([ 100, 200, 400, 600 ], x => x / RS);
-let ws_n = 0, ws_next = null;
+// Whenever the Internet is lost (typically after a power cut: the router starts before the source does, and the
+// WiFi client of this driver does not scan again by itself) the link is retried every 2 minutes, the first time
+// after 1 minute without Internet, until the Internet is back. The 3, 15 and 30 minute steps below stay as the safety net.
+const WS_FIRST = 60 / RS, WS_EVERY = 120 / RS;
+let ws_next = null;
 
 function wifi_source_tick(now, off) {
-	if (wan_carrier() || !sta_configured() || uplink_kind() != 'none') {
-		ws_n = 0; ws_next = null;
-		return;
-	}
 	if (ws_next == null)
-		ws_next = now + WS_STEPS[0];
+		ws_next = now - off + WS_FIRST;
 	if (now < ws_next)
 		return;
-	W.wlog('system', 'The source WiFi is not joined: restarting the WiFi');
-	W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
-	ws_n++;
-	ws_next = now + WS_STEPS[ws_n < length(WS_STEPS) ? ws_n : length(WS_STEPS) - 1];
+	ws_next = now + WS_EVERY;
+	if (!wan_carrier() && sta_configured() && uplink_kind() == 'none') {
+		W.wlog('system', 'The source WiFi is not joined: restarting the WiFi');
+		W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
+	} else {
+		W.wlog('system', 'No Internet: renewing the connection');
+		W.run('ifup wan >/dev/null 2>&1 &');
+		if (sta_configured())
+			W.run('ifup wwan >/dev/null 2>&1 &');
+	}
 }
 
 function boot_reason(reason) {
@@ -99,7 +101,7 @@ function recovery_tick(online) {
 	if (online) {
 		off_since = null;
 		rec_stage = 0;
-		ws_n = 0; ws_next = null;
+		ws_next = null;
 		if (on_since == null) on_since = now;
 		if (now - on_since >= REC_OK && W.num(W.core('recovery_reboots', '0'), 0) > 0)
 			W.core_set({ recovery_reboots: null });

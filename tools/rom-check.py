@@ -254,6 +254,9 @@ checks = {
         and all(os.path.isfile(F + "/www-wiflow-portal/" + x) for x in ["template-website.html", "template-image.html", "template-video.html",
             "connected.html", "runtime/assets/fonts/inter-400.woff2", "runtime/assets/fonts/lexend.woff"])
         and not any(os.path.exists(F + "/www-wiflow-portal/runtime/assets/" + x) for x in ["bg-landscape.webp", "bg-portrait.webp"])
+        # v1.1.9: a router start (uptime under 5 minutes) forgets the old guests; the agent retries the link every 2 minutes
+        and 'uptime_s)" -lt 300' in open(F + "/usr/lib/wiflow/portal-boot").read() and 'rm -f "$SESSION_SNAP"' in open(F + "/usr/lib/wiflow/portal-boot").read()
+        and "WS_EVERY = 120 / RS" in open(F + "/usr/libexec/wiflow/agent").read()
         # v1.1.8: no hotline/email in the brand introduction; Confirm goes straight to the success page (no outside link)
         and all("hotline" not in open(F + "/www-wiflow-portal/" + x).read() and "mailto:" not in open(F + "/www-wiflow-portal/" + x).read()
                 and "openOutside" not in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
