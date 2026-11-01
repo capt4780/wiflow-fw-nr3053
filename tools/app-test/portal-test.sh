@@ -9,14 +9,16 @@ expect "portal is off before content" "$(U get wiflow.core.portal_enabled || ech
 # WordPress publishes revision 7: an image and the shop data
 mkdir -p /tmp/mock/wp/media
 head -c 3000 /dev/urandom > /tmp/mock/wp/media/bg.jpg
+head -c 2000 /dev/urandom > /tmp/mock/wp/media/intro.jpg
 echo '{"v":1,"brand":"Quan Test"}' > /tmp/mock/wp/media/shop.json
 wp "s['codes']['WIFAPIPORT01']={'account':'WIFUID777000'}; s['commands']=[]"
 r="$(job pair '{"code":"WIFAPIPORT01"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
-wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'}]}"
+wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'},{'role':'intro_image','name':'intro.jpg'}]}"
 # the mode loop is NOT started: the content download alone must switch the portal on
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 7 ] && $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && break; sleep 2; done
 expect "portal: content revision 7 downloaded, checked and active" "$(U get wiflow.core.portal_revision)|$(U get wiflow.core.portal_sync_status)|$(U get wiflow.core.portal_enabled)|$($B x jsonfilter -i /www-wiflow-portal/runtime/active/portal.json -e '@.mode' 2>/dev/null)" '^7\|active\|1\|image$'
-expect "App page: portal state, revision and where the WiFi sits" "$(st "(s['portal']['state'], s['portal']['revision'], s['portal']['network'])")" "^\\('on', 7, 'mixed'\\)$"
+expect "App page: portal state, revision and where the WiFi sits" "$(st "(s['portal']['state'], s['portal']['revision'], s['portal']['network'])")" "^\\('on', 7, 'guest'\\)$"
+[ -s /www-wiflow-portal/runtime/active/media/intro.jpg ] && pass "portal: intro image role accepted and stored" || fail "portal: intro_image not stored"
 cmp -s /tmp/mock/wp/media/bg.jpg /www-wiflow-portal/runtime/active/media/bg.jpg && pass "portal: media identical to the server copy (sha256 checked)" || fail "portal: media differs"
 $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && pass "portal: captive firewall table is up" || fail "portal: no captive table"
 grep -q '"status": "active"' /tmp/mock/wp/portal-ack.jsonl 2>/dev/null && pass "portal: WordPress told the revision is active" || fail "portal: no ack: $(cat /tmp/mock/wp/portal-ack.jsonl 2>/dev/null)"
