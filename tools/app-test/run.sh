@@ -129,12 +129,14 @@ expect "reboot reason without a stored one: power or manual" "$(st "s['system'][
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 rm -rf /tmp/wiflow/st/recovery; : > /tmp/mock/calls.log
 $B world 'w["wan_cable"]=False; w["inet"].update({k: False for k in w["inet"]})'
+$B x ip link set wan down
 $B x sh -c "uci set wireless.wfsrc=wifi-iface; uci set wireless.wfsrc.device=MT7981_1_2; uci set wireless.wfsrc.mode=sta; uci set wireless.wfsrc.network=wwan; uci set wireless.wfsrc.ssid=SRC; uci commit wireless"
 $B agent
 wait_for 25 "s['system']['recovery']['offline_s']>=0" >/dev/null 2>&1; sleep 14
 expect "WiFi source not joined: the WiFi restarts early, the 15 min step not reached" "$(grep -c '^wifi reload' /tmp/mock/calls.log | sed 's/^0$/none/;s/^[1-9].*$/reloaded/')|$(st "s['system']['recovery']['stage']<2")" '^reloaded\|True$'
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 $B x sh -c "uci delete wireless.wfsrc; uci commit wireless"
+$B x ip link set wan up
 $B world 'w["wan_cable"]=True; w["inet"].update({k: True for k in w["inet"]})'
 rm -rf /tmp/wiflow/st/recovery /tmp/wiflow/st/boot_reason
 unset WIFLOW_REC_SCALE
