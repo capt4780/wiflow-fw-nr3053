@@ -199,12 +199,14 @@ return view.extend({
 		const halt = () => { stopped = true; window.clearTimeout(timer); };
 		const stop = btn('g', _('Stop refreshing'), () => { halt(); stop.disabled = true; });
 		K.dialog(_('Scan WiFi %s').format(band(b)), body, [ stop, btn('g', _('Not now'), () => { halt(); ui.hideModal(); }) ], { wide: true });
+		// like the stock scan page: results are kept by BSSID, an entry that is missed once stays (dimmed) and is dropped after 3 misses
+		const cache = {};
 		const list = rows => {
 			if (!rows.length) { body.replaceChildren(K.waitBox(_('No networks found'))); return; }
-			body.replaceChildren(E('div', {}, rows.map(r => E('div', { 'class': 'w-net' + (r.ssid ? '' : ' w-hid') }, [
+			body.replaceChildren(E('div', {}, rows.map(r => E('div', { 'class': 'w-net' + (r.ssid ? '' : ' w-hid') + (r.miss ? ' w-stale' : '') }, [
 				E('div', { 'class': 'w-i' }, [
 					E('div', { 'class': 'w-n' }, r.ssid || _('Hidden network')),
-					E('div', { 'class': 'w-m' }, [ sig(r.signal || -90), E('span', {}, (r.signal || -90) + ' dBm · ' + encLabel(r.encryption)) ])
+					E('div', { 'class': 'w-m' }, [ sig(r.signal || -90), E('span', {}, (r.signal || -90) + ' dBm · CH ' + r.channel + ' · ' + encLabel(r.encryption)) ])
 				]),
 				btn('p', _('Join'), () => { halt(); this.join(r); }, { sm: true })
 			]))));
@@ -213,13 +215,14 @@ return view.extend({
 			d.getScanList().then(l => l.map(r => Object.assign({}, r, { dev: d.getName(), band: b, modes: d.getHTModes() || [] })), () => [])
 		))).then(all => {
 			if (stopped) return;
-			const own = ownSsids(), best = {};
+			const own = ownSsids(), seen = {};
 			[].concat.apply([], all).forEach(r => {
-				if (r.ssid && own.indexOf(r.ssid) >= 0) return;
-				const key = r.ssid || ('#' + r.bssid);
-				if (!best[key] || (r.signal || -200) > (best[key].signal || -200)) best[key] = r;
+				if (!r.bssid || (r.ssid && own.indexOf(r.ssid) >= 0)) return;
+				seen[r.bssid] = 1;
+				cache[r.bssid] = Object.assign(r, { miss: 0 });
 			});
-			list(Object.keys(best).map(k => best[k]).sort((x, y) => (y.signal || -200) - (x.signal || -200)));
+			Object.keys(cache).forEach(k => { if (!seen[k] && ++cache[k].miss > 3) delete cache[k]; });
+			list(Object.keys(cache).map(k => cache[k]).sort((x, y) => (y.signal || -200) - (x.signal || -200)));
 		}).catch(() => {}).then(() => { if (!stopped) timer = window.setTimeout(run, 8000); });
 		run();
 	},

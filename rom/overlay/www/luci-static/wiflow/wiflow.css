@@ -384,3 +384,8 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-app button:focus,.w-app input:focus,.modal button:focus,.modal input:focus,.w-gate input:focus,.w-gate button:focus{outline:none!important;box-shadow:none!important}
 .w-topm{background:transparent;color:var(--ink)}
 .w-net.w-hid .w-n{color:var(--mut);font-weight:500}
+.w-net.w-stale{opacity:.5}
+.w-ph{min-width:0}
+.w-ph h2{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.w-ph .w-chip{flex:0 1 auto;min-width:0;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+.w-ph .w-chip::before{flex:none}

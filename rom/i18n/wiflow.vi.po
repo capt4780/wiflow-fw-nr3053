@@ -624,7 +624,7 @@ msgid "Power on or manual restart"
 msgstr "Cắm điện hoặc khởi động lại thủ công"
 
 msgid "Renewing the WAN connection"
-msgstr "Đang làm mới kết nối WAN"
+msgstr "Làm mới WAN"
 
 msgid "Restart done, waiting for Internet"
 msgstr "Đã khởi động lại, đang chờ Internet"
@@ -633,7 +633,7 @@ msgid "Restart from the Wiflow app"
 msgstr "Khởi động lại từ ứng dụng Wiflow"
 
 msgid "Restarting the WiFi"
-msgstr "Đang khởi động lại WiFi"
+msgstr "Khởi động lại WiFi"
 
 msgid "Router health"
 msgstr "Sức khỏe router"

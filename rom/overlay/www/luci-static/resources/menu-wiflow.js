@@ -6,7 +6,7 @@
    this only runs the language menu. The language is stored in luci.main.lang. */
 
 return baseclass.extend({
-	__init() {
+	__init__() {
 		document.querySelectorAll('.w-lang').forEach(box => {
 			const btn = box.querySelector('.w-lb');
 
