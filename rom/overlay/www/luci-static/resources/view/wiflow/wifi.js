@@ -119,10 +119,15 @@ return view.extend({
 	guestPanel() {
 		const nets = this.st.networks || [];
 		const aps = ifaces().filter(i => i.mode == 'ap');
-		const rows = aps.map(a => {
-			const n = nets.find(x => x.band == bandOf(a.device)) || {};
-			return row(a.ssid, a.disabled == '1' ? chip('', _('Off')) : chip('ok', _('Broadcasting')), { sub: band(bandOf(a.device)) + ' · ' + _('%d devices').format(n.clients ?? 0) });
+		// one name on both bands is one row ("auto 2.4 / 5 GHz"), as in the mockup
+		const groups = [];
+		aps.forEach(a => {
+			const g = groups.find(x => x.ssid == a.ssid);
+			if (g) { g.bands.push(bandOf(a.device)); g.off = g.off && a.disabled == '1'; }
+			else groups.push({ ssid: a.ssid, bands: [ bandOf(a.device) ], off: a.disabled == '1' });
 		});
+		const rows = groups.map(g => row(g.ssid, g.off ? chip('', _('Off')) : chip('ok', _('Broadcasting')),
+			{ sub: g.bands.length > 1 ? _('Auto 2.4 / 5 GHz') : band(g.bands[0]) }));
 		rows.push(row(_('Connected now'), String((this.st.clients || {}).now ?? 0), { t: 1 }));
 		return panel('users', _('Guest WiFi'), '', rows, 'w-half');
 	},
@@ -143,7 +148,7 @@ return view.extend({
 	draw() {
 		const inet = this.st.internet || {};
 		return E('div', {}, [
-			K.head(_('Network'), inet.online ? chip('ok', _('Online')) : chip('warn', _('No Internet'))),
+			K.head(_('Network'), inet.online ? chip('ok', _('Has Internet')) : null),
 			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.scanPanel(), this.guestPanel() ]),
 			this.actionBar()
 		]);

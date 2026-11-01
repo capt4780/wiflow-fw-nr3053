@@ -15,6 +15,28 @@ return view.extend({
 			button.textContent = button.getAttribute('data-busy') || '…';
 		});
 
+		document.querySelectorAll('.w-lang').forEach(function(box) {
+			var cur = box.getAttribute('data-lang');
+			box.querySelector('.w-lb').addEventListener('click', function(ev) {
+				ev.stopPropagation();
+				box.classList.toggle('w-open');
+			});
+			box.querySelectorAll('.w-lm button').forEach(function(b) {
+				b.addEventListener('click', function(ev) {
+					ev.stopPropagation();
+					var l = b.getAttribute('data-l');
+					if (l && l != cur) {
+						document.cookie = 'wf_lang=' + l + '; path=/; max-age=31536000; SameSite=Lax';
+						location.reload();
+					}
+					else box.classList.remove('w-open');
+				});
+			});
+		});
+		document.addEventListener('click', function() {
+			document.querySelectorAll('.w-lang.w-open').forEach(function(b) { b.classList.remove('w-open'); });
+		});
+
 		var inputs = form.querySelectorAll('input'), first = inputs[0];
 		for (var i = 0; i < inputs.length; i++)
 			if (!inputs[i].value) { first = inputs[i]; break; }

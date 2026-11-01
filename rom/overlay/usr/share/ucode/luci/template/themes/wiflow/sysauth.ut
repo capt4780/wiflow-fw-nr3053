@@ -9,6 +9,24 @@
 
 {%
 	import { passed as gate_passed, attempt as gate_attempt } from 'wiflow.gate';
+	import { load_catalog, change_catalog } from 'luci.core';
+
+	// Language of the gate and login pages: before sign-in nothing can be written to the router,
+	// so the flag button keeps the choice in a cookie (wf_lang); after sign-in luci.main.lang rules.
+	let page_lang = (dispatcher.lang == 'vi') ? 'vi' : 'en';
+	const lc = match(http.getenv('HTTP_COOKIE') ?? '', /(^|;)\s*wf_lang=(vi|en)/);
+	if (lc && lc[2] != page_lang) {
+		try {
+			if (load_catalog(lc[2], '/usr/lib/lua/luci/i18n'))
+				change_catalog(lc[2]);
+			page_lang = lc[2];
+		}
+		catch (e) {}
+	}
+	const flag = {
+		vi: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#DA251D"/><path d="M12.00 5.40 L13.65 10.13 L18.66 10.24 L14.66 13.27 L16.11 18.06 L12.00 15.20 L7.89 18.06 L9.34 13.27 L5.34 10.24 L10.35 10.13z" fill="#FFCD00"/></svg>',
+		en: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#1F3A93"/><path d="M0 0L24 24M24 0L0 24" stroke="#fff" stroke-width="4.5"/><path d="M0 0L24 24M24 0L0 24" stroke="#D52B3A" stroke-width="1.6"/><path d="M12 0v24M0 12h24" stroke="#fff" stroke-width="7"/><path d="M12 0v24M0 12h24" stroke="#D52B3A" stroke-width="4"/></svg>'
+	};
 
 	const gate_try = gate_attempt(http);
 	if (gate_try?.cookie)
@@ -21,6 +39,13 @@
 {% include('header', { blank_page: true, wf_login: true }) %}
 
 <div class="w-gate">
+	<div class="w-lang" data-lang="{{ page_lang }}">
+		<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{{ flag[page_lang] }}</button>
+		<div class="w-lm">
+			<button type="button" data-l="vi" class="{{ page_lang == 'vi' ? 'w-on' : '' }}">{{ flag.vi }}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+			<button type="button" data-l="en" class="{{ page_lang == 'en' ? 'w-on' : '' }}">{{ flag.en }}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+		</div>
+	</div>
 	<img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">
 	{% if (!gate_ok): %}
 	<div class="w-tt" data-title="Security code"><h1>{{ _('Security code') }}</h1><p>{{ _('Enter the device code to continue') }}</p></div>

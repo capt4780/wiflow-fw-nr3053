@@ -96,7 +96,7 @@ return view.extend({
 			}).catch(e => ui.addNotification(null, E('p', {}, String(e && e.message || e)), 'danger')).finally(() => { go.disabled = false; });
 		});
 		return panel('shield', _('Admin password'), '', [
-			E('div', { 'class': 'w-fgrid', 'style': 'padding-top:8px' }, [ K.field(_('New password'), a, { pw: 1 }), K.field(_('Confirm password'), b, { pw: 1 }) ]),
+			E('div', { 'class': 'w-fgrid', 'style': 'padding-top:8px' }, [ K.field(_('New password'), a), K.field(_('Confirm password'), b) ]),
 			E('div', { 'class': 'w-pf' }, go)
 		], 'w-half');
 	},

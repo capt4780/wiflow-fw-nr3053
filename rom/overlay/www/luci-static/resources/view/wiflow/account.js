@@ -149,9 +149,9 @@ return view.extend({
 		else if (r.stage == 1) st = [ 'warn', _('Renewing the WAN connection') ];
 		else if (min >= 1) st = [ 'warn', _('No Internet for %d min').format(min) ];
 		return panel('shield', _('Stability'), chip(st[0], st[1]), [
-			row(_('Automatic restarts in a row'), String(y.recovery_reboots ?? 0)),
+			row(_('Consecutive restarts'), String(y.recovery_reboots ?? 0)),
 			row(_('Last start'), why),
-			row(_('Guests at most'), y.guest_max > 0 ? String(y.guest_max) : _('No limit'))
+			row(_('Command from the app'), s.job && s.job.state == 'running' ? _('Running') : _('No command'))
 		], 'w-third');
 	},
 

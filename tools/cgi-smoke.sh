@@ -53,6 +53,9 @@ has() { grep -q "$2" <<<"$1"; }
 
 r="$(req /)"
 has "$r" '^Status: 403' && has "$r" 'data-title="Security code"' && ok "login page renders, gate shown first" || no "login page: $(head -c 400 <<<"$r" | tr '\r\n\t' '|| ')"
+has "$r" 'class="w-lang"' && has "$r" 'data-l="en"' && ok "gate has the language button" || no "gate language button missing"
+r="$(req / "wf_lang=en")"
+has "$r" 'data-lang="en"' && ok "language cookie switches the gate page" || no "language cookie ignored"
 r="$(req / "" "wf_gate_code=WRONG")"
 has "$r" 'Wrong security code' && ok "wrong access code refused" || no "wrong code not refused"
 r="$(req / "" "luci_username=wiflow&luci_password=wiflow")"

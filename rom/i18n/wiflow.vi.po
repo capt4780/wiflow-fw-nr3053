@@ -549,7 +549,7 @@ msgid "Last contact"
 msgstr "Liên lạc gần nhất"
 
 msgid "Last start"
-msgstr "Lần khởi động gần nhất"
+msgstr "Khởi động gần nhất"
 
 msgid "Latency (ms)"
 msgstr "Độ trễ (ms)"
@@ -858,10 +858,10 @@ msgid "WAN port · Connected"
 msgstr "Cổng WAN · Đã kết nối"
 
 msgid "WAN port · Cable plugged in"
-msgstr "Cổng WAN · Đã cắm cáp"
+msgstr "Cổng WAN · Đã cắm dây"
 
 msgid "WAN port · No cable"
-msgstr "Cổng WAN · Chưa cắm cáp"
+msgstr "Cổng WAN · Chưa cắm dây"
 
 msgid "Plugged in"
 msgstr "Đã cắm"
@@ -873,10 +873,10 @@ msgid "Devices"
 msgstr "Thiết bị"
 
 msgid "Cable plugged in"
-msgstr "Đã cắm cáp"
+msgstr "Đã cắm dây"
 
 msgid "No cable"
-msgstr "Chưa cắm cáp"
+msgstr "Chưa cắm dây"
 
 msgid "Connected"
 msgstr "Đã kết nối"
@@ -1242,3 +1242,20 @@ msgstr "Đang tải tệp lên…"
 msgid "Hidden network"
 msgstr "Mạng ẩn"
 
+msgid "Consecutive restarts"
+msgstr "Số lần khởi động liên tiếp"
+
+msgid "Command from the app"
+msgstr "Lệnh từ app"
+
+msgid "Running"
+msgstr "Đang chạy"
+
+msgid "No command"
+msgstr "Không có"
+
+msgid "Auto 2.4 / 5 GHz"
+msgstr "Tự chọn 2.4 / 5 GHz"
+
+msgid "Has Internet"
+msgstr "Có Internet"
