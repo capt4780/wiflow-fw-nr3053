@@ -115,8 +115,11 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms, introduction and banner detail: a fixed frame; only the body scrolls. */
-.cp-terms,.cp-detail{overflow:hidden;padding:var(--pad) 0 0}
-.cp-terms{height:min(calc(100vh - 48px),640px);height:min(calc(100dvh - 48px),640px)}
+.cp-detail{overflow:hidden;padding:var(--pad) 0 0}
+.cp-terms{height:min(calc(100vh - 48px),640px);height:min(calc(100dvh - 48px),640px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:0;display:block}
+.cp-terms>.cp-dhead{position:sticky;top:0;z-index:2;background:#fff;padding-top:var(--pad)}
+.cp-terms>.scr{overflow:visible;flex:none;min-height:0}
+.cp-terms>.cp-foot{position:sticky;bottom:0;z-index:2;background:#fff}
 .cp-detail{max-height:min(calc(100vh - 48px),560px);max-height:min(calc(100dvh - 48px),560px)}
 .cp-about{max-height:min(calc(100vh - 48px),740px);max-height:min(calc(100dvh - 48px),740px)}
 .cp-detail .scr{padding:4px var(--pad) 10px;flex:0 1 auto}
@@ -270,7 +273,7 @@ html,body{overscroll-behavior:none}
           <section><h3><em>8</em>Tạm ngừng và chất lượng kết nối</h3><p>Dịch vụ có thể bị gián đoạn do bảo trì, sự cố kỹ thuật, lỗi hạ tầng, mất điện, sự cố của nhà mạng, yêu cầu an ninh hoặc sự kiện ngoài khả năng kiểm soát hợp lý. Bên cung cấp sẽ xử lý trong phạm vi kiểm soát của mình nhưng không cam kết kết nối luôn liên tục hoặc không có lỗi.</p></section>
           <section><h3><em>9</em>Luật áp dụng và giải quyết vấn đề phát sinh</h3><p>Các điều khoản này được điều chỉnh bởi pháp luật Việt Nam. Mọi vấn đề phát sinh trước hết được ưu tiên giải quyết thông qua trao đổi và hợp tác thiện chí; trường hợp không giải quyết được sẽ thực hiện theo trình tự, thẩm quyền và quy định của pháp luật Việt Nam.</p></section>
         </div></div>
-        <div class="cp-foot"><button class="cp-no" type="button" data-terms-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button><button class="cp-go" type="button" data-dialog-confirm><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Xác nhận</span></button></div>
+        <div class="cp-foot"><button class="cp-go" type="button" data-terms-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button></div>
       </div>
     </div>
   </section>
@@ -568,9 +571,9 @@ html,body{overscroll-behavior:none}
   /* iOS: a swipe that starts at the very edge of a scroll box is handed to the page behind and
      the screen freezes or reloads. Nothing cancels touches here; the box is only nudged 1px off
      the edge when a touch starts, so the browser keeps the swipe inside it. */
-  const nudge=el=>{if(!el)return;el.addEventListener('touchstart',()=>{const max=el.scrollHeight-el.clientHeight;if(max<=1)return;if(el.scrollTop<=0)el.scrollTop=1;else if(el.scrollTop>=max-1)el.scrollTop=max-1.5;},{passive:true});};
-  [mainView,detailView,termsDialog,aboutView].forEach(nudge);
-  stage.querySelectorAll('.scr').forEach(nudge);
+  const nudge=(el,top)=>{if(!el)return;el.addEventListener('touchstart',()=>{const max=el.scrollHeight-el.clientHeight;if(max<=1)return;if(el.scrollTop<=0)el.scrollTop=1;else if(!top&&el.scrollTop>=max-1)el.scrollTop=max-1.5;},{passive:true});};
+  [mainView,detailView,aboutView].forEach(v=>nudge(v));nudge(termsDialog,true);
+  stage.querySelectorAll('.scr').forEach(e=>nudge(e));
   const preview=stage.dataset.preview==='1';
   const sessionId=String(stage.dataset.localSessionId||'');
   const authorizeUrl=String(stage.dataset.localAuthorizeUrl||'');
@@ -792,7 +795,7 @@ html,body{overscroll-behavior:none}
     if(aboutView)aboutView.hidden=true;
     termsDialog.hidden=false;
     termsDialog.setAttribute('aria-hidden','false');
-    const ts=termsDialog.querySelector('.scr');if(ts)ts.scrollTop=0;
+    termsDialog.scrollTop=0;
     const firstClose=termsDialog.querySelector('[data-terms-close]');
     window.setTimeout(()=>{if(firstClose)firstClose.focus({preventScroll:true});},0);
   };
