@@ -39,7 +39,7 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^job_clear pair status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '1\.1\.5'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '1\.1\.6'\)$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
 $B world 'w["wan_cable"]=True'
@@ -62,7 +62,7 @@ n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
 [ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^1\.1\.5 4  Wiflow 2\.4G (lan|wifi) \[\]$'
+expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^1\.1\.6 4  Wiflow 2\.4G (lan|wifi) \[\]$'
 
 wp "s['commands']=[
  {'id':'c1','action':'change_guest_ssid','payload':{'guest_ssid':'X'}},
@@ -125,6 +125,18 @@ wait_for 60 "s['system']['recovery_reboots']==0" && pass "recovery: counter clea
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 rm -rf /tmp/wiflow/st/boot_reason; $B agent; sleep 6
 expect "reboot reason without a stored one: power or manual" "$(st "s['system']['boot_reason']")" '^power_or_manual$'
+# --- a saved WiFi source that is not joined (power cut, the source starts later): the WiFi is restarted early
+$B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
+rm -rf /tmp/wiflow/st/recovery; : > /tmp/mock/calls.log
+$B world 'w["wan_cable"]=False; w["inet"].update({k: False for k in w["inet"]})'
+$B x sh -c "uci set wireless.wfsrc=wifi-iface; uci set wireless.wfsrc.device=MT7981_1_2; uci set wireless.wfsrc.mode=sta; uci set wireless.wfsrc.network=wwan; uci set wireless.wfsrc.ssid=SRC; uci commit wireless"
+$B agent
+wait_for 25 "s['system']['recovery']['offline_s']>=0" >/dev/null 2>&1; sleep 14
+expect "WiFi source not joined: the WiFi restarts early, the 15 min step not reached" "$(grep -c '^wifi reload' /tmp/mock/calls.log | sed 's/^0$/none/;s/^[1-9].*$/reloaded/')|$(st "s['system']['recovery']['stage']<2")" '^reloaded\|True$'
+$B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
+$B x sh -c "uci delete wireless.wfsrc; uci commit wireless"
+$B world 'w["wan_cable"]=True; w["inet"].update({k: True for k in w["inet"]})'
+rm -rf /tmp/wiflow/st/recovery /tmp/wiflow/st/boot_reason
 unset WIFLOW_REC_SCALE
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 pgrep -f '^/usr/bin/ucode /usr/libexec/wiflow/agen[t]' >/dev/null && fail "agent ignores SIGTERM" || pass "agent stops on SIGTERM"
