@@ -43,8 +43,8 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
 .w-ct svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .w-ct.w-land{height:68%;aspect-ratio:4/3}
 .w-ct.w-port{height:84%;aspect-ratio:3/4}
-.w-ct.w-im{background:linear-gradient(135deg,#4F8BFF,#7C5CFF)}
-.w-ct.w-vi{background:linear-gradient(135deg,#1B2340,#3A4A86)}
+.w-ct.w-im{background:#5B7BFF}
+.w-ct.w-vi{background:#26325F}
 .w-ct.w-vi svg{fill:#fff;width:20px;height:20px}
 .w-ct.w-we{background:#fff;border:1px solid var(--line);align-content:start;grid-template-rows:12px 1fr;color:var(--mut)}
 .w-ct.w-we i{display:block;height:12px;background:var(--pri-soft);width:100%}

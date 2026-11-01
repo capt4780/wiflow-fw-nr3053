@@ -276,7 +276,7 @@ checks = {
         "linear-gradient" not in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
     "Wiflow UI: one stylesheet, phone bar + tablet rail + Vietnamese gate":
         not os.path.exists(F + "/www/luci-static/wiflow/ui.css")
-        and "wf-dock" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
+        and "w-tabbar" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
         and "M\u00e3 b\u1ea3o m\u1eadt".encode() in open(F + "/usr/lib/lua/luci/i18n/wiflow.vi.lmo", "rb").read(),
     "LuCI package upload accepts an unsigned package file":
         '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
@@ -285,7 +285,7 @@ checks = {
     "LuCI look: one Wiflow stylesheet over cascade.css (no mobile.css); tables are lists, dialogs fit the screen":
         not os.path.exists(F + "/www/luci-static/wiflow/mobile.css")
         and "mobile.css" not in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
-        and "#modal_overlay{inset:0" in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
+        and "#modal_overlay{position:fixed;inset:0" in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
     "5 GHz scans and uses channels 100-140 (country VN, A-band region 7)":
         json.load(open(F + "/usr/share/schema/mtwifi/dat-defs.json"))["COUNTRY_REGIONS"]["VN"] == [1, 7]
         and "country='VN'" in open(F + "/etc/uci-defaults/98-wiflow-base").read(),
