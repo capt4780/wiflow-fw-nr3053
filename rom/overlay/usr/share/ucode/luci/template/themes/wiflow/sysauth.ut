@@ -40,7 +40,7 @@
 	<div class="w-tt" data-title="Sign in"><h1>{{ _('Sign in') }}</h1><p>{{ _('Wiflow router administration') }}</p></div>
 	<form class="w-f" method="post">
 		<div class="w-fld">
-			<label for="luci_username">{{ _('Username') }}</label>
+			<label for="luci_username">{{ _('Sign-in name') }}</label>
 			<div class="w-in"><input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}"></div>
 		</div>
 		<div class="w-fld">

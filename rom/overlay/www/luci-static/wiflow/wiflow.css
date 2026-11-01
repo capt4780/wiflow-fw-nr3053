@@ -284,7 +284,7 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
   .w-side .w-lb .w-cv2{display:block;margin-left:auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .w-side .w-lm{left:0;right:0;bottom:calc(100% + 6px);min-width:0}
   .w-side .w-sup{margin:8px 0 12px;background:var(--soft);border-radius:10px}
-  .w-side>a{background:var(--soft);border-radius:var(--r)}
+  .w-side>a.w-out{background:var(--soft);border-radius:var(--r)}
   .w-side .w-code{display:block;font-size:12px;background:var(--soft);border-radius:8px;padding:5px 10px}
   .w-side .w-lg{gap:10px}
   .w-side a{width:auto;height:44px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:15px}
@@ -377,3 +377,10 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-lgl>div:first-child{border-top:0}
 .w-lgl b{font-weight:500;color:var(--mut);flex:none;width:56px}
 .w-lgl span{min-width:0;overflow-wrap:anywhere}
+
+/* logo: no box, no background; no glow or shadow on any control */
+.w-side a.w-lg,.w-topm a.w-lg{background:none;height:auto;width:auto;padding:0;border-radius:0;display:flex;font-weight:400}
+.w-app button,.w-app input,.w-app select,.w-app a,.modal button,.modal input,.w-gate button,.w-gate input,.w-btn,.w-in{box-shadow:none!important;-webkit-box-shadow:none!important;text-shadow:none!important}
+.w-app button:focus,.w-app input:focus,.modal button:focus,.modal input:focus,.w-gate input:focus,.w-gate button:focus{outline:none!important;box-shadow:none!important}
+.w-topm{background:transparent;color:var(--ink)}
+.w-net.w-hid .w-n{color:var(--mut);font-weight:500}

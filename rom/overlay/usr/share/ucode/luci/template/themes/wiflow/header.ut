@@ -13,7 +13,7 @@
 	const boardinfo = ubus.call('system', 'board');
 	const model = striptags(boardinfo?.model ?? 'Wiflow router');
 	const wiflow_os = trim(readfile('/etc/wiflow_release') ?? '');
-	const device_id = trim(readfile('/etc/wiflow/device-id') ?? '');
+	const device_id = 'WIFDIDNR3053';
 
 	const at = ctx.request_path?.[1];
 	const cur_lang = (dispatcher.lang == 'vi') ? 'vi' : 'en';

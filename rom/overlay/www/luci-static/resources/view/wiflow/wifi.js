@@ -79,28 +79,28 @@ return view.extend({
 		const src = this.st.source || {}, inet = this.st.internet || {}, sta = staOf();
 		const lanRow = row(_('LAN cable'), src.via == 'lan' ? _('In use') : src.cable ? _('Cable plugged in') : _('No cable'));
 		if (!sta)
-			return panel('wifi', _('Source WiFi'), chip('', _('Not connected')), [
+			return panel('wifi', _('Source WiFi'), chip('', _('Not connected yet')), [
 				E('div', { 'class': 'w-row' }, E('div', { 'class': 'w-k', 'style': 'color:var(--mut);font-weight:400' }, _('No source WiFi'))), lanRow
 			], 'w-half w-r2');
 
 		const off = sta.disabled == '1', on = src.via == 'wifi' && !off, changed = this.pending() > 0;
 		const acts = E('div', { 'class': 'w-acts' }, [
-			btn('g', off ? _('Enable') : _('Disable'), () => this.toggle(sta), { sm: true }),
-			btn('s', _('Edit'), () => this.edit(sta), { sm: true }),
-			btn('d', _('Delete'), () => this.drop(sta), { sm: true })
+			btn('g', off ? _('Turn on') : _('Disable'), () => this.toggle(sta), { sm: true }),
+			btn('s', _('Edit WiFi'), () => this.edit(sta), { sm: true }),
+			btn('d', _('Remove WiFi'), () => this.drop(sta), { sm: true })
 		]);
 		const rows = [ E('div', { 'class': 'w-row w-stack' }, [
-			E('div', { 'class': 'w-k' }, [ sta.ssid, E('small', {}, band(bandOf(sta.device)) + ' · ' + _('Client')) ]), acts
+			E('div', { 'class': 'w-k' }, [ sta.ssid, E('small', {}, band(bandOf(sta.device)) + ' · ' + _('Client mode')) ]), acts
 		]) ];
 		let state;
 		if (changed) state = chip('warn', _('Waiting to save'));
-		else if (off) state = chip('', _('Disabled'));
+		else if (off) state = chip('', _('Turned off'));
 		else if (on) state = chip('ok', _('Connected'));
-		else state = chip('warn', _('Not connected'));
+		else state = chip('warn', _('Not connected yet'));
 		if (on && !changed) {
 			rows.push(row(_('Signal'), src.signal ? [ sig(src.signal), ' ' + src.signal + ' dBm' ] : '—'));
 			rows.push(row(_('IP address'), src.ip || '—'));
-			rows.push(row(_('Gateway'), src.gateway || '—'));
+			rows.push(row(_('Gateway address'), src.gateway || '—'));
 			rows.push(row(_('Latency'), inet.latency > 0 ? inet.latency + ' ms' : '—'));
 		}
 		rows.push(lanRow);
@@ -110,7 +110,7 @@ return view.extend({
 	scanPanel() {
 		const one = b => E('div', { 'class': 'w-row' }, [
 			E('span', { 'class': 'w-bandi' }, svg('band')), E('div', { 'class': 'w-k' }, band(b)),
-			btn('p', _('Scan'), () => this.scan(b), { sm: true })
+			btn('p', _('Scan now'), () => this.scan(b), { sm: true })
 		]);
 		const bands = [ '2g', '5g' ].filter(b => uci.sections('wireless', 'wifi-device').some(d => d.band == b));
 		return panel('band', _('Scan source WiFi'), '', bands.map(one), 'w-half');
@@ -132,7 +132,7 @@ return view.extend({
 		const n = this.pending();
 		const bar = E('div', { 'class': 'w-act', 'hidden': n ? null : '' });
 		if (!n) return bar;
-		bar.appendChild(E('div', { 'class': 'w-t' }, [ E('span', {}, _('%d unsaved changes').format(n)), btn('t', _('Reset'), () => this.reset(), { sm: true }) ]));
+		bar.appendChild(E('div', { 'class': 'w-t' }, [ E('span', {}, _('%d unsaved changes').format(n)), btn('t', _('Reset changes'), () => this.reset(), { sm: true }) ]));
 		const b = E('div', { 'class': 'w-b' });
 		if (this.mem > 0) b.appendChild(btn('s', _('Save'), () => this.saveOnly()));
 		b.appendChild(btn('p', _('Save & apply'), () => this.apply()));
@@ -162,9 +162,9 @@ return view.extend({
 	},
 
 	drop(sta) {
-		K.dialog(_('Delete'), E('p', {}, _('Remove the source WiFi %s from this router?').format(sta.ssid)), [
-			btn('g', _('Cancel'), ui.hideModal),
-			btn('d', _('Delete'), () => { this.remove('wireless', sta['.name']); ui.hideModal(); this.redraw(); })
+		K.dialog(_('Remove WiFi'), E('p', {}, _('Remove the source WiFi %s from this router?').format(sta.ssid)), [
+			btn('g', _('Close dialog'), ui.hideModal),
+			btn('d', _('Remove WiFi'), () => { this.remove('wireless', sta['.name']); ui.hideModal(); this.redraw(); })
 		]);
 	},
 
@@ -172,10 +172,10 @@ return view.extend({
 		const pw = E('input', { 'type': 'password', 'autocomplete': 'off', 'placeholder': _('Leave empty to keep it'), 'aria-label': _('WPA password') });
 		K.dialog(_('Wireless network: %s').format(sta.ssid), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
 			K.field(_('Source WiFi name'), E('input', { 'type': 'text', 'value': sta.ssid, 'readonly': '' }), { rd: 1 }),
-			K.field(_('Band'), E('input', { 'type': 'text', 'value': band(bandOf(sta.device)), 'readonly': '' }), { rd: 1 }),
+			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': band(bandOf(sta.device)), 'readonly': '' }), { rd: 1 }),
 			K.field(_('WPA password'), pw, { pw: 1 })
 		]), [
-			btn('g', _('Skip'), ui.hideModal),
+			btn('g', _('Not now'), ui.hideModal),
 			btn('p', _('Save'), () => {
 				if (pw.value) {
 					if (pw.value.length < 8) return ui.addNotification(null, E('p', {}, _('The password needs at least 8 characters.')), 'danger');
@@ -193,25 +193,26 @@ return view.extend({
 		const body = E('div', {}, K.waitBox(_('Starting the scan…')));
 		const halt = () => { stopped = true; window.clearTimeout(timer); };
 		const stop = btn('g', _('Stop refreshing'), () => { halt(); stop.disabled = true; });
-		K.dialog(_('Scan WiFi %s').format(band(b)), body, [ stop, btn('g', _('Skip'), () => { halt(); ui.hideModal(); }) ], { wide: true });
+		K.dialog(_('Scan WiFi %s').format(band(b)), body, [ stop, btn('g', _('Not now'), () => { halt(); ui.hideModal(); }) ], { wide: true });
 		const list = rows => {
 			if (!rows.length) { body.replaceChildren(K.waitBox(_('No networks found'))); return; }
-			body.replaceChildren(E('div', {}, rows.map(r => E('div', { 'class': 'w-net' }, [
+			body.replaceChildren(E('div', {}, rows.map(r => E('div', { 'class': 'w-net' + (r.ssid ? '' : ' w-hid') }, [
 				E('div', { 'class': 'w-i' }, [
-					E('div', { 'class': 'w-n' }, r.ssid),
+					E('div', { 'class': 'w-n' }, r.ssid || _('Hidden network')),
 					E('div', { 'class': 'w-m' }, [ sig(r.signal || -90), E('span', {}, (r.signal || -90) + ' dBm · ' + encLabel(r.encryption)) ])
 				]),
 				btn('p', _('Join'), () => { halt(); this.join(r); }, { sm: true })
 			]))));
 		};
 		const run = () => network.getWifiDevices().then(devs => Promise.all(devs.filter(d => bandOf(d.getName()) == b).map(d =>
-			d.getScanList().then(l => l.map(r => Object.assign({}, r, { dev: d.getName(), band: b })), () => [])
+			d.getScanList().then(l => l.map(r => Object.assign({}, r, { dev: d.getName(), band: b, modes: d.getHTModes() || [] })), () => [])
 		))).then(all => {
 			if (stopped) return;
 			const own = ownSsids(), best = {};
 			[].concat.apply([], all).forEach(r => {
-				if (!r.ssid || own.indexOf(r.ssid) >= 0) return;
-				if (!best[r.ssid] || (r.signal || -200) > (best[r.ssid].signal || -200)) best[r.ssid] = r;
+				if (r.ssid && own.indexOf(r.ssid) >= 0) return;
+				const key = r.ssid || ('#' + r.bssid);
+				if (!best[key] || (r.signal || -200) > (best[key].signal || -200)) best[key] = r;
 			});
 			list(Object.keys(best).map(k => best[k]).sort((x, y) => (y.signal || -200) - (x.signal || -200)));
 		}).catch(() => {}).then(() => { if (!stopped) timer = window.setTimeout(run, 8000); });
@@ -221,26 +222,29 @@ return view.extend({
 	/* Password, then the settings page, then the change is collected. */
 	join(bss) {
 		const open = !bss.encryption || !bss.encryption.enabled;
-		const next = key => this.review(bss, key);
-		if (open) return next('');
+		const hidden = !bss.ssid;
+		const nm = hidden ? E('input', { 'type': 'text', 'autocomplete': 'off', 'aria-label': _('Source WiFi name') }) : null;
+		const next = key => this.review(hidden ? Object.assign({}, bss, { ssid: nm.value.trim(), hid: true }) : bss, key);
+		if (open && !hidden) return next('');
 		const pw = E('input', { 'type': 'password', 'autocomplete': 'off', 'aria-label': _('WPA password') });
-		const go = btn('p', _('Continue'), () => next(pw.value));
-		const check = () => { go.disabled = pw.value.length < 8; };
+		const go = btn('p', _('Continue'), () => next(open ? '' : pw.value));
+		const check = () => { go.disabled = (hidden && !nm.value.trim()) || (!open && pw.value.length < 8); };
 		pw.addEventListener('input', check);
+		if (nm) nm.addEventListener('input', check);
 		pw.addEventListener('keydown', ev => { if (ev.key == 'Enter' && !go.disabled) go.click(); });
 		check();
-		K.dialog(_('Join: %s').format(bss.ssid), E('div', { 'style': 'padding-bottom:12px' }, K.field(_('WPA password'), pw, { pw: 1 })), [
-			btn('g', _('Cancel'), ui.hideModal), go
+		K.dialog(_('Join: %s').format(bss.ssid || _('Hidden network')), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [].concat(hidden ? [ K.field(_('Source WiFi name'), nm) ] : [], open ? [] : [ K.field(_('WPA password'), pw, { pw: 1 }) ])), [
+			btn('g', _('Close dialog'), ui.hideModal), go
 		]);
-		pw.focus();
+		(nm || pw).focus();
 	},
 
 	review(bss, key) {
 		K.dialog(_('Wireless network: %s').format(bss.ssid), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
 			K.field(_('Source WiFi name'), E('input', { 'type': 'text', 'value': bss.ssid, 'readonly': '' }), { rd: 1 }),
-			K.field(_('Band'), E('input', { 'type': 'text', 'value': band(bss.band), 'readonly': '' }), { rd: 1 })
+			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': band(bss.band), 'readonly': '' }), { rd: 1 })
 		]), [
-			btn('g', _('Skip'), ui.hideModal),
+			btn('g', _('Not now'), ui.hideModal),
 			btn('p', _('Save'), () => { this.stage(bss, key); ui.hideModal(); this.redraw(); })
 		]);
 	},
@@ -253,11 +257,16 @@ return view.extend({
 		const dev = bss.dev;
 		this.unset('wireless', dev, 'disabled');
 		this.set('wireless', dev, 'channel', String(bss.channel));
-		if (bss.band == '2g') {
-			this.set('wireless', dev, 'htmode', 'HE20');
-		} else {
-			const w = bss.vht_operation ? bss.vht_operation.channel_width : 0;
-			this.set('wireless', dev, 'htmode', w >= 80 ? 'HE80' : (bss.ht_operation && bss.ht_operation.secondary_channel_offset != 'no secondary') ? 'HE40' : 'HE20');
+		// channel width of the source, as the stock "Join network" does it, with the modes this radio offers
+		const modes = bss.modes || [];
+		if (modes.length) {
+			let w = bss.vht_operation ? (bss.vht_operation.channel_width || 20) : (bss.ht_operation && bss.ht_operation.secondary_channel_offset != 'no secondary') ? 40 : 20;
+			const pre = bss.band == '2g' ? [ 'HE', 'HT' ] : [ 'HE', 'VHT', 'HT' ];
+			let pick = null;
+			for (; w >= 20 && !pick; w /= 2)
+				for (let i = 0; i < pre.length && !pick; i++)
+					if (modes.indexOf(pre[i] + w) >= 0) pick = pre[i] + w;
+			if (pick) this.set('wireless', dev, 'htmode', pick);
 		}
 
 		const sid = this.add('wireless', 'wifi-iface', 'wiflow_src');
@@ -265,6 +274,7 @@ return view.extend({
 		this.set('wireless', sid, 'mode', 'sta');
 		this.set('wireless', sid, 'network', 'wwan');
 		this.set('wireless', sid, 'ssid', bss.ssid);
+		if (bss.hid && bss.bssid) this.set('wireless', sid, 'bssid', bss.bssid);
 		this.set('wireless', sid, 'encryption', mode);
 		if (mode == 'wep-open') { this.set('wireless', sid, 'key', '1'); this.set('wireless', sid, 'key1', key); }
 		else if (mode != 'none') this.set('wireless', sid, 'key', key);

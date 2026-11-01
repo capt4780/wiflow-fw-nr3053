@@ -47,7 +47,7 @@ return view.extend({
 		const sgs = [];
 		const mk = cls => {
 			const g = E('div', { 'class': 'w-sg ' + cls, 'role': 'tablist' });
-			[ [ 'dev', _('Devices') ], [ 'lat', _('Latency') ] ].forEach(k => {
+			[ [ 'dev', _('Device count') ], [ 'lat', _('Latency') ] ].forEach(k => {
 				const b = E('button', { 'type': 'button', 'role': 'tab', 'data-k': k[0] }, k[1]);
 				b.addEventListener('click', () => show(k[0]));
 				g.appendChild(b);
@@ -81,7 +81,7 @@ return view.extend({
 			const unlink = btn('d', _('Unlink account'), () => ui.showModal(_('Unlink account'), [
 				E('div', { 'class': 'w-bd' }, E('p', {}, _('This router stops sending data to the Wiflow account. You can link it again at any time.'))),
 				E('div', { 'class': 'w-ft' }, [
-					btn('g', _('Cancel'), ui.hideModal),
+					btn('g', _('Close dialog'), ui.hideModal),
 					btn('d', _('Unlink'), () => this.follow(_('Unlinking…'), () => callUnpair(false)))
 				])
 			]), { full: true });
@@ -106,7 +106,7 @@ return view.extend({
 		const p = s.portal || {}, w = s.wp || {};
 		let rows;
 		if (!w.paired)
-			rows = [ row(_('Status'), chip('warn', _('Not connected'))), row(_('Content'), '—') ];
+			rows = [ row(_('Status'), chip('warn', _('Not connected yet'))), row(_('Content'), '—') ];
 		else if (p.state == 'on' || p.state == 'safe') {
 			const kinds = { image: _('Images'), video: _('Video'), website: _('Website') };
 			const chips = Object.keys(kinds).filter(k => p.mode == k).map(k => chip('', kinds[k]));
@@ -138,10 +138,10 @@ return view.extend({
 	stabilityPanel(s) {
 		const y = s.system || {}, r = y.recovery || {};
 		const why = {
-			power_or_manual: _('Manual'),
+			power_or_manual: _('Manually'),
 			auto_recovery: _('Automatic (lost Internet)'),
 			wp_command: _('From the Wiflow app')
-		}[y.boot_reason] || _('Manual');
+		}[y.boot_reason] || _('Manually');
 		const min = Math.floor((+r.offline_s || 0) / 60);
 		let st = [ 'ok', _('On') ];
 		if (r.stage >= 3) st = [ 'warn', _('Waiting for Internet') ];
@@ -164,7 +164,7 @@ return view.extend({
 				tile('globe', _('Internet'), inet.online ? _('Online') : _('Offline'), subNet),
 				tile('users', _('Connected now'), String(c.now ?? 0), _('2.4 GHz: %d · 5 GHz: %d').format(c.band2g ?? 0, c.band5g ?? 0)),
 				tile('pulse', _('Today'), String(c.today ?? 0), _('different devices')),
-				tile('clock', _('Uptime'), dur(d.uptime), 'Wiflow OS ' + (d.os || '')),
+				tile('clock', _('Running time'), dur(d.uptime), 'Wiflow OS ' + (d.os || '')),
 				this.chartPanel(s), this.linkPanel(s), this.guestPagePanel(s), this.guestsPanel(s), this.stabilityPanel(s)
 			])
 		]);

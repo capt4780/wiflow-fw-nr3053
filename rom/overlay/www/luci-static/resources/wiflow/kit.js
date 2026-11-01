@@ -1,6 +1,8 @@
 'use strict';
 'require baseclass';
 'require ui';
+'require rpc';
+'require request';
 
 /* Shared pieces of the Wiflow pages (Overview, Network, System): flat rows, panels, tiles,
    chips, buttons, the 24 h chart and dialogs, built to the firmware mockup. */
@@ -98,7 +100,31 @@ function dialog(title, body, foot, o) {
 	const kids = [ E('div', { 'class': 'w-bd' }, body) ];
 	if (foot && foot.length)
 		kids.push(E('div', { 'class': 'w-ft' }, foot));
-	return ui.showModal(title, kids, o.wide ? 'w-wide' : '');
+	return ui.showModal(title, kids, o.wide ? 'w-wide' : 'w-std');
+}
+
+/* Pick a file and send it to the router (what the stock upload dialog does, without its dialog). */
+function pickFile(path) {
+	return new Promise((resolve, reject) => {
+		const inp = E('input', { 'type': 'file', 'style': 'display:none' });
+		document.body.appendChild(inp);
+		inp.addEventListener('change', () => {
+			const f = inp.files[0];
+			inp.remove();
+			if (!f) return;
+			dialog(_('Uploading…'), waitBox(_('Uploading…')), []);
+			const fd = new FormData();
+			fd.append('sessionid', rpc.getSessionID());
+			fd.append('filename', path);
+			fd.append('filedata', f);
+			request.post(L.env.cgi_base + '/cgi-upload', fd, { timeout: 0 }).then(r => {
+				const j = r.json();
+				ui.hideModal();
+				if (j && j.failure) reject(new Error(j.failure)); else resolve(j);
+			}, e => { ui.hideModal(); reject(e); });
+		});
+		inp.click();
+	});
 }
 
 function waitBox(text) {
@@ -152,7 +178,7 @@ function flow(o) {
 		E('span', { 'class': 'w-fni' }, svg(icon)), E('div', { 'class': 'w-fnt' }, [ E('div', { 'class': 'w-fna' }, name), E('div', { 'class': 'w-fnb' }, sub) ])
 	]);
 	const lan = T(lanOn ? 'w-on' : '', 'lan', _('LAN cable'), lanOn ? _('WAN port') : o.cable ? _('Cable plugged in') : _('No cable'));
-	const wifi = T(wifiOn ? 'w-on' : '', 'wifi', o.saved || _('Source WiFi'), o.saved ? (o.band ? band(o.band) : _('Not connected')) : _('No network chosen'));
+	const wifi = T(wifiOn ? 'w-on' : '', 'wifi', o.saved || _('Source WiFi'), o.saved ? (o.band ? band(o.band) : _('Not connected yet')) : _('No network chosen'));
 	const merge = E('span', { 'class': 'w-fm' }, [
 		curve('w-mp', '0 0 100 32', P('M25 0C25 18 50 12 50 32', lanOn) + P('M75 0C75 18 50 12 50 32', wifiOn)),
 		curve('w-mw', '0 0 56 196', P('M0 46C28 46 28 98 56 98', lanOn) + P('M0 150C28 150 28 98 56 98', wifiOn))
@@ -166,5 +192,5 @@ function flow(o) {
 
 return baseclass.extend({
 	svg: svg, band: band, chip: chip, sig: sig, btn: btn, row: row, panel: panel, tile: tile, meter: meter,
-	head: head, field: field, dialog: dialog, waitBox: waitBox, chart: chart, flow: flow
+	head: head, field: field, dialog: dialog, pickFile: pickFile, waitBox: waitBox, chart: chart, flow: flow
 });

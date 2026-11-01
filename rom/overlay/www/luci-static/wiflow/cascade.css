@@ -862,14 +862,11 @@ input, button, textarea, select {
 }
 
 .item:hover::after,
-.btn:hover, .btn:focus,
-.cbi-button:hover, .cbi-button:focus,
 .cbi-select.focus,
 .cbi-dropdown:focus, .cbi-dropdown[open],
 .cbi-dynlist > .item:focus,
 input[type="checkbox"]:focus::before,
-input[type="radio"]:focus::before,
-input:focus, button:hover, textarea:focus, select:focus {
+input[type="radio"]:focus::before {
 	--focus-color-rgb: 82, 168, 236;
 
 	outline: 0;

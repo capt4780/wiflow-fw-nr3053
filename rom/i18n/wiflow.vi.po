@@ -513,7 +513,7 @@ msgid "Could not start."
 msgstr "Không thể bắt đầu."
 
 msgid "Device ID"
-msgstr "Mã thiết bị"
+msgstr "ID thiết bị"
 
 msgid "Devices now"
 msgstr "Thiết bị hiện tại"
@@ -636,7 +636,7 @@ msgid "Restarting the WiFi"
 msgstr "Đang khởi động lại WiFi"
 
 msgid "Router health"
-msgstr "Tình trạng router"
+msgstr "Sức khỏe router"
 
 msgid "Security"
 msgstr "Bảo mật"
@@ -1180,3 +1180,65 @@ msgstr "Đăng nhập"
 
 msgid "Logging in…"
 msgstr "Đang đăng nhập…"
+
+msgid "Radio band"
+msgstr "Băng tần"
+
+msgid "Close dialog"
+msgstr "Hủy"
+
+msgid "Client mode"
+msgstr "Máy khách"
+
+msgid "Remove WiFi"
+msgstr "Xóa"
+
+msgid "Device count"
+msgstr "Thiết bị"
+
+msgid "Turned off"
+msgstr "Đã vô hiệu hóa"
+
+msgid "Download file"
+msgstr "Tải về"
+
+msgid "Edit WiFi"
+msgstr "Chỉnh sửa"
+
+msgid "Turn on"
+msgstr "Bật"
+
+msgid "Gateway address"
+msgstr "Cổng mạng"
+
+msgid "Manually"
+msgstr "Thủ công"
+
+msgid "Not connected yet"
+msgstr "Chưa kết nối"
+
+msgid "Reset changes"
+msgstr "Đặt lại"
+
+msgid "Restart router"
+msgstr "Khởi động lại"
+
+msgid "Scan now"
+msgstr "Quét"
+
+msgid "Not now"
+msgstr "Bỏ qua"
+
+msgid "Running time"
+msgstr "Hoạt động"
+
+msgid "Sign-in name"
+msgstr "Tên đăng nhập"
+
+msgid "Uploading…"
+msgstr "Đang tải tệp lên…"
+
+
+msgid "Hidden network"
+msgstr "Mạng ẩn"
+

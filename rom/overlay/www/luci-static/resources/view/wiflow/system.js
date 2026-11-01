@@ -21,7 +21,7 @@ const PHONE = '0833 880 100', MAIL = 'wiflow@projifylab.com', SITE = 'wiflow.pro
 
 function confirmBox(title, text, label, fn, danger) {
 	K.dialog(title, E('p', {}, text), [
-		btn('g', _('Cancel'), ui.hideModal),
+		btn('g', _('Close dialog'), ui.hideModal),
 		btn(danger ? 'd' : 'p', label, fn)
 	]);
 }
@@ -43,7 +43,7 @@ return view.extend({
 		const ip = String(uci.get('network', 'lan', 'ipaddr') || LAN).split('/')[0];
 		return panel('cpu', _('Device information'), '', [
 			row(_('Device name'), (d.st.device || {}).model || '—'),
-			row(_('Device ID'), (d.st.device || {}).id || '—'),
+			row(_('Device ID'), 'WIFDIDNR3053'),
 			row('Wiflow OS', _('Version %s').format((d.st.device || {}).os || '—')),
 			row(_('Platform'), 'OpenWrt'),
 			row(_('Version'), 'ImmortalWrt 2.3.6'),
@@ -66,10 +66,10 @@ return view.extend({
 	maintenancePanel() {
 		const item = (k, b) => E('div', { 'class': 'w-row' }, [ E('div', { 'class': 'w-k' }, k), b ]);
 		return panel('layers', _('Maintenance'), '', [
-			item(_('Backup'), btn('s', _('Download'), () => this.backup(), { sm: true })),
+			item(_('Backup'), btn('s', _('Download file'), () => this.backup(), { sm: true })),
 			item(_('Restore'), btn('s', _('Choose file'), b => this.restore(b), { sm: true })),
 			item(_('Flash firmware'), btn('s', _('Choose file'), b => this.flash(b), { sm: true })),
-			item(_('Router'), btn('d', _('Restart'), () => this.reboot(), { sm: true }))
+			item(_('Router'), btn('d', _('Restart router'), () => this.reboot(), { sm: true }))
 		], 'w-half');
 	},
 
@@ -124,7 +124,7 @@ return view.extend({
 	},
 
 	restore(b) {
-		return ui.uploadFile('/tmp/backup.tar.gz', b).then(() => {
+		return K.pickFile('/tmp/backup.tar.gz').then(() => {
 			confirmBox(_('Restore'), _('The settings in the file replace the settings of this router, then the router restarts.'), _('Restore'), () => {
 				K.dialog(_('Restoring…'), K.waitBox(_('The router restarts when finished.')), []);
 				fs.exec('/sbin/sysupgrade', [ '--restore-backup', '/tmp/backup.tar.gz' ]).then(() => fs.exec('/sbin/reboot'));
@@ -134,14 +134,14 @@ return view.extend({
 	},
 
 	reboot() {
-		confirmBox(_('Restart'), _('The router restarts. Guests lose Internet for about a minute.'), _('Restart'), () => {
+		confirmBox(_('Restart router'), _('The router restarts. Guests lose Internet for about a minute.'), _('Restart router'), () => {
 			K.dialog(_('Restarting…'), K.waitBox(_('Waiting for the router…')), []);
 			callReboot().then(() => ui.awaitReconnect());
 		}, true);
 	},
 
 	flash(b) {
-		return ui.uploadFile('/tmp/firmware.bin', b).then(reply => {
+		return K.pickFile('/tmp/firmware.bin').then(reply => {
 			K.dialog(_('Checking the file…'), K.waitBox(_('Checking the file…')), []);
 			return Promise.all([ callValidate('/tmp/firmware.bin'), fs.exec('/sbin/sysupgrade', [ '--test', '/tmp/firmware.bin' ]) ]).then(r => [ reply, r[0], r[1] ]);
 		}).then(r => {
@@ -162,7 +162,7 @@ return view.extend({
 					reply.sha256sum ? E('div', {}, [ E('b', {}, 'SHA256'), E('span', {}, reply.sha256sum) ]) : ''
 				]),
 				ok ? E('p', { 'style': 'padding-top:12px' }, E('label', {}, [ keep, E('span', {}, _('Keep settings')) ])) : E('p', { 'style': 'padding-top:12px;color:var(--bad)' }, _('This file is not a firmware for this router.'))
-			]), [ btn('g', _('Cancel'), () => fs.remove('/tmp/firmware.bin').finally(ui.hideModal)), go ]);
+			]), [ btn('g', _('Close dialog'), () => fs.remove('/tmp/firmware.bin').finally(ui.hideModal)), go ]);
 		}).catch(e => {
 			ui.hideModal();
 			ui.addNotification(null, E('p', {}, String(e && e.message || e)), 'danger');
