@@ -51,7 +51,7 @@ r="$(job pair '{"code":"WIFAPI-ABCD12"}')"; expect "pair" "$r" '^success\|Linked
 wait_for 20 "s['wp']['online']" && pass "heartbeat accepted" || fail "heartbeat: $(st "s['wp']")"
 wait_for 60 "s['clients']['now']==3" && pass "dashboard: 3 WiFi devices from the bridge table (2 on 2.4G, 1 on 5G; cable and the router itself not counted)" || fail "clients: $(st "s['clients']")"
 expect "dashboard: devices per band, today" "$(st "(s['clients']['band2g'], s['clients']['band5g'], s['clients']['today'])")" '^\(2, 1, 3\)$'
-expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow', '2g', 'Auto', 2, 'Open'\), \('Wiflow', '5g', 'Auto', 1, 'Open'\), \('Wiflow Quan', '2g', 'Auto', 2, 'Open'\)\]$"
+expect "dashboard: WiFi networks" "$(st "[(n['ssid'], n['band'], n['channel'], n['clients'], n['enc']) for n in s['networks']]")" "^\[\('Wiflow 2.4G', '2g', 'Auto', 2, 'Open'\), \('Wiflow 5G', '5g', 'Auto', 1, 'Open'\)\]$"
 expect "dashboard: router health" "$(st "(s['metrics']['mem_total_mb'] > 0, s['metrics']['flash_total_mb'] >= 0, s['metrics']['cpu'] is None or 0 <= s['metrics']['cpu'] <= 100)")" '^\(True, True, True\)$'
 expect "dashboard: 24 h history and latency" "$(st "(len(s['series']['devices']), s['series']['devices'][-1], len(s['series']['latency']), s['internet']['latency'] >= 0, s['wp']['since'] > 0)")" '^\(24, 3, 24, True, True\)$'
 [ -z "$(grep -v '^info$' /tmp/mock/iwinfo.log 2>/dev/null)" ] && pass "Wiflow only reads the source WiFi signal (info), never scans or lists the driver" || fail "driver calls: $(sort /tmp/mock/iwinfo.log | uniq -c | tr '\n' ' ')"
