@@ -250,10 +250,6 @@ html,body{overscroll-behavior:none}
         <div class="scr" data-about-body>
           <div class="cp-hero cp-ahero" data-about-hero hidden><img data-about-img alt="" decoding="async" draggable="false"></div>
           <p class="cp-dp cp-aintro" data-about-text hidden></p>
-          <div class="cp-ct" data-about-ct hidden>
-            <a class="cp-hot" data-about-hot hidden><span class="cp-hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></span><span class="cp-ht"><b data-about-hot-t></b></span></a>
-            <a class="cp-hot" data-about-mail hidden><span class="cp-hi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 8l8 6 8-6"/></svg></span><span class="cp-ht"><b data-about-mail-t></b></span></a>
-          </div>
         </div>
         <div class="cp-foot"><button class="cp-go" type="button" data-about-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button></div>
       </div>
@@ -608,11 +604,22 @@ html,body{overscroll-behavior:none}
   };
   const setLogo=src=>{stage.querySelectorAll('[data-shop-logo]').forEach(box=>{const img=make('img');img.alt='';img.decoding='async';img.draggable=false;
     img.addEventListener('load',()=>{box.textContent='';box.appendChild(img);box.classList.add('has-img');},{once:true});img.src=src;});};
+  /* v1.1.7: after Confirm, open the shop's chosen page in the phone's own browser. It runs inside the Confirm tap
+     (the only moment a phone allows opening another app) and only after the router answered 204 (Internet is open).
+     Android: intent:// -> default browser. iPhone: x-safari-https://. Anything else: a new tab. A refusal is silent. */
+  let openUrl='';
+  const openOutside=u=>{
+    if(!/^https?:\/\/[^\s<>"']{3,500}$/i.test(u))return;
+    const ua=navigator.userAgent||'',click=h=>{const a=document.createElement('a');a.href=h;a.target='_blank';a.rel='noopener noreferrer';a.style.display='none';document.body.appendChild(a);a.click();window.setTimeout(()=>{try{a.remove();}catch(_e){}},1500);};
+    try{
+      if(/Android/i.test(ua)){const m=u.match(/^(https?):\/\/(.+)$/i);click('intent://'+m[2]+'#Intent;scheme='+m[1].toLowerCase()+';action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end');}
+      else if(/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1)){click(u.replace(/^https?:/i,x=>x.toLowerCase()==='https:'?'x-safari-https:':'x-safari-http:'));}
+      else{if(!window.open(u,'_blank','noopener,noreferrer'))click(u);}
+    }catch(_e){}
+  };
   let shopBanners=[];
   const markBannerDetails=()=>{if(!sliderTrack)return;[...sliderTrack.children].forEach((el,i)=>{const b=shopBanners[i];el.classList.toggle('has-detail',Boolean(b&&(b.title||b.detail)));});};
   const all=sel=>[...stage.querySelectorAll(sel)];
-  const fitContacts=()=>{const ct=stage.querySelector('[data-about-ct]');if(!ct||ct.hidden||!aboutView||aboutView.hidden)return;ct.classList.remove('stack');
-    if([...ct.querySelectorAll('.cp-hot:not([hidden]) b')].some(b=>b.scrollWidth>b.clientWidth+1))ct.classList.add('stack');};
   const renderShop=(shop,base)=>{
     if(!shop||typeof shop!=='object')return;
     applyAccent(shop.accent);
@@ -624,17 +631,13 @@ html,body{overscroll-behavior:none}
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const hide=shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false';
     all('[data-shop-verified]').forEach(vf=>{if(hide)vf.setAttribute('hidden','');else vf.removeAttribute('hidden');});
+    openUrl=typeof shop.open_url==='string'?shop.open_url.trim().slice(0,500):'';
     const it=shop.intro&&typeof shop.intro==='object'?shop.intro:{};
-    const iImg=assetUrl(base,it.image),iText=clip(it.text,2000),iHot=clip(it.hotline,24).replace(/[^0-9+ .()-]/g,'').trim(),iMail=clip(it.email,120);
-    const mailOk=/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(iMail)?iMail:'';
+    const iImg=assetUrl(base,it.image),iText=clip(it.text,2000);
     const aImg=stage.querySelector('[data-about-img]'),aHero=stage.querySelector('[data-about-hero]'),aText=stage.querySelector('[data-about-text]');
-    const aCt=stage.querySelector('[data-about-ct]'),aHot=stage.querySelector('[data-about-hot]'),aMail=stage.querySelector('[data-about-mail]');
     if(aImg&&aHero){if(iImg){aImg.src=iImg;aHero.hidden=false;}else{aImg.removeAttribute('src');aHero.hidden=true;}}
     if(aText){aText.textContent=iText;aText.hidden=!iText;}
-    if(aHot){if(iHot){aHot.href='tel:'+iHot.replace(/[^0-9+]/g,'');stage.querySelector('[data-about-hot-t]').textContent=iHot;aHot.hidden=false;}else aHot.hidden=true;}
-    if(aMail){if(mailOk){aMail.href='mailto:'+mailOk;stage.querySelector('[data-about-mail-t]').textContent=mailOk;aMail.hidden=false;}else aMail.hidden=true;}
-    if(aCt)aCt.hidden=!(iHot||mailOk);
-    if(aboutOpen)aboutOpen.hidden=!(iImg||iText||iHot||mailOk);
+    if(aboutOpen)aboutOpen.hidden=!(iImg||iText);
     const sections=(shop.terms&&Array.isArray(shop.terms.sections)?shop.terms.sections:[]).filter(x=>x&&typeof x==='object'&&(clip(x.title,120)||clip(x.body,4000))).slice(0,20);
     if(termsBody&&sections.length){
       termsBody.textContent='';
@@ -763,7 +766,6 @@ html,body{overscroll-behavior:none}
     if(mainView)mainView.hidden=true;
     aboutView.hidden=false;aboutView.setAttribute('aria-hidden','false');
     if(aboutBody)aboutBody.scrollTop=0;
-    fitContacts();
   };
   const closeAbout=()=>{if(!aboutShown())return;showMain();scheduleAutoSlider();};
   const openDialog=(transitionMode='default')=>{
@@ -851,9 +853,10 @@ html,body{overscroll-behavior:none}
          site means this phone is already online. */
       state='authorized';
       track('content_interaction','connect');
+      openOutside(openUrl);
       /* v1.0.16: open a new page so the phone's sign-in window re-checks the
          Internet now and closes (Android re-checks only on page loads). */
-      try{location.replace('http://10.10.10.1:2080/connected.html');}catch(_e){}
+      window.setTimeout(()=>{try{location.replace('http://10.10.10.1:2080/connected.html');}catch(_e){}},openUrl?900:0);
     }catch(error){
       state='ready';
       showMain();
@@ -889,7 +892,6 @@ html,body{overscroll-behavior:none}
   const detailBack=stage.querySelector('[data-detail-back]');if(detailBack)detailBack.addEventListener('click',closeDetail);
   const aboutBack=stage.querySelector('[data-about-back]');if(aboutBack)aboutBack.addEventListener('click',closeAbout);
   if(aboutOpen)aboutOpen.addEventListener('click',openAbout);
-  window.addEventListener('resize',fitContacts,{passive:true});
   termsCloses.forEach(button=>button.addEventListener('click',()=>closeTerms(true)));
   confirms.forEach(button=>button.addEventListener('click',commit));
   cancels.forEach(button=>button.addEventListener('click',cancelDialog));
