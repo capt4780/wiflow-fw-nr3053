@@ -10,6 +10,9 @@ return view.extend({
 		var form = document.querySelector('form.w-f'),
 		    button = form.querySelector('button');
 
+		var gc = form.querySelector('#wf_gate_code');
+		if (gc) gc.addEventListener('input', function() { var v = gc.value.toUpperCase(); if (v !== gc.value) gc.value = v; });
+
 		form.addEventListener('submit', function() {
 			button.disabled = true;
 			button.textContent = button.getAttribute('data-busy') || '…';

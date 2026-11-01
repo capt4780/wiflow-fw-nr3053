@@ -92,11 +92,12 @@ return view.extend({
 				E('div', { 'class': 'w-pf' }, unlink)
 			], 'w-third');
 		}
-		const code = E('input', { 'type': 'text', 'maxlength': '14', 'autocomplete': 'off', 'spellcheck': 'false', 'aria-label': _('Connection code') });
+		const code = E('input', { 'type': 'text', 'maxlength': '14', 'autocomplete': 'off', 'spellcheck': 'false', 'aria-label': _('Connection code'), 'autocapitalize': 'characters' });
+		code.addEventListener('input', () => { const v = code.value.toUpperCase(); if (v !== code.value) code.value = v; });
 		code.addEventListener('keydown', ev => { if (ev.key == 'Enter') go.click(); });
 		const go = btn('p', _('Link'), () => this.follow(_('Linking…'), () => callPair(code.value)), { full: true });
 		return panel('link', _('Link'), chip('warn', _('Not linked')), [
-			E('div', { 'class': 'w-fld', 'style': 'margin-top:8px' }, [ E('label', {}, _('Connection code')), E('div', { 'class': 'w-in' }, code) ]),
+			E('div', { 'class': 'w-fld', 'style': 'margin-top:8px' }, [ E('label', {}, _('Connection code')), E('div', { 'class': 'w-in w-cd' }, code) ]),
 			E('div', { 'class': 'w-pf' }, go)
 		], 'w-third');
 	},

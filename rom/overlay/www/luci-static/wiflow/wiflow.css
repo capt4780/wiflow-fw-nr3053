@@ -389,3 +389,5 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-ph h2{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .w-ph .w-chip{flex:0 1 auto;min-width:0;max-width:60%;overflow:hidden;text-overflow:ellipsis}
 .w-ph .w-chip::before{flex:none}
+
+.w-in.w-cd input{text-transform:uppercase;letter-spacing:.2em;font-weight:600}

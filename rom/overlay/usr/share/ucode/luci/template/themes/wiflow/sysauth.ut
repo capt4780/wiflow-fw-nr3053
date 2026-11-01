@@ -52,7 +52,7 @@
 	<form class="w-f" method="post" autocomplete="off">
 		<div class="w-fld">
 			<label for="wf_gate_code">{{ _('Security code') }}</label>
-			<div class="w-in"><input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text"></div>
+			<div class="w-in w-cd"><input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text"></div>
 		</div>
 		{% if (gate_try?.error == 'locked'): %}
 		<p class="w-err">{{ sprintf(_('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</p>
