@@ -100,7 +100,7 @@ while [ "$i" -lt 24 ]; do
  role="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].role" 2>/dev/null || true)"; [ -n "$role" ] || break
  name="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].name" 2>/dev/null || true)"; url="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].download_url" 2>/dev/null || true)"; hash="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].sha256" 2>/dev/null || true)"; size="$(jsonfilter -i "$RESP" -e "@.manifest.files[$i].size" 2>/dev/null || true)"
  # v1.0.19: shop_data (brand/products/terms JSON), shop_logo and product_1..8 images.
- case "$role" in image_landscape|image_portrait|video_landscape|video_portrait|popup_1|popup_2|popup_3|popup_4|popup_5|shop_data|shop_logo|product_[1-8]) :;; *) fail 'media_role';; esac
+ case "$role" in image_landscape|image_portrait|video_landscape|video_portrait|popup_1|popup_2|popup_3|popup_4|popup_5|shop_data|shop_logo|intro_image|website_thumb|product_[1-8]) :;; *) fail 'media_role';; esac
  case "$seen" in *"|$role|"*) fail 'media_duplicate';; esac; seen="$seen$role|"
  printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'; case "$url" in "$WIFLOW_PORTAL_API"/media/*) :;; *) fail 'media_url';; esac
  printf '%s' "$hash" | grep -Eq '^[A-Fa-f0-9]{64}$' || fail 'media_hash'; case "$size" in ''|*[!0-9]*) fail 'media_size';; esac; [ "$size" -gt 0 ] && [ "$size" -le 157286400 ] || fail 'media_size'
