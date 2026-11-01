@@ -24,6 +24,25 @@ return baseclass.extend({
 			}));
 		});
 
+		/* The gate and sign-in pages keep the language in a cookie (nothing can be written to the router
+		   before sign-in): the first page after sign-in copies it into the router's setting. Tried once
+		   per choice, so a failed write cannot loop. */
+		const first = document.querySelector('.w-lang');
+		const ck = document.cookie.match(/(?:^|;\s*)wf_lang=(vi|en)/);
+		if (first && ck) {
+			const have = first.getAttribute('data-lang');
+			let tried = '';
+			try { tried = sessionStorage.getItem('wf_lang_sync') || ''; } catch (e) {}
+			if (have == ck[1]) {
+				try { sessionStorage.removeItem('wf_lang_sync'); } catch (e) {}
+			}
+			else if (tried != ck[1]) {
+				try { sessionStorage.setItem('wf_lang_sync', ck[1]); } catch (e) {}
+				this.setLang(ck[1], have);
+				return;
+			}
+		}
+
 		document.addEventListener('click', () => this.closeMenus());
 		document.addEventListener('keydown', ev => { if (ev.key == 'Escape') this.closeMenus(); });
 	},
@@ -36,6 +55,9 @@ return baseclass.extend({
 		this.closeMenus();
 		if (!lang || lang == cur)
 			return;
+
+		/* the sign-in pages show the same language after signing out */
+		document.cookie = 'wf_lang=' + lang + '; path=/; max-age=31536000; SameSite=Lax';
 
 		uci.load('luci').then(() => {
 			uci.set('luci', 'main', 'lang', lang);

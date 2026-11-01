@@ -67,7 +67,7 @@
 	<div class="w-tt" data-title="Sign in"><h1>{{ T('Sign in') }}</h1><p>{{ T('Wiflow router administration') }}</p></div>
 	<form class="w-f" method="post">
 		<div class="w-fld">
-			<label for="luci_username">{{ T('Sign-in name') }}</label>
+			<label for="luci_username">{{ T('Username') }}</label>
 			<div class="w-in"><input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}"></div>
 		</div>
 		<div class="w-fld">
@@ -77,7 +77,7 @@
 		{% if (fuser && gate_passed(http)): %}
 		<p class="w-err">{{ T('Invalid username and/or password! Please try again.') }}</p>
 		{% endif %}
-		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(T('Logging in…'), true) }}">{{ T('Log in') }}</button>
+		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(T('Signing in…'), true) }}">{{ T('Sign in') }}</button>
 	</form>
 	{% endif %}
 </div>

@@ -185,7 +185,7 @@ function flow(o) {
 	]);
 	const vt = E('span', { 'class': 'w-fv' }, curve('', '0 0 2 28', P('M1 0V28', up)));
 	const hz = E('span', { 'class': 'w-fh' }, curve('', '0 0 56 2', P('M0 1H56', up)));
-	const rt = T('w-rt w-ln' + (up ? ' w-on' : ''), 'router', _('Router Wiflow'), o.lanIp || '10.0.0.1');
+	const rt = T('w-rt w-ln' + (up ? ' w-on' : ''), 'router', _('Wiflow router'), o.lanIp || '10.0.0.1');
 	const gs = T('w-ln' + (up ? ' w-on' : ''), 'users', _('Guest WiFi'), (o.guestName || 'Wiflow') + ' · ' + _('%d devices').format(o.guests || 0));
 	return E('div', { 'class': 'w-fn' }, [ E('div', { 'class': 'w-fs' }, [ lan, wifi ]), merge, rt, vt, hz, gs ]);
 }

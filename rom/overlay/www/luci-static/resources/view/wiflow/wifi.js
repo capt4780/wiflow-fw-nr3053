@@ -148,7 +148,7 @@ return view.extend({
 	draw() {
 		const inet = this.st.internet || {};
 		return E('div', {}, [
-			K.head(_('Network'), inet.online ? chip('ok', _('Has Internet')) : null),
+			K.head(_('Internet'), inet.online ? chip('ok', _('Has Internet')) : null),
 			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.scanPanel(), this.guestPanel() ]),
 			this.actionBar()
 		]);

@@ -393,3 +393,4 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-in.w-cd input{text-transform:uppercase;letter-spacing:.2em;font-weight:600}
 
 .w-row.w-nm .w-k{flex:none}.w-row.w-nm .w-v{flex:1 1 auto;min-width:0;justify-content:flex-end}.w-nmv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-weight:600}
+.w-in.w-cd input{text-align:center;padding-left:.2em}.w-in.w-cd input::placeholder{letter-spacing:0}

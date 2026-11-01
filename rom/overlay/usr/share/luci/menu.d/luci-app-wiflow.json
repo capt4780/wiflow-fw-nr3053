@@ -13,7 +13,7 @@
 		}
 	},
 	"admin/wifi": {
-		"title": "Network",
+		"title": "Internet",
 		"order": 2,
 		"action": {
 			"type": "view",

@@ -163,7 +163,7 @@ return view.extend({
 				tile('globe', _('Internet'), inet.online ? _('Online') : _('Offline'), subNet),
 				tile('users', _('Connected now'), String(c.now ?? 0), _('2.4 GHz: %d · 5 GHz: %d').format(c.band2g ?? 0, c.band5g ?? 0)),
 				tile('pulse', _('Today'), String(c.today ?? 0), _('different devices')),
-				tile('clock', _('Running time'), dur(d.uptime), 'Wiflow OS ' + (d.os || '')),
+				tile('clock', _('Uptime'), dur(d.uptime), 'Wiflow OS ' + (d.os || '')),
 				this.chartPanel(s), this.linkPanel(s), this.guestPagePanel(s), this.guestsPanel(s), this.stabilityPanel(s)
 			])
 		]);
