@@ -607,19 +607,6 @@ html,body{overscroll-behavior:none}
   };
   const setLogo=src=>{stage.querySelectorAll('[data-shop-logo]').forEach(box=>{const img=make('img');img.alt='';img.decoding='async';img.draggable=false;
     img.addEventListener('load',()=>{box.textContent='';box.appendChild(img);box.classList.add('has-img');},{once:true});img.src=src;});};
-  /* v1.1.7: after Confirm, open the shop's chosen page in the phone's own browser. It runs inside the Confirm tap
-     (the only moment a phone allows opening another app) and only after the router answered 204 (Internet is open).
-     Android: intent:// -> default browser. iPhone: x-safari-https://. Anything else: a new tab. A refusal is silent. */
-  let openUrl='';
-  const openOutside=u=>{
-    if(!/^https?:\/\/[^\s<>"']{3,500}$/i.test(u))return;
-    const ua=navigator.userAgent||'',click=h=>{const a=document.createElement('a');a.href=h;a.target='_blank';a.rel='noopener noreferrer';a.style.display='none';document.body.appendChild(a);a.click();window.setTimeout(()=>{try{a.remove();}catch(_e){}},1500);};
-    try{
-      if(/Android/i.test(ua)){const m=u.match(/^(https?):\/\/(.+)$/i);click('intent://'+m[2]+'#Intent;scheme='+m[1].toLowerCase()+';action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end');}
-      else if(/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1)){click(u.replace(/^https?:/i,x=>x.toLowerCase()==='https:'?'x-safari-https:':'x-safari-http:'));}
-      else{if(!window.open(u,'_blank','noopener,noreferrer'))click(u);}
-    }catch(_e){}
-  };
   let shopBanners=[];
   const markBannerDetails=()=>{if(!sliderTrack)return;[...sliderTrack.children].forEach((el,i)=>{const b=shopBanners[i];el.classList.toggle('has-detail',Boolean(b&&(b.title||b.detail)));});};
   const all=sel=>[...stage.querySelectorAll(sel)];
@@ -634,7 +621,6 @@ html,body{overscroll-behavior:none}
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const hide=shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false';
     all('[data-shop-verified]').forEach(vf=>{if(hide)vf.setAttribute('hidden','');else vf.removeAttribute('hidden');});
-    openUrl=typeof shop.open_url==='string'?shop.open_url.trim().slice(0,500):'';
     const it=shop.intro&&typeof shop.intro==='object'?shop.intro:{};
     const iImg=assetUrl(base,it.image),iText=clip(it.text,2000);
     const aImg=stage.querySelector('[data-about-img]'),aHero=stage.querySelector('[data-about-hero]'),aText=stage.querySelector('[data-about-text]');
@@ -856,10 +842,9 @@ html,body{overscroll-behavior:none}
          site means this phone is already online. */
       state='authorized';
       track('content_interaction','connect');
-      openOutside(openUrl);
       /* v1.0.16: open a new page so the phone's sign-in window re-checks the
          Internet now and closes (Android re-checks only on page loads). */
-      window.setTimeout(()=>{try{location.replace('http://10.10.10.1:2080/connected.html');}catch(_e){}},openUrl?900:0);
+      try{location.replace('http://10.10.10.1:2080/connected.html');}catch(_e){}
     }catch(error){
       state='ready';
       showMain();
