@@ -19,7 +19,7 @@
 		</div>
 		<nav class="w-tabbar">
 			{% for (let n in nav): %}
-			<a class="{{ at == n[0] ? 'w-on' : '' }}" href="{{ dispatcher.build_url('admin', n[0]) }}"><span class="w-p">{! n[2] !}</span>{{ n[1] }}</a>
+			<a class="{{ at == n[0] ? 'w-on' : '' }}" href="{{ dispatcher.build_url('admin', n[0]) }}"><span class="w-p">{{ n[2] }}</span>{{ n[1] }}</a>
 			{% endfor %}
 		</nav>
 		<ul id="modemenu" style="display:none"></ul>

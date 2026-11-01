@@ -325,8 +325,8 @@ a.w-ib{text-decoration:none}
 .w-pg>.w-col>.alert-message{max-width:1040px}
 /* dialogs (ui.showModal): phone = a sheet inset from the screen edges; tablet and PC = centred */
 body.modal-overlay-active{overflow:hidden}
-#modal_overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:12px;background:rgba(22,27,46,.42);overflow:hidden;-webkit-backdrop-filter:none;backdrop-filter:none}
-#modal_overlay:not(.modal-overlay-active){display:none}
+#modal_overlay{position:fixed;inset:0;z-index:900;display:flex;align-items:flex-end;justify-content:center;padding:12px;background:rgba(22,27,46,.42);overflow:hidden;-webkit-backdrop-filter:none;backdrop-filter:none}
+body:not(.modal-overlay-active) #modal_overlay{display:none}
 .modal{background:#fff;width:100%;max-width:none;max-height:100%;margin:0;padding:0;border:0;border-radius:20px;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(22,27,46,.22);overflow:hidden;overflow-wrap:anywhere;color:var(--ink)}
 .modal>h4{margin:0;padding:20px 20px 12px;font-size:18px;font-weight:700;line-height:1.3;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal>.w-bd,.modal>p,.modal>ul{padding:0 20px 8px;margin:0;overflow-y:auto;min-height:0;font-size:15px;line-height:1.45}

@@ -60,30 +60,30 @@
 			<a class="w-lg" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">{% if (device_id): %}<span class="w-code" title="{{ model }}">{{ device_id }}</span>{% endif %}</a>
 			<nav class="w-nv">
 				{% for (let n in nav): %}
-				<a class="{{ at == n[0] ? 'w-on' : '' }}" href="{{ dispatcher.build_url('admin', n[0]) }}">{! n[2] !}<span class="w-l">{{ n[1] }}</span></a>
+				<a class="{{ at == n[0] ? 'w-on' : '' }}" href="{{ dispatcher.build_url('admin', n[0]) }}">{{ n[2] }}<span class="w-l">{{ n[1] }}</span></a>
 				{% endfor %}
 			</nav>
 			<div class="w-lang" data-lang="{{ cur_lang }}">
-				<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{! flag[cur_lang] !}<span class="w-ln">{{ cur_lang == 'vi' ? 'Tiếng Việt' : 'English' }}</span><svg class="w-cv2" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+				<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{{ flag[cur_lang] }}<span class="w-ln">{{ cur_lang == 'vi' ? 'Tiếng Việt' : 'English' }}</span><svg class="w-cv2" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
 				<div class="w-lm">
-					<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{! flag.vi !}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
-					<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{! flag.en !}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+					<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{{ flag.vi }}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+					<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{{ flag.en }}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
 				</div>
 			</div>
-			<a class="w-out" href="{{ dispatcher.build_url('admin') }}/logout">{! out_icon !}<span class="w-l">{{ _('Sign out') }}</span></a>
+			<a class="w-out" href="{{ dispatcher.build_url('admin') }}/logout">{{ out_icon }}<span class="w-l">{{ _('Sign out') }}</span></a>
 		</aside>
 		<div class="w-main">
 		<header class="w-topm">
 			<a class="w-lg" href="{{ dispatcher.build_url('admin') }}" aria-label="Wiflow"><img src="{{ media }}/wiflow-mark.webp" alt="Wiflow"></a>
 			<div class="w-tr">
 				<div class="w-lang" data-lang="{{ cur_lang }}">
-					<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{! flag[cur_lang] !}</button>
+					<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{{ flag[cur_lang] }}</button>
 					<div class="w-lm">
-						<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{! flag.vi !}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
-						<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{! flag.en !}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+						<button type="button" data-l="vi" class="{{ cur_lang == 'vi' ? 'w-on' : '' }}">{{ flag.vi }}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
+						<button type="button" data-l="en" class="{{ cur_lang == 'en' ? 'w-on' : '' }}">{{ flag.en }}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
 					</div>
 				</div>
-				<a class="w-ib" href="{{ dispatcher.build_url('admin') }}/logout" aria-label="{{ _('Sign out') }}">{! out_icon !}</a>
+				<a class="w-ib" href="{{ dispatcher.build_url('admin') }}/logout" aria-label="{{ _('Sign out') }}">{{ out_icon }}</a>
 			</div>
 		</header>
 

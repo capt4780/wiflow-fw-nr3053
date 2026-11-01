@@ -48,7 +48,7 @@ return view.extend({
 			row(_('Platform'), 'OpenWrt'),
 			row(_('Version'), 'ImmortalWrt 2.3.6'),
 			row(_('IP address'), ip),
-			row(_('MAC address'), d.mac || '—'),
+			row(_('MAC address'), (d.st.device || {}).mac || d.mac || '—'),
 			row(_('Time zone'), _('UTC+7 · Vietnam'))
 		], 'w-half w-r2');
 	},

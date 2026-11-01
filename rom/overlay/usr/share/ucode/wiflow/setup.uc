@@ -150,6 +150,15 @@ export function device_id() {
 	return match(s, /^WIFDID-NR3053-[0-9]{6}$/) ? s : null;
 };
 
+function lan_mac() {
+	for (let dev in [ 'br-lan', 'eth0', 'lan1' ]) {
+		const m = trim(readfile(`/sys/class/net/${dev}/address`) ?? '');
+		if (length(m) && m != '00:00:00:00:00:00')
+			return uc(m);
+	}
+	return '';
+};
+
 // The 6 digits come from the factory MAC, so the code printed for this
 // router stays the same after a factory reset or a reinstall.
 export function ensure_device_id() {
@@ -308,7 +317,7 @@ export function status() {
 	const st = st_get('stats', {});
 	return {
 		device: {
-			id: device_id(), model: MODEL, os: os_version(), agent: VERSION, uptime: uptime()
+			id: device_id(), model: MODEL, os: os_version(), agent: VERSION, uptime: uptime(), mac: lan_mac()
 		},
 		internet: { online: online, latency: st_get('latency', -1) },
 		wp: {
