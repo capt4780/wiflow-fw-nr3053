@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '1.1.2';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '1.1.3';
 export const GEN = '4';
 export const MODEL = 'Viettel NR3053';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '1.1.2';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '1.1.3';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -274,16 +274,30 @@ function series_out() {
 	for (let i = h - 23; i <= h; i++) {
 		const b = s[`${i}`];
 		push(dev, (b && b.d != null) ? b.d : null);
-		push(lat, (b && b.ln > 0) ? int(b.ls / b.ln + 0.5) : null);
+		push(lat, (b && b.ln > 0) ? int(b.ls / (b.ln + 0.0) + 0.5) : null);
 	}
 	return { devices: dev, latency: lat };
 };
 
 // Content type of the active guest page: image, video or website ('' when none).
-function portal_mode() {
+function portal_cfg() {
 	const t = readfile('/www-wiflow-portal/runtime/active/portal.json');
-	const j = t ? json(t) : null;
+	return t ? json(t) : null;
+}
+
+function portal_mode() {
+	const j = portal_cfg();
 	return (j && (j.mode == 'image' || j.mode == 'video' || j.mode == 'website')) ? j.mode : '';
+}
+
+// Name of the content set that is applied (WP puts it in the shop data file).
+function portal_content_name() {
+	const j = portal_cfg();
+	if (!j || type(j.shop) != 'string' || !match(j.shop, /^\/runtime\/active\/media\/[A-Za-z0-9._-]{1,120}$/))
+		return '';
+	const t = readfile('/www-wiflow-portal' + j.shop);
+	const s = t ? json(t) : null;
+	return (s && type(s.content_name) == 'string') ? substr(s.content_name, 0, 60) : '';
 }
 
 // Guest portal state for the page: where the WiFi sits and what the portal is doing.
@@ -306,7 +320,7 @@ function portal_state() {
 	else if (core('portal_enabled', '0') == '1') state = 'on';
 	else if (core('portal_sync_status') == 'syncing') state = 'syncing';
 	else if (core('portal_sync_status') == 'failed') state = 'error';
-	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net, mode: portal_mode() };
+	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net, mode: portal_mode(), content_name: portal_content_name() };
 };
 
 export function status() {

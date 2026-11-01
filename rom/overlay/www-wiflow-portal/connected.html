@@ -1,1 +1,76 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Wiflow</title><style>html,body{height:100%;margin:0;background:#0b2a5b url("/runtime/assets/bg-landscape.webp") center/cover no-repeat}@media (orientation:portrait){html,body{background-image:url("/runtime/assets/bg-portrait.webp")}}</style></head><body data-wiflow-connected></body></html>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Wiflow</title><style>
+@font-face{font-family:"Inter";font-style:normal;font-weight:400 500;font-display:block;src:url("/runtime/assets/fonts/inter-400.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:600 700;font-display:block;src:url("/runtime/assets/fonts/inter-600.woff2") format("woff2")}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:#0c1838;color:#fff;font:400 15px/1.45 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-synthesis:none;-webkit-font-smoothing:antialiased}
+.bg{position:fixed;inset:-24px;z-index:0;overflow:hidden}
+.bg img,.bg video{width:100%;height:100%;object-fit:cover;filter:blur(18px) saturate(1.1);display:block}
+.sh{position:fixed;inset:0;z-index:1;background:linear-gradient(rgba(8,20,56,.55),rgba(8,20,56,.75))}
+main{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom));text-align:center}
+.lg{width:88px;height:88px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.5);display:grid;place-items:center;overflow:hidden;flex:none;color:#0054f0}
+.lg img{width:100%;height:100%;object-fit:cover;display:block}
+.lg svg{width:46px;height:46px}
+.nm{margin-top:16px;display:flex;align-items:center;gap:8px;max-width:100%;font-size:22px;line-height:1.25;font-weight:700;letter-spacing:-.01em}
+.nm span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk{flex:none;width:19px;height:19px}
+.tk[hidden]{display:none}
+.sl{margin-top:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.78)}
+.sl:empty{display:none}
+.tg{margin-top:22px;display:inline-flex;align-items:center;gap:10px;max-width:100%;height:40px;padding:0 16px 0 8px;border-radius:20px;background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ow{position:relative;flex:none;width:24px;height:24px}
+.ow i{position:absolute;inset:0;border-radius:50%;background:#1baf7a;animation:pu 1.8s ease-out infinite}
+.ok{position:relative;width:24px;height:24px;border-radius:50%;background:#1baf7a;display:grid;place-items:center}
+.ok svg{width:14px;height:14px;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.tg b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes pu{from{transform:scale(1);opacity:.35}to{transform:scale(1.7);opacity:0}}
+@media (orientation:landscape) and (max-height:480px){.lg{width:72px;height:72px}.nm{margin-top:10px;font-size:20px}.tg{margin-top:14px}}
+@media (min-width:600px) and (min-height:700px){.lg{width:104px;height:104px}.nm{font-size:26px;margin-top:20px}.tg{height:46px;margin-top:28px}.tg b{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.ow i{animation:none}}
+</style></head><body data-wiflow-connected>
+<div class="bg" id="bg" aria-hidden="true"></div><div class="sh"></div>
+<main>
+<div class="lg" id="lg" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.2" r=".6" fill="currentColor"/></svg></div>
+<div class="nm"><span id="nm">WiFi miễn phí</span><svg class="tk" id="vf" viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="sl" id="sl"></div>
+<div class="tg" role="status"><span class="ow"><i></i><span class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><b>Kết nối internet thành công</b></div>
+</main>
+<script>
+(function(){
+  var OK=/^\/runtime\/active\/media\/[A-Za-z0-9._-]{1,120}$/;
+  function get(url,ms){var c=new AbortController(),t=setTimeout(function(){c.abort();},ms||3000);
+    return fetch(url,{cache:'no-store',signal:c.signal}).then(function(r){clearTimeout(t);if(!r.ok)throw 0;return r.json();});}
+  function clip(v,n){return typeof v==='string'?v.slice(0,n):'';}
+  function background(cfg){
+    var m=cfg.media&&typeof cfg.media==='object'?cfg.media:{},portrait=matchMedia('(orientation: portrait)').matches,src='',vid=false;
+    if(cfg.mode==='video'){src=portrait?(m.video_portrait||m.video_landscape):(m.video_landscape||m.video_portrait);vid=true;}
+    else if(cfg.mode==='image'){src=portrait?(m.image_portrait||m.image_landscape):(m.image_landscape||m.image_portrait);}
+    else if(cfg.mode==='website'){src=cfg.thumb;}
+    if(typeof src!=='string'||!OK.test(src))return;
+    var el=document.createElement(vid?'video':'img');
+    if(vid){el.muted=true;el.setAttribute('playsinline','');el.preload='metadata';el.src=src+'#t=0.1';}
+    else{el.alt='';el.decoding='async';el.src=src;}
+    el.addEventListener(vid?'loadeddata':'load',function(){document.getElementById('bg').appendChild(el);},{once:true});
+  }
+  function shop(path){
+    if(typeof path!=='string'||!OK.test(path))return;
+    get(path,4000).then(function(s){
+      if(!s||typeof s!=='object')return;
+      var n=clip(s.name,80),sl=clip(s.slogan,120);
+      if(n)document.getElementById('nm').textContent=n;
+      document.getElementById('sl').textContent=sl;
+      if(s.verified===false||s.verified===0||s.verified==='0'||s.verified==='false')document.getElementById('vf').hidden=true;
+      var f=typeof s.logo==='string'?s.logo:'';
+      if(/^[A-Za-z0-9._-]{1,120}$/.test(f)){
+        var img=new Image();img.alt='';img.draggable=false;
+        img.onload=function(){var b=document.getElementById('lg');b.textContent='';b.appendChild(img);};
+        img.src=path.slice(0,path.lastIndexOf('/')+1)+f;
+      }
+    }).catch(function(){});
+  }
+  get('/runtime/active/portal.json',3000).then(function(cfg){
+    if(!cfg||typeof cfg!=='object')return;
+    background(cfg);shop(cfg.shop);
+  }).catch(function(){});
+})();
+</script>
+</body></html>

@@ -23,6 +23,8 @@
 		}
 		catch (e) {}
 	}
+	// English is the source language: with no catalog to load, 'en' must bypass the active (Vietnamese) one.
+	const T = (s) => page_lang == 'en' ? s : _(s);
 	const flag = {
 		vi: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#DA251D"/><path d="M12.00 5.40 L13.65 10.13 L18.66 10.24 L14.66 13.27 L16.11 18.06 L12.00 15.20 L7.89 18.06 L9.34 13.27 L5.34 10.24 L10.35 10.13z" fill="#FFCD00"/></svg>',
 		en: '<svg class="w-fl" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#1F3A93"/><path d="M0 0L24 24M24 0L0 24" stroke="#fff" stroke-width="4.5"/><path d="M0 0L24 24M24 0L0 24" stroke="#D52B3A" stroke-width="1.6"/><path d="M12 0v24M0 12h24" stroke="#fff" stroke-width="7"/><path d="M12 0v24M0 12h24" stroke="#D52B3A" stroke-width="4"/></svg>'
@@ -40,7 +42,7 @@
 
 <div class="w-gate">
 	<div class="w-lang" data-lang="{{ page_lang }}">
-		<button class="w-lb" type="button" aria-label="{{ _('Language') }}">{{ flag[page_lang] }}</button>
+		<button class="w-lb" type="button" aria-label="{{ T('Language') }}">{{ flag[page_lang] }}</button>
 		<div class="w-lm">
 			<button type="button" data-l="vi" class="{{ page_lang == 'vi' ? 'w-on' : '' }}">{{ flag.vi }}Tiếng Việt<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
 			<button type="button" data-l="en" class="{{ page_lang == 'en' ? 'w-on' : '' }}">{{ flag.en }}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
@@ -48,34 +50,34 @@
 	</div>
 	<img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">
 	{% if (!gate_ok): %}
-	<div class="w-tt" data-title="Security code"><h1>{{ _('Security code') }}</h1><p>{{ _('Enter the device code to continue') }}</p></div>
+	<div class="w-tt" data-title="Security code"><h1>{{ T('Security code') }}</h1><p>{{ T('Enter the device code to continue') }}</p></div>
 	<form class="w-f" method="post" autocomplete="off">
 		<div class="w-fld">
-			<label for="wf_gate_code">{{ _('Security code') }}</label>
+			<label for="wf_gate_code">{{ T('Security code') }}</label>
 			<div class="w-in w-cd"><input name="wf_gate_code" id="wf_gate_code" type="text" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text"></div>
 		</div>
 		{% if (gate_try?.error == 'locked'): %}
-		<p class="w-err">{{ sprintf(_('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</p>
+		<p class="w-err">{{ sprintf(T('Too many wrong codes. Try again in %d seconds.'), gate_try.wait) }}</p>
 		{% elif (gate_try?.error == 'invalid'): %}
-		<p class="w-err">{{ sprintf(_('Wrong security code. %d attempts left.'), gate_try.left) }}</p>
+		<p class="w-err">{{ sprintf(T('Wrong security code. %d attempts left.'), gate_try.left) }}</p>
 		{% endif %}
-		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(_('Checking…'), true) }}">{{ _('Continue') }}</button>
+		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(T('Checking…'), true) }}">{{ T('Continue') }}</button>
 	</form>
 	{% else %}
-	<div class="w-tt" data-title="Sign in"><h1>{{ _('Sign in') }}</h1><p>{{ _('Wiflow router administration') }}</p></div>
+	<div class="w-tt" data-title="Sign in"><h1>{{ T('Sign in') }}</h1><p>{{ T('Wiflow router administration') }}</p></div>
 	<form class="w-f" method="post">
 		<div class="w-fld">
-			<label for="luci_username">{{ _('Sign-in name') }}</label>
+			<label for="luci_username">{{ T('Sign-in name') }}</label>
 			<div class="w-in"><input name="luci_username" id="luci_username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ entityencode(login_user, true) }}"></div>
 		</div>
 		<div class="w-fld">
-			<label for="luci_password">{{ _('Password') }}</label>
+			<label for="luci_password">{{ T('Password') }}</label>
 			<div class="w-in"><input name="luci_password" id="luci_password" type="password" autocomplete="current-password"></div>
 		</div>
 		{% if (fuser && gate_passed(http)): %}
-		<p class="w-err">{{ _('Invalid username and/or password! Please try again.') }}</p>
+		<p class="w-err">{{ T('Invalid username and/or password! Please try again.') }}</p>
 		{% endif %}
-		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(_('Logging in…'), true) }}">{{ _('Log in') }}</button>
+		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(T('Logging in…'), true) }}">{{ T('Log in') }}</button>
 	</form>
 	{% endif %}
 </div>

@@ -1259,3 +1259,9 @@ msgstr "Tự chọn 2.4 / 5 GHz"
 
 msgid "Has Internet"
 msgstr "Có Internet"
+
+msgid "Not updated"
+msgstr "Chưa cập nhật"
+
+msgid "Display type"
+msgstr "Kiểu hiển thị"

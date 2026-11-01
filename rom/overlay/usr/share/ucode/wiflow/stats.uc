@@ -16,14 +16,16 @@ function fields(line) {
 function cpu() {
 	const f = fields(split(readfile('/proc/stat') ?? '', '\n')[0]);
 	let total = 0;
-	for (let i = 1; i < length(f); i++)
+	// user..steal only: guest and guest_nice are already counted inside user and nice.
+	for (let i = 1; i < length(f) && i < 9; i++)
 		total += W.num(f[i], 0);
 	const idle = W.num(f[4], 0) + W.num(f[5], 0);
 	const prev = W.st_get('cpu_prev');
 	W.st_set('cpu_prev', [ idle, total ]);
 	if (!prev || total <= prev[1])
 		return null;
-	return int(100 * (1 - (idle - prev[0]) / (total - prev[1])) + 0.5);
+	// ucode divides integers as integers: the ratio is taken on doubles.
+	return int(100.0 * (1.0 - (idle - prev[0]) / (total - prev[1] + 0.0)) + 0.5);
 }
 
 function meminfo(k) {
@@ -51,7 +53,7 @@ function route() {
 		const f = fields(l);
 		if (length(f) >= 8 && f[1] == '00000000' && f[7] == '00000000') {
 			const g = f[2];
-			const gw = `${hexdec(substr(g, 6, 2))}.${hexdec(substr(g, 4, 2))}.${hexdec(substr(g, 2, 2))}.${hexdec(substr(g, 0, 2))}`;
+			const gw = `${int(substr(g, 6, 2), 16)}.${int(substr(g, 4, 2), 16)}.${int(substr(g, 2, 2), 16)}.${int(substr(g, 0, 2), 16)}`;
 			const a = match(W.sh(`ip -4 -o addr show dev ${W.q(f[0])}`), /inet ([0-9.]+)/);
 			return { dev: f[0], gateway: gw, ip: a ? a[1] : '' };
 		}

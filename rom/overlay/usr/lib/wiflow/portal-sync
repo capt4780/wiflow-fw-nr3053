@@ -109,10 +109,10 @@ done
 has(){ grep -q "^$1|" "$MAN" 2>/dev/null; }; path_for(){ awk -F'|' -v r="$1" '$1==r{print "/runtime/active/media/"$2;exit}' "$MAN"; }
 # A content snapshot may carry Website + Image + Video assets together. Active mode is synced separately.
 n=1; while [ "$n" -le "$popup_count" ]; do has "popup_$n" || fail "popup_${n}_missing"; n=$((n+1)); done
-il="$(path_for image_landscape)"; ip="$(path_for image_portrait)"; vl="$(path_for video_landscape)"; vp="$(path_for video_portrait)"; shop="$(path_for shop_data)"
+il="$(path_for image_landscape)"; ip="$(path_for image_portrait)"; vl="$(path_for video_landscape)"; vp="$(path_for video_portrait)"; shop="$(path_for shop_data)"; thumb="$(path_for website_thumb)"
 if [ -n "$shop" ]; then jsonfilter -i "$STAGE/media/${shop##*/}" -e '@.v' >/dev/null 2>&1 || fail 'shop_data_invalid'; fi
 {
- printf '{"schema":2,"data_generation":4,"revision":%s,"mode":"%s","website_url":"%s","media":{' "$REV" "$mode" "$(json_escape "$website")"; printf '"image_landscape":"%s","image_portrait":"%s","video_landscape":"%s","video_portrait":"%s"},"shop":"%s","popups":[' "$(json_escape "$il")" "$(json_escape "$ip")" "$(json_escape "$vl")" "$(json_escape "$vp")" "$(json_escape "$shop")"; first=1; n=1; while [ "$n" -le "$popup_count" ]; do x="$(path_for "popup_$n")"; [ "$first" = 1 ] || printf ','; first=0; printf '"%s"' "$(json_escape "$x")"; n=$((n+1)); done; printf ']}\n'
+ printf '{"schema":2,"data_generation":4,"revision":%s,"mode":"%s","website_url":"%s","media":{' "$REV" "$mode" "$(json_escape "$website")"; printf '"image_landscape":"%s","image_portrait":"%s","video_landscape":"%s","video_portrait":"%s"},"shop":"%s","thumb":"%s","popups":[' "$(json_escape "$il")" "$(json_escape "$ip")" "$(json_escape "$vl")" "$(json_escape "$vp")" "$(json_escape "$shop")" "$(json_escape "$thumb")"; first=1; n=1; while [ "$n" -le "$popup_count" ]; do x="$(path_for "popup_$n")"; [ "$first" = 1 ] || printf ','; first=0; printf '"%s"' "$(json_escape "$x")"; n=$((n+1)); done; printf ']}\n'
 } > "$STAGE/portal.json" || fail 'config_write'
 jsonfilter -i "$STAGE/portal.json" -e '@.revision' >/dev/null 2>&1 || fail 'config_invalid'
 [ "$(jsonfilter -i "$STAGE/portal.json" -e '@.data_generation' 2>/dev/null || true)" = "$WIFLOW_DATA_GENERATION" ] || fail 'config_generation'

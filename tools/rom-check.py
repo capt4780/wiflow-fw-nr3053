@@ -252,7 +252,8 @@ checks = {
             "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync", "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop",
             "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot", "/www-wiflow-portal/cgi-bin/portal", "/www-wiflow-portal/cgi-bin/captive-api"])
         and all(os.path.isfile(F + "/www-wiflow-portal/" + x) for x in ["template-website.html", "template-image.html", "template-video.html",
-            "connected.html", "runtime/assets/bg-landscape.webp", "runtime/assets/fonts/lexend.woff"])
+            "connected.html", "runtime/assets/fonts/inter-400.woff2", "runtime/assets/fonts/lexend.woff"])
+        and not any(os.path.exists(F + "/www-wiflow-portal/runtime/assets/" + x) for x in ["bg-landscape.webp", "bg-portrait.webp"])
         and "portal-mode-loop" in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
     "guest portal: no WiFi-driver access (no iwinfo/iwpriv/hostapd/wifi calls in the portal and agent)":
         not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())

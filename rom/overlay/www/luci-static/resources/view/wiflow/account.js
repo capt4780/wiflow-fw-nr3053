@@ -102,27 +102,25 @@ return view.extend({
 		], 'w-third');
 	},
 
-	/* What the guests see: the state of the content and which kinds it holds. */
+	/* What the guests see: the state of the content, how it is shown and which content is applied. */
 	guestPagePanel(s) {
 		const p = s.portal || {}, w = s.wp || {};
-		let rows;
-		if (!w.paired)
-			rows = [ row(_('Status'), chip('warn', _('Not connected yet'))), row(_('Content'), '—') ];
-		else if (p.state == 'on' || p.state == 'safe') {
-			const kinds = { image: _('Images'), video: _('Video'), website: _('Website') };
-			const chips = Object.keys(kinds).filter(k => p.mode == k).map(k => chip('', kinds[k]));
-			rows = [
-				row(_('Status'), p.state == 'safe' ? chip('warn', _('Paused')) : chip('ok', _('Up to date'))),
-				E('div', { 'class': 'w-row w-stack' }, [ E('div', { 'class': 'w-k' }, _('Content')), E('div', { 'class': 'w-cps' }, chips.length ? chips : '—') ])
-			];
-		}
-		else if (p.state == 'syncing')
-			rows = [ row(_('Status'), chip('warn', _('Updating'))), row(_('Content'), '—') ];
-		else if (p.state == 'error')
-			rows = [ row(_('Status'), chip('warn', _('Content not received'))), row(_('Content'), '—') ];
-		else
-			rows = [ row(_('Status'), chip('warn', _('No content yet'))), row(_('Content'), '—') ];
-		return panel('layers', _('Guest page'), '', rows, 'w-third');
+		const kinds = { image: _('Images'), video: _('Video'), website: _('Website') };
+		let st;
+		if (!w.paired) st = chip('warn', _('Not updated'));
+		else if (p.state == 'on') st = chip('ok', _('Up to date'));
+		else if (p.state == 'safe') st = chip('warn', _('Paused'));
+		else if (p.state == 'syncing') st = chip('warn', _('Updating'));
+		else if (p.state == 'error') st = chip('warn', _('Content not received'));
+		else st = chip('warn', _('Not updated'));
+		const live = w.paired && (p.state == 'on' || p.state == 'safe');
+		const kind = live && kinds[p.mode] ? chip('', kinds[p.mode]) : '—';
+		const name = live && p.content_name ? p.content_name : '—';
+		return panel('layers', _('Guest page'), '', [
+			row(_('Status'), st),
+			row(_('Display type'), kind),
+			E('div', { 'class': 'w-row w-nm' }, [ E('div', { 'class': 'w-k' }, _('Content')), E('div', { 'class': 'w-v' }, E('span', { 'class': 'w-nmv', 'title': name }, name)) ])
+		], 'w-third');
 	},
 
 	guestsPanel(s) {
