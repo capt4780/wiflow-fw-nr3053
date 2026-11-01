@@ -24,6 +24,9 @@ def log(name, obj):
 def perr(code, msg, status=400):
     return {'ok': False, 'code': code, 'message': msg, 'retryable': False, 'data_generation': '4', 'http_status': status}
 
+KEYS = {}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -66,12 +69,13 @@ class H(BaseHTTPRequestHandler):
                     data = open(D + '/media/' + f['name'], 'rb').read()
                     import hashlib
                     files.append({'role': f['role'], 'name': f['name'], 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
-                                  'download_url': REST.replace('/wp-json', '/wp-json') + '/portal/media/' + f['name']})
+                                  'download_url': REST + '/portal/media/m%d-%s' % (abs(hash(f['name'])) % 10**6, hashlib.sha256(data).hexdigest()[:8])})
+                    KEYS['m%d-%s' % (abs(hash(f['name'])) % 10**6, hashlib.sha256(data).hexdigest()[:8])] = f['name']
                 return self.reply({'ok': True, 'data_generation': '4', 'manifest': {
-                    'revision': po['revision'], 'api_version': 1, 'data_generation': '4', 'snapshot_schema': 2, 'mode': po['mode'],
+                    'revision': po['revision'], 'api_version': 1, 'data_generation': '4', 'snapshot_schema': 3, 'mode': po['mode'],
                     'website_url': po.get('website_url', ''), 'popup_count': 0, 'files': files}})
             if self.path.startswith('/wp-json/portal/media/'):
-                n = self.path.rsplit('/', 1)[1]
+                n = KEYS.get(self.path.rsplit('/', 1)[1], '')
                 try:
                     b = open(D + '/media/' + n, 'rb').read()
                 except Exception:

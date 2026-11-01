@@ -22,7 +22,7 @@ REV="$(jsonfilter -i "$RESP" -e '@.manifest.revision' 2>/dev/null || true)"; cas
 [ "$REV" -gt 0 ] || fail 'manifest_revision'; [ "$WANTED" -eq 0 ] || [ "$REV" -eq "$WANTED" ] || fail 'manifest_revision_changed'
 api="$(jsonfilter -i "$RESP" -e '@.manifest.api_version' 2>/dev/null || true)"; [ "$api" = 1 ] || fail 'manifest_api_version'
 manifest_generation="$(jsonfilter -i "$RESP" -e '@.manifest.data_generation' 2>/dev/null || true)"; [ "$manifest_generation" = "$WIFLOW_DATA_GENERATION" ] || fail 'manifest_generation'
-schema="$(jsonfilter -i "$RESP" -e '@.manifest.snapshot_schema' 2>/dev/null || true)"; [ "$schema" = 2 ] || fail 'manifest_schema'
+schema="$(jsonfilter -i "$RESP" -e '@.manifest.snapshot_schema' 2>/dev/null || true)"; case "$schema" in 2|3) :;; *) fail 'manifest_schema';; esac
 mode="$(jsonfilter -i "$RESP" -e '@.manifest.mode' 2>/dev/null || true)"; case "$mode" in website|image|video) :;; *) fail 'manifest_mode';; esac
 website="$(jsonfilter -i "$RESP" -e '@.manifest.website_url' 2>/dev/null || true)"; if [ -n "$website" ]; then website_url_valid "$website" || fail 'manifest_website_url'; fi
 # Renderer source hash is diagnostic only. Runtime compatibility is governed by
@@ -102,7 +102,7 @@ while [ "$i" -lt 24 ]; do
  # v1.0.19: shop_data (brand/products/terms JSON), shop_logo and product_1..8 images.
  case "$role" in image_landscape|image_portrait|video_landscape|video_portrait|popup_1|popup_2|popup_3|popup_4|popup_5|shop_data|shop_logo|intro_image|website_thumb|product_[1-8]) :;; *) fail 'media_role';; esac
  case "$seen" in *"|$role|"*) fail 'media_duplicate';; esac; seen="$seen$role|"
- printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'; case "$url" in "$WIFLOW_PORTAL_API"/media/*) :;; *) fail 'media_url';; esac
+ printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'; key="${url##*/}"; printf '%s' "$key" | grep -Eq '^m[0-9]{1,12}-[a-f0-9]{8}$' || fail 'media_url'; url="$WIFLOW_PORTAL_API/media/$key";
  printf '%s' "$hash" | grep -Eq '^[A-Fa-f0-9]{64}$' || fail 'media_hash'; case "$size" in ''|*[!0-9]*) fail 'media_size';; esac; [ "$size" -gt 0 ] && [ "$size" -le 157286400 ] || fail 'media_size'
  out="$STAGE/media/$name"; if file_ok "$out" "$hash"; then :; elif file_ok "$PORTAL_ACTIVE/media/$name" "$hash" && { rm -f "$out"; ln "$PORTAL_ACTIVE/media/$name" "$out" 2>/dev/null; }; then :; else dst="$out"; rm -f "$dst" "$dst.part"; wiflow_get "$dst.part" "$url" >/dev/null 2>&1 || { rm -f "$dst.part"; fail "download_$role"; }; mv -f "$dst.part" "$dst" || fail "download_$role"; out="$dst"; fi; got_size="$(wc -c < "$out" 2>/dev/null | tr -d ' ')"; [ "$got_size" = "$size" ] || fail "size_$role"; got_hash="$(sha256sum "$out" | awk '{print $1}')"; [ "$got_hash" = "$hash" ] || fail "hash_$role"; chmod 644 "$out" 2>/dev/null || true; printf '%s|%s\n' "$role" "$name" >> "$MAN"; i=$((i+1))
 done
