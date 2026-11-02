@@ -284,7 +284,6 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
   .w-side .w-lb .w-cv2{display:block;margin-left:auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .w-side .w-lm{left:0;right:0;bottom:calc(100% + 6px);min-width:0}
   .w-side .w-sup{margin:8px 0 12px;background:var(--soft);border-radius:10px}
-  .w-side>a.w-out{background:var(--soft);border-radius:var(--r)}
   .w-side .w-code{display:block;font-size:12px;background:var(--soft);border-radius:8px;padding:5px 10px}
   .w-side .w-lg{gap:10px}
   .w-side a{width:auto;height:44px;display:flex;align-items:center;gap:12px;padding:0 12px;font-weight:600;font-size:15px}
@@ -394,3 +393,12 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 
 .w-row.w-nm .w-k{flex:none}.w-row.w-nm .w-v{flex:1 1 auto;min-width:0;justify-content:flex-end}.w-nmv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-weight:600}
 .w-in.w-cd input{text-align:center;padding-left:.2em}.w-in.w-cd input::placeholder{letter-spacing:0}
+
+/* phone: the page title sits in the middle of the top bar (the page's own heading is hidden); language on the right */
+.w-topm{position:relative}
+.w-topm .w-tt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:18px;line-height:1.2;font-weight:700;white-space:nowrap;pointer-events:none}
+@media (max-width:639px){.w-hd{display:none}.w-pg{padding-top:20px}}
+/* sign out: one button at the end of System */
+.w-lo{display:flex;margin-top:16px}
+.w-lo .w-btn{min-width:160px}
+@media (max-width:639px){.w-lo .w-btn{width:100%}}

@@ -298,7 +298,11 @@ checks = {
         and "#modal_overlay{position:fixed;inset:0" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
         and "body:not(.modal-overlay-active) #modal_overlay" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
         and "B\u1ea3o tr\u00ec thi\u1ebft b\u1ecb".encode() in open(F + "/usr/lib/lua/luci/i18n/wiflow.vi.lmo", "rb").read()
-        and "{!" not in "".join(open(F + "/usr/share/ucode/luci/template/themes/wiflow/" + t).read() for t in ("header.ut", "footer.ut", "sysauth.ut")),
+        and "{!" not in "".join(open(F + "/usr/share/ucode/luci/template/themes/wiflow/" + t).read() for t in ("header.ut", "footer.ut", "sysauth.ut"))
+        # v1.1.11: the page title sits in the middle of the phone top bar, language on the right; Sign out is one button at the end of System (not in the bar or the sidebar)
+        and 'class="w-tt"' in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
+        and "/logout" not in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
+        and "admin/logout" in open(F + "/www/luci-static/resources/view/wiflow/system.js").read(),
     "5 GHz scans and uses channels 100-140 (country VN, A-band region 7)":
         json.load(open(F + "/usr/share/schema/mtwifi/dat-defs.json"))["COUNTRY_REGIONS"]["VN"] == [1, 7]
         and "country='VN'" in open(F + "/etc/uci-defaults/98-wiflow-base").read(),

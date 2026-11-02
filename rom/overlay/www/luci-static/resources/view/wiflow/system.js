@@ -172,7 +172,8 @@ return view.extend({
 	render(d) {
 		return E('div', {}, [
 			K.head(_('System')),
-			E('div', { 'class': 'w-gr' }, [ this.devicePanel(d), this.healthPanel(d), this.maintenancePanel(), this.passwordPanel(), this.contactPanel() ])
+			E('div', { 'class': 'w-gr' }, [ this.devicePanel(d), this.healthPanel(d), this.maintenancePanel(), this.passwordPanel(), this.contactPanel() ]),
+			E('div', { 'class': 'w-lo' }, btn('d', [ svg('out'), _('Sign out') ], () => { location.href = L.url('admin/logout'); }))
 		]);
 	},
 
