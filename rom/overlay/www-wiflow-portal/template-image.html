@@ -100,11 +100,14 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms: a fixed frame; only the body scrolls. */
-.cp-terms{height:min(calc(100vh - 48px),640px);height:min(calc(100dvh - 48px),640px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:0;display:block}
-.cp-terms>.cp-dhead{position:sticky;top:0;z-index:2;background:#fff;padding-top:var(--pad)}
-.cp-terms>.scr{overflow:visible;flex:none;min-height:0}
-.cp-terms>.cp-foot{position:sticky;bottom:0;z-index:2;background:#fff}
-.cp-terms .scr{padding:4px var(--pad) 10px;font-size:14px;line-height:1.6;color:var(--ink-3)}
+.cp-terms{display:flex;flex-direction:column;height:min(calc(100vh - 48px),640px);height:min(calc(100dvh - 48px),640px);overflow:hidden;padding:0}
+.cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
+.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.cp-terms .scr{padding:4px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
+.cp-x{appearance:none;-webkit-appearance:none;border:0;flex:none;margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--ink);background:var(--soft)}
+.cp-x svg{width:20px;height:20px}
+.cp-x:focus{outline:none}
+.cp-x:active{transform:scale(.94)}
 .cp-terms .scr h2.cp-dt{margin:0 0 10px}
 .cp-terms section{margin:14px 0 0}
 .cp-terms section:first-of-type{margin-top:6px}
@@ -221,6 +224,7 @@ html,body{overscroll-behavior:none}
         <div class="cp-head cp-dhead">
           <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12.5V20h13v-7.5"/><path d="M10 20v-4.5h4V20"/></svg></span>
           <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b><small data-shop-slogan></small></span>
+          <button class="cp-x" type="button" data-terms-close aria-label="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
         <div class="scr"><h2 class="cp-dt" id="cp-terms-title">Điều khoản sử dụng</h2>
         <div data-terms-body>
@@ -234,7 +238,6 @@ html,body{overscroll-behavior:none}
           <section><h3><em>8</em>Tạm ngừng và chất lượng kết nối</h3><p>Dịch vụ có thể bị gián đoạn do bảo trì, sự cố kỹ thuật, lỗi hạ tầng, mất điện, sự cố của nhà mạng, yêu cầu an ninh hoặc sự kiện ngoài khả năng kiểm soát hợp lý. Bên cung cấp sẽ xử lý trong phạm vi kiểm soát của mình nhưng không cam kết kết nối luôn liên tục hoặc không có lỗi.</p></section>
           <section><h3><em>9</em>Luật áp dụng và giải quyết vấn đề phát sinh</h3><p>Các điều khoản này được điều chỉnh bởi pháp luật Việt Nam. Mọi vấn đề phát sinh trước hết được ưu tiên giải quyết thông qua trao đổi và hợp tác thiện chí; trường hợp không giải quyết được sẽ thực hiện theo trình tự, thẩm quyền và quy định của pháp luật Việt Nam.</p></section>
         </div></div>
-        <div class="cp-foot"><button class="cp-go" type="button" data-terms-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Quay lại</span></button></div>
       </div>
     </div>
   </section>
@@ -528,8 +531,8 @@ html,body{overscroll-behavior:none}
      the screen freezes or reloads. Nothing cancels touches here; the box is only nudged 1px off
      the edge when a touch starts, so the browser keeps the swipe inside it. */
   const nudge=(el,top)=>{if(!el)return;el.addEventListener('touchstart',()=>{const max=el.scrollHeight-el.clientHeight;if(max<=1)return;if(el.scrollTop<=0)el.scrollTop=1;else if(!top&&el.scrollTop>=max-1)el.scrollTop=max-1.5;},{passive:true});};
-  nudge(mainView);nudge(termsDialog,true);
-  stage.querySelectorAll('.scr').forEach(e=>nudge(e));
+  nudge(mainView);
+  stage.querySelectorAll('.cp-view:not(.cp-terms) .scr').forEach(e=>nudge(e));
   const preview=stage.dataset.preview==='1';
   const sessionId=String(stage.dataset.localSessionId||'');
   const authorizeUrl=String(stage.dataset.localAuthorizeUrl||'');
@@ -663,7 +666,7 @@ html,body{overscroll-behavior:none}
     if(mainView)mainView.hidden=true;
     termsDialog.hidden=false;
     termsDialog.setAttribute('aria-hidden','false');
-    termsDialog.scrollTop=0;
+    {const tb=termsDialog.querySelector('.scr');if(tb)tb.scrollTop=0;}
     const firstClose=termsDialog.querySelector('[data-terms-close]');
     window.setTimeout(()=>{if(firstClose)firstClose.focus({preventScroll:true});},0);
   };

@@ -260,9 +260,12 @@ checks = {
         # v1.1.8: no hotline/email in the brand introduction; Confirm goes straight to the success page (no outside link)
         and all("hotline" not in open(F + "/www-wiflow-portal/" + x).read() and "mailto:" not in open(F + "/www-wiflow-portal/" + x).read()
                 and "openOutside" not in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
-        # v1.1.10: the terms page is one scroller (sticky header and button) and has only a Back button, no Confirm
+        # v1.1.13: the terms page has a fixed header with a round X close button; only the body scrolls; no footer button, no Confirm
         and all("data-dialog-confirm" not in re.search(r'<div class="cp-view cp-terms".*?(?=<!--@/ui-html-->)', open(F + "/www-wiflow-portal/" + x).read(), re.S).group(0)
-                and ".cp-terms>.cp-foot{position:sticky" in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
+                and "cp-foot" not in re.search(r'<div class="cp-view cp-terms".*?(?=<!--@/ui-html-->)', open(F + "/www-wiflow-portal/" + x).read(), re.S).group(0)
+                and 'class="cp-x" type="button" data-terms-close' in open(F + "/www-wiflow-portal/" + x).read()
+                and ".cp-terms>.scr{flex:1 1 auto" in open(F + "/www-wiflow-portal/" + x).read()
+                and "nudge(termsDialog" not in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
         and "portal-mode-loop" in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
     "guest portal: no WiFi-driver access (no iwinfo/iwpriv/hostapd/wifi calls in the portal and agent)":
         not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())
