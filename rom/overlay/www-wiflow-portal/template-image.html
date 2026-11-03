@@ -91,7 +91,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-two{display:flex;gap:12px}
 .cp-two>button,.cp-foot>button{flex:1 1 0;min-width:0}
 /* Buttons. */
-.cp-go,.cp-no{appearance:none;flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:56px;margin:0;padding:0 20px;border:0;border-radius:999px;background:var(--acc);color:var(--acc-ink);font-family:inherit;font-weight:600;font-size:17px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 8px 18px color-mix(in srgb,var(--acc) 28%,transparent);transition:transform .15s ease,opacity .15s ease}
+.cp-go,.cp-no{appearance:none;flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:44px;margin:0;padding:0 16px;border:0;border-radius:999px;background:var(--acc);color:var(--acc-ink);font-family:inherit;font-weight:600;font-size:16px;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 8px 18px color-mix(in srgb,var(--acc) 28%,transparent);transition:transform .15s ease,opacity .15s ease}
 .cp-no{background:var(--soft);color:var(--ink-3);box-shadow:none}
 .cp-go svg,.cp-no svg{width:20px;height:20px}
 .cp-go:active,.cp-no:active{transform:scale(.985)}
@@ -110,7 +110,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-x svg{width:20px;height:20px}
 .cp-x:focus{outline:none}
 .cp-x:active{transform:scale(.94)}
-.cp-terms .scr h2.cp-dt{margin:0 0 10px}
+.cp-terms>.cp-dhead .cp-dt{flex:1;min-width:0;margin:0;font-size:20px;line-height:1.3}
 .cp-terms section{margin:14px 0 0}
 .cp-terms section:first-of-type{margin-top:6px}
 .cp-terms h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-weight:600;font-size:15px;line-height:1.4;color:var(--ink)}
@@ -157,7 +157,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
  .cp-hero{grid-column:1;grid-row:1/3;align-self:start;margin:0;height:calc(100dvh - 16px - 28px);width:auto;max-width:56vw}
  .cp-cta{grid-column:2;grid-row:2;align-self:end;margin-top:0;gap:10px}
  .cp-no-hero .cp-head,.cp-no-hero .cp-cta{grid-column:1/3}
- .cp-go,.cp-no{height:50px;font-size:16px;gap:6px;padding:0 12px}
+ .cp-go,.cp-no{height:44px;font-size:16px;gap:6px;padding:0 12px}
  .cp-go svg,.cp-no svg{width:18px;height:18px}
  .cp-runtime-error{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
@@ -224,11 +224,10 @@ html,body{overscroll-behavior:none}
       </div>
       <div class="cp-view cp-terms" data-terms-dialog hidden aria-hidden="true" role="document" aria-labelledby="cp-terms-title">
         <div class="cp-head cp-dhead">
-          <span class="cp-logo" data-shop-logo aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12.5V20h13v-7.5"/><path d="M10 20v-4.5h4V20"/></svg></span>
-          <span class="cp-head-t"><b><span data-shop-name>WiFi miễn phí</span><svg class="cp-vf" data-shop-verified viewBox="0 0 24 24" role="img" aria-label="Đã xác minh"><circle cx="12" cy="12" r="11" fill="#0054F0"/><path d="M7 12.4l3.4 3.4L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b><small data-shop-slogan></small></span>
+          <h2 class="cp-dt" id="cp-terms-title">Điều khoản sử dụng</h2>
           <button class="cp-x" type="button" data-terms-close aria-label="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
-        <div class="scr"><h2 class="cp-dt" id="cp-terms-title">Điều khoản sử dụng</h2>
+        <div class="scr">
         <div data-terms-body>
           <section><h3><em>1</em>Phạm vi sử dụng</h3><p>Kết nối Internet được cung cấp cho mục đích truy cập mạng hợp pháp. Bạn chỉ được sử dụng dịch vụ trong phạm vi pháp luật Việt Nam cho phép và phải tuân thủ các quy định hiện hành về viễn thông, an ninh mạng, an toàn thông tin, sở hữu trí tuệ và các quy định có liên quan.</p></section>
           <section><h3><em>2</em>Trách nhiệm của người sử dụng</h3><p>Bạn tự chịu trách nhiệm trước pháp luật đối với hành vi do mình thực hiện, nội dung mình lưu trữ, truyền đưa, cung cấp hoặc phát tán, các giao dịch mình thực hiện và việc sử dụng thiết bị, tài khoản hoặc phiên truy cập của mình trong thời gian kết nối. Trách nhiệm này không loại trừ trách nhiệm của bên cung cấp đối với phần lỗi hoặc nghĩa vụ pháp lý thuộc về bên cung cấp theo quy định bắt buộc của pháp luật.</p></section>
