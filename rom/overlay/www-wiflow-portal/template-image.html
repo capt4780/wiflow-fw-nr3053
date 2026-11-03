@@ -103,9 +103,8 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-terms{display:flex;flex-direction:column;height:min(calc(100vh - 48px),640px);height:min(calc(100svh - 48px),640px);overflow:hidden;padding:0}
 .cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
 .cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;overscroll-behavior-y:contain}
-.cp-terms .scr{padding:4px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
-.cp-terms>.cp-dhead{box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
-.cp-terms.is-scrolled>.cp-dhead{box-shadow:0 1px 0 var(--soft)}
+.cp-terms .scr{padding:12px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
+.cp-terms>.cp-dhead{border-bottom:1px solid var(--line);padding-bottom:12px}
 .cp-ti{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink)}
 .cp-ti svg{width:20px;height:20px}
 .cp-x{appearance:none;-webkit-appearance:none;border:0;flex:none;margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--ink);background:var(--soft)}
