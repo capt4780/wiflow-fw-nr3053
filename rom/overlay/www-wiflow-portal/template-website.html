@@ -70,7 +70,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 @keyframes cp-rise{from{transform:translateY(40px);opacity:0}}
 @keyframes cp-pop{from{transform:translateY(16px) scale(.98);opacity:0}}
 /* Scrolling is CSS only (no touch handler cancels moves). */
-.cp-view{display:flex;flex-direction:column;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.cp-view{display:flex;flex-direction:column;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto;overscroll-behavior:contain;touch-action:none;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cp-view::-webkit-scrollbar{display:none}
 .scr{flex:1;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 .cp-main{padding:var(--pad) var(--pad) 20px}
@@ -102,7 +102,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 /* Terms: a fixed frame; only the body scrolls. */
 .cp-terms{display:flex;flex-direction:column;height:min(calc(100vh - 48px),640px);height:min(calc(100svh - 48px),640px);overflow:hidden;padding:0}
 .cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
-.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;overscroll-behavior-y:contain}
+.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;overscroll-behavior-y:contain;touch-action:none}
 .cp-terms .scr{padding:12px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
 .cp-terms>.cp-dhead{border-bottom:1px solid var(--line);padding-bottom:12px}
 .cp-ti{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink)}
@@ -302,6 +302,45 @@ html,body{overscroll-behavior:none}
       const atTop=box.scrollTop<=0,atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-1;
       if((atTop&&dy>0)||(atEnd&&dy<0))e.preventDefault();
     },{passive:false});
+  })();
+  /* Touch scrolling of the open box is done here, not by the browser: some phone and tablet browsers lose the drag at the end of a
+     scrolled box (or start their own pull-to-refresh), while the mouse wheel keeps working. The box moves with scrollTop. */
+  (()=>{
+    const boxes=[...document.querySelectorAll('.cp-terms>.scr,.cp-view:not(.cp-terms)')];
+    boxes.forEach(el=>{
+      let y0=0,top0=0,lastY=0,lastT=0,v=0,raf=0,on=false;
+      const halt=()=>{if(raf){cancelAnimationFrame(raf);raf=0;}};
+      const maxTop=()=>Math.max(0,el.scrollHeight-el.clientHeight);
+      el.addEventListener('touchstart',e=>{
+        halt();if(!e.touches||e.touches.length!==1){on=false;return;}
+        const t=e.touches[0];on=true;y0=lastY=t.clientY;top0=el.scrollTop;lastT=e.timeStamp;v=0;
+      },{passive:true});
+      el.addEventListener('touchmove',e=>{
+        if(!on||!e.touches||e.touches.length!==1)return;
+        const t=e.touches[0];
+        if(e.cancelable)e.preventDefault();
+        el.scrollTop=Math.min(maxTop(),Math.max(0,top0+(y0-t.clientY)));
+        const dt=e.timeStamp-lastT;
+        if(dt>0){const nv=(lastY-t.clientY)/dt;v=v*.6+nv*.4;}
+        lastY=t.clientY;lastT=e.timeStamp;
+      },{passive:false});
+      const end=e=>{
+        if(!on)return;on=false;
+        if(e.timeStamp-lastT>90)v=0;
+        let prev=performance.now();
+        const step=now=>{
+          const dt=Math.min(40,now-prev);prev=now;
+          const next=el.scrollTop+v*dt;
+          el.scrollTop=Math.min(maxTop(),Math.max(0,next));
+          v*=Math.pow(.995,dt);
+          if(Math.abs(v)<.02||el.scrollTop<=0||el.scrollTop>=maxTop()){raf=0;return;}
+          raf=requestAnimationFrame(step);
+        };
+        if(Math.abs(v)>=.05)raf=requestAnimationFrame(step);
+      };
+      el.addEventListener('touchend',end,{passive:true});
+      el.addEventListener('touchcancel',()=>{on=false;halt();},{passive:true});
+    });
   })();
   /* Diagnostics: open the portal with ?dbg=1 to see touch and scroll counters on screen. */
   let dbgOn=false;
