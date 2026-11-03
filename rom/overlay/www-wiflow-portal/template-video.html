@@ -323,7 +323,9 @@ html,body{overscroll-behavior:none}
     },{passive:false});
   })();
   /* Diagnostics: open the portal with ?dbg=1 to see touch and scroll counters on screen. */
-  if(/[?&]dbg=1/.test(location.search)){
+  let dbgOn=false;
+  const startDbg=()=>{
+    if(dbgOn)return;dbgOn=true;
     const box=document.createElement('div');box.style.cssText='position:fixed;left:6px;top:6px;z-index:99999;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.78);color:#fff;font:11px/1.35 monospace;pointer-events:none;white-space:pre';
     document.documentElement.appendChild(box);
     const c={start:0,move:0,end:0,cancel:0,prevented:0,err:'',t:'-'};
@@ -331,7 +333,10 @@ html,body{overscroll-behavior:none}
     ['touchstart','touchmove','touchend','touchcancel'].forEach(n=>document.addEventListener(n,e=>{c[n.replace('touch','')]++;if(e.defaultPrevented)c.prevented++;if(n==='touchstart')c.t=(e.target.className||e.target.tagName||'').toString().slice(0,24);show();},{passive:true,capture:true}));
     window.addEventListener('error',e=>{c.err=String(e.message).slice(0,80);show();});
     document.addEventListener('scroll',show,{capture:true,passive:true});show();
-  }
+  };
+  if(/[?&]dbg=1/.test(location.search))startDbg();
+  /* Inside the phone's sign-in window there is no address bar: five quick taps on the shop logo turn the same counters on. */
+  (()=>{let n=0,t0=0;document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-shop-logo]')))return;const now=Date.now();if(now-t0>4000)n=0;t0=t0&&now-t0<=4000?t0:now;n++;if(n>=5){n=0;startDbg();}},true);})();
   document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault();},{passive:false});
   document.addEventListener('keydown',event=>{
     if(!(event.ctrlKey||event.metaKey))return;
