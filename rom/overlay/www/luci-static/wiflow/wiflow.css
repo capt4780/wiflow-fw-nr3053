@@ -402,3 +402,21 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-lo{display:flex;margin-top:16px}
 .w-lo .w-btn{min-width:160px}
 @media (max-width:639px){.w-lo .w-btn{width:100%}}
+/* larger radius, pill buttons (like the portal CTAs) */
+.w-pn{border-radius:28px;padding:12px 20px 16px}
+.w-pn.w-tile{padding:14px 18px}
+.w-btn,.w-in,.w-sg,.w-side a,.w-side .w-lb,.modal .btn,.modal .cbi-button{border-radius:999px}
+.w-sg button{border-radius:999px}
+.w-in input{padding-left:20px;padding-right:20px}
+.w-pi{border-radius:50%}
+.w-ib,.w-topm .w-lb{border-radius:50%}
+.w-chip{border-radius:999px}
+.w-code,.w-side .w-code{border-radius:999px;padding:5px 12px}
+.w-lm{border-radius:22px;padding:8px}.w-lm button{border-radius:999px}
+.w-fnn{border-radius:22px}
+.w-bandi{border-radius:18px}
+.w-dlg,.modal{border-radius:28px}
+.w-cv{border-radius:18px}.w-ct{border-radius:12px}
+.w-dev img{border-radius:16px}
+.w-col>.alert-message,.w-pg .alert-message{border-radius:22px}
+.w-tabbar a span.w-p{border-radius:999px}

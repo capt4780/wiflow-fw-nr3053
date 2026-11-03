@@ -302,7 +302,18 @@ checks = {
         # v1.1.11: the page title sits in the middle of the phone top bar, language on the right; Sign out is one button at the end of System (not in the bar or the sidebar)
         and 'class="w-tt"' in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
         and "/logout" not in open(F + "/usr/share/ucode/luci/template/themes/wiflow/header.ut").read()
-        and "admin/logout" in open(F + "/www/luci-static/resources/view/wiflow/system.js").read(),
+        and "admin/logout" in open(F + "/www/luci-static/resources/view/wiflow/system.js").read()
+        # v1.1.12: large radius, pill buttons
+        and ".w-btn,.w-in,.w-sg" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
+        and "border-radius:999px" in open(F + "/www/luci-static/wiflow/wiflow.css").read(),
+    "guest page popup (v1.1.12): shop line, one 4:3 banner, Huy / Xac nhan; no slider, no introduction, no banner detail":
+        all(
+            "data-dialog-dots" not in open(F + "/www-wiflow-portal/" + t).read()
+            and "data-about-open" not in open(F + "/www-wiflow-portal/" + t).read()
+            and "data-detail-view" not in open(F + "/www-wiflow-portal/" + t).read()
+            and "aspect-ratio:4/3" in open(F + "/www-wiflow-portal/" + t).read()
+            for t in ("template-image.html", "template-video.html", "template-website.html")
+        ),
     "5 GHz scans and uses channels 100-140 (country VN, A-band region 7)":
         json.load(open(F + "/usr/share/schema/mtwifi/dat-defs.json"))["COUNTRY_REGIONS"]["VN"] == [1, 7]
         and "country='VN'" in open(F + "/etc/uci-defaults/98-wiflow-base").read(),
