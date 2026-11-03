@@ -39,7 +39,8 @@
 		<meta charset="utf-8">
 		<meta name="google" content="notranslate">
 		<title>{{ striptags(node?.title ? `${node.title} · Wiflow` : 'Wiflow') }}</title>
-		<meta name="viewport" content="initial-scale=1.0,width=device-width">
+		<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no,width=device-width">
+		<script>document.addEventListener('gesturestart',function(e){e.preventDefault();});document.addEventListener('gesturechange',function(e){e.preventDefault();});document.addEventListener('gestureend',function(e){e.preventDefault();});document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});</script>
 		<meta name="theme-color" content="#F2F4F8">
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
 		<link rel="stylesheet" href="{{ media }}/wiflow.css">

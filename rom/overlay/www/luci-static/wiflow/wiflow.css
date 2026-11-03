@@ -439,3 +439,6 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-gate .w-gc .w-tt{gap:4px}
 .w-gate .w-gc .w-fld{gap:8px}
 .w-gate .w-gc .w-fld label{line-height:1.3}
+
+/* no pinch / double-tap zoom */
+html,body{touch-action:pan-x pan-y}

@@ -1,4 +1,4 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Wiflow</title><style>
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><title>Wiflow</title><style>
 @font-face{font-family:"Inter";font-style:normal;font-weight:400 500;font-display:block;src:url("/runtime/assets/fonts/inter-400.woff2") format("woff2")}
 @font-face{font-family:"Inter";font-style:normal;font-weight:600 700;font-display:block;src:url("/runtime/assets/fonts/inter-600.woff2") format("woff2")}
 *{box-sizing:border-box;margin:0}
@@ -26,7 +26,7 @@ main{position:fixed;inset:0;z-index:2;display:flex;flex-direction:column;align-i
 @media (orientation:landscape) and (max-height:480px){.lg{width:72px;height:72px}.nm{margin-top:10px;font-size:20px}.tg{margin-top:14px}}
 @media (min-width:600px) and (min-height:700px){.lg{width:104px;height:104px}.nm{font-size:26px;margin-top:20px}.tg{height:46px;margin-top:28px}.tg b{font-size:16px}}
 @media (prefers-reduced-motion:reduce){.ow i{animation:none}}
-html{height:calc(100% + 3px);overscroll-behavior:none}body{overscroll-behavior:none}
+html{touch-action:pan-x pan-y;height:calc(100% + 3px);overscroll-behavior:none}body{overscroll-behavior:none}
 </style></head><body data-wiflow-connected>
 <div class="bg" id="bg" aria-hidden="true"></div><div class="sh"></div>
 <main>
@@ -36,6 +36,7 @@ html{height:calc(100% + 3px);overscroll-behavior:none}body{overscroll-behavior:n
 <div class="tg" role="status"><span class="ow"><i></i><span class="ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><b>Kết nối internet thành công</b></div>
 </main>
 <script>
+document.addEventListener('gesturestart',function(e){e.preventDefault();});document.addEventListener('gesturechange',function(e){e.preventDefault();});document.addEventListener('gestureend',function(e){e.preventDefault();});document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
 /* Park the page at 1px so the sign-in window's own pull-to-refresh never starts. */
 (function(){var pin=function(){if((window.pageYOffset||0)<1)window.scrollTo(0,1);};pin();
 ['load','pageshow','resize','orientationchange','scroll','touchstart','visibilitychange'].forEach(function(n){window.addEventListener(n,pin,{passive:true});});
