@@ -289,6 +289,21 @@ html,body{overscroll-behavior:none}
 
   const preventZoomGesture=event=>event.preventDefault();
   ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,preventZoomGesture,{passive:false}));
+  /* Touch guard: a drag the open box cannot scroll (or one that would run past its top or bottom edge) never reaches the page
+     behind it, so the browser's own pull-to-refresh / rubber band cannot start and leave the page stuck. */
+  (()=>{
+    let startX=0,startY=0,box=null;
+    const scroller=node=>{for(let n=node;n&&n!==document.body;n=n.parentElement){if(n.nodeType===1&&n.scrollHeight>n.clientHeight+1&&/(auto|scroll)/.test(getComputedStyle(n).overflowY))return n;}return null;};
+    document.addEventListener('touchstart',e=>{const t=e.touches&&e.touches[0];startX=t?t.clientX:0;startY=t?t.clientY:0;box=scroller(e.target);},{passive:true});
+    document.addEventListener('touchmove',e=>{
+      if(e.touches&&e.touches.length>1){e.preventDefault();return;}
+      const t=e.touches&&e.touches[0];if(!t)return;
+      const dy=t.clientY-startY;if(Math.abs(t.clientX-startX)>Math.abs(dy))return;
+      if(!box){e.preventDefault();return;}
+      const atTop=box.scrollTop<=0,atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-1;
+      if((atTop&&dy>0)||(atEnd&&dy<0))e.preventDefault();
+    },{passive:false});
+  })();
   document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault();},{passive:false});
   document.addEventListener('keydown',event=>{
     if(!(event.ctrlKey||event.metaKey))return;

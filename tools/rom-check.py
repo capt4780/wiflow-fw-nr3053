@@ -265,7 +265,8 @@ checks = {
                 and "cp-foot" not in re.search(r'<div class="cp-view cp-terms".*?(?=<!--@/ui-html-->)', open(F + "/www-wiflow-portal/" + x).read(), re.S).group(0)
                 and 'class="cp-x" type="button" data-terms-close' in open(F + "/www-wiflow-portal/" + x).read()
                 and ".cp-terms>.scr{flex:1 1 auto" in open(F + "/www-wiflow-portal/" + x).read()
-                and "nudge(termsDialog" not in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
+                and "nudge(termsDialog" not in open(F + "/www-wiflow-portal/" + x).read()
+                and "Touch guard" in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
         and "portal-mode-loop" in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
     "guest portal: no WiFi-driver access (no iwinfo/iwpriv/hostapd/wifi calls in the portal and agent)":
         not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())
