@@ -9,7 +9,7 @@
 @font-face{font-family:"Inter";font-style:normal;font-weight:400 500;font-display:block;src:url("/runtime/assets/fonts/inter-400.woff2") format("woff2")}
 @font-face{font-family:"Inter";font-style:normal;font-weight:600 700;font-display:block;src:url("/runtime/assets/fonts/inter-600.woff2") format("woff2")}
 *{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;touch-action:pan-x pan-y}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;touch-action:manipulation}
 body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-stage button,.cp-stage a{ -webkit-tap-highlight-color:transparent; }
 .cp-stage{--type-line-title:1.3;--type-line-body:1.62;--type-line-control:1.2;--control-height:44px;--control-font-size:16px;--control-font-weight:600;--control-radius:999px;--control-pad-x:16px;--brand-primary:#424242;--brand-primary-hover:#343434;--brand-secondary:#6F6F6F;--brand-secondary-hover:#4E4E4E;--brand-on-primary:#FFFFFF;--dialog-bg:#F8F8F8;--dialog-text:#292929;--dialog-muted:#707070;--dialog-cancel-bg:#EAEAEA;--dialog-cancel-text:#424242;--dialog-shadow:rgba(0,0,0,.18);--dialog-backdrop:rgba(0,0,0,.42);--terms-backdrop:rgba(0,0,0,.54);--dialog-divider:rgba(0,0,0,.10);position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;overflow:hidden;background:#000;isolation:isolate}
@@ -102,10 +102,12 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 /* Terms: a fixed frame; only the body scrolls. */
 .cp-terms{display:flex;flex-direction:column;height:min(calc(100vh - 48px),640px);height:min(calc(100svh - 48px),640px);overflow:hidden;padding:0}
 .cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
-.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll}
+.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:scroll;overscroll-behavior-y:contain}
 .cp-terms .scr{padding:4px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
 .cp-terms>.cp-dhead{box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
 .cp-terms.is-scrolled>.cp-dhead{box-shadow:0 1px 0 var(--soft)}
+.cp-ti{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--ink)}
+.cp-ti svg{width:20px;height:20px}
 .cp-x{appearance:none;-webkit-appearance:none;border:0;flex:none;margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--ink);background:var(--soft)}
 .cp-x svg{width:20px;height:20px}
 .cp-x:focus{outline:none}
@@ -240,6 +242,7 @@ html,body{overscroll-behavior:none}
       </div>
       <div class="cp-view cp-terms" data-terms-dialog hidden aria-hidden="true" role="document" aria-labelledby="cp-terms-title">
         <div class="cp-head cp-dhead">
+          <span class="cp-ti" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span>
           <h2 class="cp-dt" id="cp-terms-title">Điều khoản sử dụng</h2>
           <button class="cp-x" type="button" data-terms-close aria-label="Đóng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
@@ -313,7 +316,8 @@ html,body{overscroll-behavior:none}
     document.addEventListener('touchmove',e=>{
       if(e.touches&&e.touches.length>1){e.preventDefault();return;}
       const t=e.touches&&e.touches[0];if(!t)return;
-      const dy=t.clientY-startY;if(Math.abs(t.clientX-startX)>Math.abs(dy))return;
+      const dy=t.clientY-startY;
+      if(Math.abs(dy)<12||Math.abs(t.clientX-startX)>Math.abs(dy))return;
       if(!box){e.preventDefault();return;}
       const atTop=box.scrollTop<=0,atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-1;
       if((atTop&&dy>0)||(atEnd&&dy<0))e.preventDefault();
@@ -786,6 +790,7 @@ html,body{overscroll-behavior:none}
   let swipeY=null;
   access.addEventListener('touchstart',e=>{swipeY=e.touches&&e.touches[0]?e.touches[0].clientY:null;},{passive:true});
   access.addEventListener('touchend',e=>{const t=e.changedTouches&&e.changedTouches[0];if(swipeY!==null&&t&&swipeY-t.clientY>24&&!access.disabled){track('content_interaction','cta');openDialog();}swipeY=null;},{passive:true});
+  document.querySelectorAll('.cp-panel').forEach(pn=>pn.addEventListener('animationend',()=>{pn.style.animation='none';}));
   if(termsOpen)termsOpen.addEventListener('click',openTerms);
   termsCloses.forEach(button=>button.addEventListener('click',()=>closeTerms(true)));
   confirms.forEach(button=>button.addEventListener('click',commit));
