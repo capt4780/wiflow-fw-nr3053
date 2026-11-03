@@ -48,6 +48,7 @@
 			<button type="button" data-l="en" class="{{ page_lang == 'en' ? 'w-on' : '' }}">{{ flag.en }}English<svg class="w-tk" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-9"/></svg></button>
 		</div>
 	</div>
+	<div class="w-gc">
 	<img src="{{ media }}/wiflow-mark.webp" alt="Wiflow">
 	{% if (!gate_ok): %}
 	<div class="w-tt" data-title="Security code"><h1>{{ T('Security code') }}</h1><p>{{ T('Enter the device code to continue') }}</p></div>
@@ -80,6 +81,7 @@
 		<button class="w-btn w-p w-full" type="submit" data-busy="{{ entityencode(T('Signing in…'), true) }}">{{ T('Sign in') }}</button>
 	</form>
 	{% endif %}
+	</div>
 </div>
 
 <div id="view">
