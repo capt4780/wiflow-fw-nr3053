@@ -104,6 +104,8 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
 .cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 .cp-terms .scr{padding:4px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
+.cp-terms>.cp-dhead{box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
+.cp-terms.is-scrolled>.cp-dhead{box-shadow:0 1px 0 var(--soft)}
 .cp-x{appearance:none;-webkit-appearance:none;border:0;flex:none;margin-left:auto;width:36px;height:36px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:var(--ink);background:var(--soft)}
 .cp-x svg{width:20px;height:20px}
 .cp-x:focus{outline:none}
@@ -666,7 +668,7 @@ html,body{overscroll-behavior:none}
     if(mainView)mainView.hidden=true;
     termsDialog.hidden=false;
     termsDialog.setAttribute('aria-hidden','false');
-    {const tb=termsDialog.querySelector('.scr');if(tb)tb.scrollTop=0;}
+    {const tb=termsDialog.querySelector('.scr');if(tb){tb.scrollTop=0;termsDialog.classList.remove('is-scrolled');if(!tb.dataset.sl){tb.dataset.sl='1';tb.addEventListener('scroll',()=>termsDialog.classList.toggle('is-scrolled',tb.scrollTop>2),{passive:true});}}}
     const firstClose=termsDialog.querySelector('[data-terms-close]');
     window.setTimeout(()=>{if(firstClose)firstClose.focus({preventScroll:true});},0);
   };
