@@ -433,3 +433,9 @@ body:not(.modal-overlay-active) #modal_overlay{display:none}
 .w-btn.w-sm{width:128px;min-width:128px;height:40px;padding:0 12px;font-size:14px;overflow:hidden;text-overflow:ellipsis}
 .w-row.w-stack .w-acts .w-btn.w-sm{width:auto;min-width:0;flex:1 1 0}
 .w-gate .w-gc .w-tt p{line-height:1.4;font-size:15px}.w-gate .w-gc .w-tt h1{line-height:1.2}
+
+/* card spacing is set here, not by the base sheet's heading / paragraph / label margins */
+.w-gate .w-gc :is(h1,p,label){margin:0}
+.w-gate .w-gc .w-tt{gap:4px}
+.w-gate .w-gc .w-fld{gap:8px}
+.w-gate .w-gc .w-fld label{line-height:1.3}
