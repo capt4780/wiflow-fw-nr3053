@@ -102,7 +102,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 /* Terms: a fixed frame; only the body scrolls. */
 .cp-terms{display:flex;flex-direction:column;height:min(calc(100vh - 48px),640px);height:min(calc(100dvh - 48px),640px);overflow:hidden;padding:0}
 .cp-terms>.cp-dhead{flex:none;display:flex;align-items:center;gap:12px;margin:0;padding:var(--pad) var(--pad) 10px}
-.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.cp-terms>.scr{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .cp-terms .scr{padding:4px var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));font-size:14px;line-height:1.6;color:var(--ink-3)}
 .cp-terms>.cp-dhead{box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
 .cp-terms.is-scrolled>.cp-dhead{box-shadow:0 1px 0 var(--soft)}
@@ -305,7 +305,6 @@ html,body{overscroll-behavior:none}
 
   const preventZoomGesture=event=>event.preventDefault();
   ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,preventZoomGesture,{passive:false}));
-  document.addEventListener('touchmove',event=>{if(event.touches&&event.touches.length>1)event.preventDefault();},{passive:false});
   document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault();},{passive:false});
   document.addEventListener('keydown',event=>{
     if(!(event.ctrlKey||event.metaKey))return;
