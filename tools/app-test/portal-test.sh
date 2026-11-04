@@ -32,6 +32,8 @@ $B x $PC is-authorized "$sid" && fail "guest authorized before the confirm" || p
 page="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=GET /www-wiflow-portal/cgi-bin/portal)"
 expect "guest: portal page served with the session" "$page" "$sid"
 expect "guest: portal page uses the image template" "$page" 'bg\.jpg|image'
+$B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=GET HTTP_ACCEPT_ENCODING="gzip, deflate" /www-wiflow-portal/cgi-bin/portal > /tmp/pg.gz
+expect "guest: portal page is sent gzip-compressed when the phone accepts it" "$(head -c 400 /tmp/pg.gz | tr -d '\r' | grep -ci '^Content-Encoding: gzip')|$(sed '1,/^\r\?$/d' /tmp/pg.gz | gzip -dc 2>/dev/null | grep -c "$sid")|$(( $(wc -c < /tmp/pg.gz) < 30000 ))" '^1\|[1-9][0-9]*\|1$'
 code="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid" /www-wiflow-portal/cgi-bin/portal | head -n1)"
 expect "guest: confirm answers 204 (Internet opened)" "$code" '204'
 $B x $PC is-authorized "$sid" && pass "guest: Internet granted by the confirm (nft element present)" || fail "guest not authorized"

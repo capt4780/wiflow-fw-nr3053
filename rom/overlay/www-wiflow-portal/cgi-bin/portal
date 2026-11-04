@@ -104,9 +104,15 @@ HTML
  exit 0
 fi
 template="/www-wiflow-portal/template-$mode.html"; [ -f "$template" ] || { printf 'Status: 500 Internal Server Error\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
-headers 'text/html; charset=utf-8'
+# The page is ~55 KB of text: compressed when the phone accepts it (about 4x less over the air).
+gz=0; case "${HTTP_ACCEPT_ENCODING:-}" in *gzip*) command -v gzip >/dev/null 2>&1 && gz=1;; esac
+if [ "$gz" = 1 ]; then printf 'Content-Type: text/html; charset=utf-8\r\nContent-Encoding: gzip\r\nVary: Accept-Encoding\r\nCache-Control: no-store\r\nPragma: no-cache\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n'; else headers 'text/html; charset=utf-8'; fi
 # v1.0.26: outside opening hours the page says so (hours shown, digits only).
 closed=0; sched_closed && closed=1
 hours=''; [ "$(uci -q get wiflow.core.sched_enabled 2>/dev/null)" = 1 ] && hours="$(uci -q get wiflow.core.sched_from 2>/dev/null)-$(uci -q get wiflow.core.sched_to 2>/dev/null)"
 hours="$(printf '%s' "$hours" | tr -cd '0-9:-')"
-sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" "$template"
+if [ "$gz" = 1 ]; then
+ sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" "$template" | gzip -c -3
+else
+ sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" "$template"
+fi

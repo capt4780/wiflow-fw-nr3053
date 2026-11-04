@@ -339,13 +339,17 @@ sched_closed(){ [ -f "$SCHED_CLOSED" ]; }
 # Per-guest speed limit (kbit/s, 0 = no limit), policed per IP in nftables.
 guest_policy_apply(){
     portal_nft_ready || return 0
-    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 0)"; _sig="wf-shape:$_dn/$_up/$_au"
+    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 0)"; _sig="wf-shape:$_dn/$_up/$_au/c1"
     _odn="$_dn"; _oup="$_up"
     # Auto fair-share shapes with queues (the fixed speeds become the per-guest maximum): no policer then.
     [ "$_au" = 1 ] && { _dn=0; _up=0; }
     [ "${1:-}" != force ] && /usr/sbin/nft list chain $CAPTIVE_TABLE shape 2>/dev/null | grep -q "\"$_sig\"" && return 0
     {
+        printf 'add set %s ncl { type ipv4_addr; flags dynamic,timeout; timeout 1m; size 1024; }\n' "$CAPTIVE_TABLE"
         printf 'flush chain %s shape\n' "$CAPTIVE_TABLE"
+        # One phone cannot flood the router with new connections (port scans, P2P): only the
+        # first packet of a connection is looked at, normal browsing never gets near the rate.
+        printf 'add rule %s shape ct state new ip saddr 10.10.10.0/24 update @ncl { ip saddr limit rate over 500/second burst 1000 packets } drop\n' "$CAPTIVE_TABLE"
         if [ "$_dn" -gt 0 ]; then _b=$((_dn / 8)); [ "$_b" -ge 32 ] || _b=32
             printf 'add rule %s shape ip daddr 10.10.10.0/24 update @dl { ip daddr limit rate over %s kbytes/second burst %s kbytes } drop\n' "$CAPTIVE_TABLE" $((_dn / 8)) "$_b"; fi
         if [ "$_up" -gt 0 ]; then _b=$((_up / 8)); [ "$_b" -ge 32 ] || _b=32
@@ -429,7 +433,7 @@ stats_sample(){
     _auth=0; [ -f "$AUTH_TICKS" ] && { _auth="$(wc -c < "$AUTH_TICKS" | tr -d ' ')"; : > "$AUTH_TICKS"; }
     _p=''
     # The auto fair-share controller already measures the delay every second: no extra ping then.
-    if shaper_running && [ -f /tmp/wiflow-shaper ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ "${6:-0}" -gt 0 ] 2>/dev/null && _p="$6"; fi
+    if shaper_running && [ -n "$(find /tmp/wiflow-shaper -mmin -1 2>/dev/null)" ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ "${6:-0}" -gt 0 ] 2>/dev/null && _p="$6"; fi
     if [ -z "$_p" ] && [ "$(net_status_read | cut -d' ' -f1)" = 1 ]; then _p="$(ping_ms 1.1.1.1)"; [ -n "$_p" ] || _p="$(ping_ms 8.8.8.8)"; fi
     state_set stat_ping "${_p:-}"
     _pv="${_p:-0}"; _pn=0; [ -n "$_p" ] && _pn=1

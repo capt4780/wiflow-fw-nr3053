@@ -7,7 +7,7 @@
 // except the pairing / settings a command changes.
 'use strict';
 
-import { readfile, writefile, unlink, access } from 'fs';
+import { readfile, writefile, unlink, access, stat } from 'fs';
 import * as W from 'wiflow.setup';
 import * as S from 'wiflow.stats';
 
@@ -35,7 +35,11 @@ function wan_carrier() {
 }
 
 function internet_tick() {
-	const ms = W.has_default_route() ? W.probe_ms(4) : -1;
+	// The auto fair-share controller pings every second: reuse its delay instead of a second probe.
+	const sh = split(trim(readfile('/tmp/wiflow-shaper') ?? ''), ' ');
+	const shp = trim(readfile('/tmp/wiflow-shaper.pid') ?? '');
+	const sms = length(sh) >= 9 && match(shp, /^[0-9]+$/) && access(`/proc/${shp}`) && time() - (stat('/tmp/wiflow-shaper')?.mtime ?? 0) <= 5 ? +sh[5] : 0;
+	const ms = W.has_default_route() ? (sms > 0 ? sms : W.probe_ms(4)) : -1;
 	const online = ms >= 0;
 	const prev = W.st_get('online', false);
 	if (online && !prev) W.st_set('online_since', W.uptime());

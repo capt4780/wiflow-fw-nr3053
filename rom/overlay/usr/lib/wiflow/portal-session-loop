@@ -5,7 +5,7 @@ current=/tmp/wiflow-portal-associated
 # A phone that sleeps its WiFi or walks out briefly keeps its authorization.
 DISCONNECT_GRACE=1800
 SNAP_EVERY=120   # loops of 5 s = 10 minutes
-loops=0; tick=0
+loops=0; tick=0; idle=0
 
 while true; do
     sleep 5
@@ -25,6 +25,10 @@ while true; do
     fi
     # Once a minute: statistics and the self-repair watchdog (web server and DNS stay up).
     if [ $((tick % 12)) = 0 ]; then stats_sample >/dev/null 2>&1 || true; watchdog_tick >/dev/null 2>&1 || true; tick=0; fi
+    # Nobody on the guest WiFi: look for guests every second pass only (the portal page creates a
+    # session by itself when a phone opens it).
+    set -- "$CLIENT_SESSIONS"/*
+    if [ ! -e "$1" ] && [ ! -s "$current" ]; then idle=$((idle+1)); [ $((idle % 2)) = 0 ] || continue; else idle=0; fi
     # Guests = devices the guest bridge has learned on a WiFi port (the driver is
     # never asked: LuCI owns it). The helper prints one MAC per line.
     : > "$current"
