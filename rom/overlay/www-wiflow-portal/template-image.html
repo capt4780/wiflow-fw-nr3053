@@ -65,7 +65,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-head-t small:empty{display:none}
 .cp-vf{flex:none;display:block;width:20px;height:20px}
 /* Banner: always 3:2; dragged by the finger, a short swipe changes it; a tap opens its detail. */
-.cp-hero{position:relative;flex:none;aspect-ratio:4/3;margin:14px 0 0;border-radius:var(--r-card);overflow:hidden;background:var(--soft);user-select:none;-webkit-user-select:none}
+.cp-hero{position:relative;flex:none;aspect-ratio:16/9;margin:14px 0 0;border-radius:var(--r-card);overflow:hidden;background:var(--soft);user-select:none;-webkit-user-select:none}
 .cp-hero-track{display:flex;width:100%;height:100%;will-change:transform}
 .cp-hero-slide{flex:0 0 100%;width:100%;height:100%}
 .cp-hero-slide img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none;user-select:none;-webkit-user-drag:none}
@@ -79,6 +79,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-go:active,.cp-no:active{transform:scale(.985)}
 .cp-go:disabled{opacity:.7;cursor:default;transform:none}
 .cp-go:focus{outline:none}
+.cp-intro{margin:0;font-size:14px;line-height:1.5;color:var(--ink-3);text-align:left;overflow-wrap:anywhere}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms: a fixed frame; only the body scrolls. */
@@ -123,7 +124,7 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
  .cp-terms{height:calc(100vh - 16px);height:calc(100dvh - 16px)}
  .cp-main{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:20px;padding:14px var(--pad)}
  .cp-head{grid-column:2;grid-row:1;margin:0 0 12px}
- .cp-hero{grid-column:1;grid-row:1/3;align-self:start;margin:0;height:calc(100dvh - 16px - 28px);width:auto;max-width:56vw}
+ .cp-hero{grid-column:1;grid-row:1/3;align-self:center;margin:0;height:auto;width:min(46vw,380px);max-width:none}
  .cp-cta{grid-column:2;grid-row:2;align-self:end;margin-top:0;gap:10px}
  .cp-no-hero .cp-head,.cp-no-hero .cp-cta{grid-column:1/3}
  .cp-go,.cp-no{height:44px;font-size:16px;gap:6px;padding:0 12px}
@@ -163,6 +164,7 @@ html,body{overscroll-behavior:none}
           <div class="cp-hero-track" data-dialog-track></div>
         </div>
         <div class="cp-cta">
+          <p class="cp-intro" data-shop-intro hidden></p>
           <div class="cp-two">
             <button class="cp-no" type="button" data-dialog-cancel><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Hủy</span></button>
             <button class="cp-go" type="button" data-dialog-confirm><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Xác nhận</span></button>
@@ -579,6 +581,10 @@ html,body{overscroll-behavior:none}
     const name=clip(shop.name,80),slogan=clip(shop.slogan,120);
     if(name)all('[data-shop-name]').forEach(n=>{n.textContent=name;});
     all('[data-shop-slogan]').forEach(n=>{n.textContent=slogan;});
+    /* popup intro: first banner's text, at most 150 characters, plain text only */
+    const b0=Array.isArray(shop.banners)&&shop.banners[0]&&typeof shop.banners[0]==='object'?shop.banners[0]:null;
+    const intro=Array.from(clip(b0&&b0.detail,600)).slice(0,150).join('');
+    all('[data-shop-intro]').forEach(n=>{n.textContent=intro;if(intro)n.removeAttribute('hidden');else n.setAttribute('hidden','');});
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const hide=shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false';
     all('[data-shop-verified]').forEach(vf=>{if(hide)vf.setAttribute('hidden','');else vf.removeAttribute('hidden');});
@@ -601,7 +607,7 @@ html,body{overscroll-behavior:none}
     return null;
   })();
 
-  /* v1.1.12: one banner (4:3), view only. The first image of the active revision is shown. */
+  /* v1.1.12: one banner (16:9), view only. The first image of the active revision is shown. */
   let slideCount=0,shownPopups=[];
   const seenBanner=new Set();
   const bannerSeen=()=>{if(!slideCount||dialog.hidden||seenBanner.has(0))return;seenBanner.add(0);trackItem('content_impression',itemOf(shownPopups[0]));};
