@@ -132,6 +132,7 @@ jobs:
             echo "- Quốc gia Việt Nam (5 GHz dùng cả kênh 100–140), múi giờ UTC+7 (Hồ Chí Minh / Hà Nội)"
             echo "- Nạp: LuCI → System → Backup / Flash Firmware, **bỏ chọn Keep settings**. Hướng dẫn: docs/HUONG-DAN-NAP.md"
             echo "- Trang Tổng quan (mục đầu menu LuCI): liên kết tài khoản Wiflow, xem tình trạng router và portal cho khách (nội dung từ WordPress), nằm sẵn trong firmware. WiFi nguồn chọn ở trang WiFi → Nguồn Internet. Hướng dẫn: docs/HUONG-DAN-WIFLOW-APP.md"
+            echo "- Mới ở 3.0: chia đều tốc độ cho khách tự động (mặc định tắt, bật ở trang WiFi), thẻ Tốc độ khách, giới hạn kết nối mới theo từng điện thoại, trang portal nén gzip, giao diện mới (nền xám nhạt, thẻ trắng, thanh menu mobile mới), popup portal ảnh 16:9 kèm đoạn giới thiệu tối đa 150 ký tự"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
