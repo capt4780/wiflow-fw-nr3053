@@ -83,7 +83,7 @@ return view.extend({
 		if (!sta)
 			return panel('wifi', _('Source WiFi'), chip('', _('Not connected yet')), [
 				E('div', { 'class': 'w-row' }, E('div', { 'class': 'w-k', 'style': 'color:var(--mut);font-weight:400' }, _('No source WiFi'))), lanRow
-			], 'w-half w-r2');
+			].concat(this.scanRows()), 'w-half');
 
 		const off = sta.disabled == '1', on = src.via == 'wifi' && !off, changed = this.pending() > 0;
 		const acts = E('div', { 'class': 'w-acts' }, [
@@ -106,16 +106,16 @@ return view.extend({
 			rows.push(row(_('Latency'), inet.latency > 0 ? inet.latency + ' ms' : '—'));
 		}
 		rows.push(lanRow);
-		return panel('wifi', _('Source WiFi'), state, rows, 'w-half w-r2');
+		return panel('wifi', _('Source WiFi'), state, rows.concat(this.scanRows()), 'w-half');
 	},
 
-	scanPanel() {
+	/* Scanning for a source WiFi belongs to the source card: one row per band. */
+	scanRows() {
 		const one = b => E('div', { 'class': 'w-row' }, [
-			E('span', { 'class': 'w-bandi' }, svg('band')), E('div', { 'class': 'w-k' }, band(b)),
+			E('span', { 'class': 'w-bandi' }, svg('band')), E('div', { 'class': 'w-k' }, _('Scan %s').format(band(b))),
 			btn('p', _('Scan now'), () => this.scan(b), { sm: true })
 		]);
-		const bands = [ '2g', '5g' ].filter(b => uci.sections('wireless', 'wifi-device').some(d => d.band == b));
-		return panel('band', _('Scan source WiFi'), '', bands.map(one), 'w-half');
+		return [ '2g', '5g' ].filter(b => uci.sections('wireless', 'wifi-device').some(d => d.band == b)).map(one);
 	},
 
 	guestPanel() {
@@ -131,16 +131,17 @@ return view.extend({
 		const rows = groups.map(g => row(g.ssid, g.off ? chip('', _('Off')) : chip('ok', _('Broadcasting')),
 			{ sub: g.bands.length > 1 ? _('Auto 2.4 / 5 GHz') : band(g.bands[0]) }));
 		rows.push(row(_('Connected now'), String((this.st.clients || {}).now ?? 0), { t: 1 }));
-		return panel('users', _('Guest WiFi'), '', rows, 'w-half');
+		const sp = this.speedBody();
+		return panel('users', _('Guest WiFi'), sp.tgl, rows.concat(sp.body), 'w-half');
 	},
 
 	/* Guest speed: a gauge like a speed test (what the guests use now) and the switch for
 	   automatic fair sharing. Updated every 2 s from the light "speed" call. */
-	speedPanel() {
+	speedBody() {
 		const sp = this.sp || {};
 		const val = E('b', {}), sub = E('span', {}, _('Mbps downloading'));
 		const dn = E('b', { 'class': 'w-dn' }), up = E('b', { 'class': 'w-up' }), rt = E('b', {});
-		const sw = E('button', { 'class': 'w-tg', 'type': 'button', 'role': 'switch', 'aria-label': _('Automatic fair sharing') });
+		const sw = E('button', { 'class': 'w-tg', 'type': 'button', 'role': 'switch', 'aria-label': _('Balance') });
 		sw.onclick = () => {
 			const on = sw.getAttribute('aria-checked') != 'true';
 			sw.setAttribute('aria-checked', on); sw.disabled = true;
@@ -155,12 +156,12 @@ return view.extend({
 			E('div', { 'class': 'w-gv' }, [ val, sub ])
 		]);
 		const m = (b, l) => E('div', { 'class': 'w-m' }, [ b, E('i', {}, l) ]);
-		const p = panel('pulse', _('Guest speed'), E('span', { 'class': 'w-tgl' }, [ _('Automatic fair sharing'), sw ]), [
-			gauge,
-			E('div', { 'class': 'w-ms' }, [ m(dn, _('Download speed')), m(up, _('Upload')), m(rt, _('Latency')) ])
-		], 'w-half');
 		this.paintSpeed();
-		return p;
+		return {
+			tgl: E('span', { 'class': 'w-tgl' }, [ _('Balance'), sw ]),
+			body: [ E('div', { 'class': 'w-sub' }, _('Guest speed')), gauge,
+				E('div', { 'class': 'w-ms' }, [ m(dn, _('Download speed')), m(up, _('Upload')), m(rt, _('Latency')) ]) ]
+		};
 	},
 
 	paintSpeed() {
@@ -194,7 +195,7 @@ return view.extend({
 		const inet = this.st.internet || {};
 		return E('div', {}, [
 			K.head(_('Internet'), inet.online ? chip('ok', _('Has Internet')) : null),
-			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.scanPanel(), this.guestPanel(), this.speedPanel() ]),
+			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.guestPanel() ]),
 			this.actionBar()
 		]);
 	},

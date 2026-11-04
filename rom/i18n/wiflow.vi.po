@@ -1077,8 +1077,8 @@ msgstr "Quét"
 msgid "Scan WiFi %s"
 msgstr "Quét WiFi %s"
 
-msgid "Scan source WiFi"
-msgstr "Quét WiFi nguồn"
+msgid "Scan %s"
+msgstr "Quét %s"
 
 msgid "Show password"
 msgstr "Hiện mật khẩu"
@@ -1270,8 +1270,8 @@ msgstr "Đang đăng nhập…"
 msgid "Guest speed"
 msgstr "Tốc độ khách"
 
-msgid "Automatic fair sharing"
-msgstr "Tự động chia đều"
+msgid "Balance"
+msgstr "Cân bằng"
 
 msgid "Mbps downloading"
 msgstr "Mbps tải xuống"

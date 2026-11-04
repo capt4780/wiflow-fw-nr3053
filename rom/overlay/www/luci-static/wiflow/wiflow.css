@@ -373,3 +373,6 @@ html,body{touch-action:pan-x pan-y}
 .w-tgl{white-space:nowrap}
 .w-ph:has(.w-tgl){flex-wrap:wrap}
 @media(max-width:560px){.w-tgl{flex:1 1 100%;justify-content:space-between;order:5;padding:6px 0 4px}}
+.w-sub{font-weight:700;font-size:14px;margin:14px 0 2px;padding-top:14px;border-top:1px solid var(--hair)}
+.w-gr>.w-half{align-self:stretch}
+.w-sub+.w-gg{max-width:260px}
