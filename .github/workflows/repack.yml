@@ -135,6 +135,7 @@ jobs:
             echo "- Mới ở 3.0: chia đều tốc độ cho khách tự động (mặc định tắt, bật ở trang WiFi), thẻ Tốc độ khách, giới hạn kết nối mới theo từng điện thoại, trang portal nén gzip, giao diện mới (nền xám nhạt, thẻ trắng, thanh menu mobile mới), popup portal ảnh 16:9 kèm đoạn giới thiệu tối đa 150 ký tự"
             echo "- Mới ở 3.0.1: trang Internet gọn hơn (quét WiFi nằm trong WiFi nguồn, Tốc độ khách nằm trong WiFi khách với công tắc Cân bằng), sửa chữ tiếng Anh còn sót ở card tốc độ"
             echo "- Mới ở 3.0.2: tên model/thiết bị là Wiflow Router ở banner, trang Hệ thống, tiêu đề phát hành và dữ liệu gửi lên WordPress"
+            echo "- Mới ở 2.0 (từ nay số phiên bản chỉ có một cấp phụ): tên model/thiết bị là Wiflow Router, bỏ dòng Nền tảng và ImmortalWrt ở trang Hệ thống, card Liên kết chưa liên kết thêm Máy chủ và Kết nối máy chủ"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'

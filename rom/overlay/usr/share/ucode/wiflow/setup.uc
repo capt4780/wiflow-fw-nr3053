@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.0.2';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.0';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '3.0.2';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '2.0';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -363,6 +363,7 @@ export function status() {
 			paired: core('paired', '0') == '1' && !!core('device_token'),
 			account: core('account_public_id'),
 			location: core('location_name'),
+			server: match(REST, /^https?:\/\/([^\/]+)/)?.[1] ?? '',
 			online: !!st_get('wp_online', false),
 			last_ok: st_get('wp_last_ok', 0),
 			since: num(core('paired_at', '0'), 0),

@@ -1284,3 +1284,15 @@ msgstr "Tải lên"
 
 msgid "Latency"
 msgstr "Độ trễ"
+
+msgid "Server"
+msgstr "Máy chủ"
+
+msgid "Server connection"
+msgstr "Kết nối máy chủ"
+
+msgid "Ready"
+msgstr "Sẵn sàng"
+
+msgid "Not ready"
+msgstr "Chưa sẵn sàng"

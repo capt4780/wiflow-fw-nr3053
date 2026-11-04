@@ -98,7 +98,9 @@ return view.extend({
 		const go = btn('p', _('Link'), () => this.follow(_('Linking…'), () => callPair(code.value)), { full: true });
 		return panel('link', _('Link'), chip('warn', _('Not linked')), [
 			E('div', { 'class': 'w-fld', 'style': 'margin-top:8px' }, [ E('label', {}, _('Connection code')), E('div', { 'class': 'w-in w-cd' }, code) ]),
-			E('div', { 'class': 'w-pf' }, go)
+			E('div', { 'class': 'w-pf', 'style': 'margin-bottom:8px' }, go),
+			row(_('Server'), w.server || '—'),
+			row(_('Server connection'), (s.internet || {}).online ? chip('ok', _('Ready')) : chip('warn', _('Not ready')))
 		], 'w-third');
 	},
 
