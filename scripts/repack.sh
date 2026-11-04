@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the lean Wiflow ROM for Viettel NR3053 by repacking the stable stock
+# Builds the lean Wiflow ROM for Wiflow Router by repacking the stable stock
 # image (base/, ImmortalWrt v2.3.6) instead of compiling:
 #   - kernel, device tree and the FIT layout stay byte-identical to v2.3.6
 #   - rootfs: packages Wiflow does not need are removed (tools/lean-keep.txt),
@@ -149,7 +149,7 @@ pad=$(( (4096 - size % 4096) % 4096 ))
 echo "rootfs $(stat -c %s "$W/rootfs.sqfs") bytes (v2.3.6: $(stat -c %s "$W/fit/_images_rootfs-1.bin"))"
 
 step "sysupgrade image"
-NAME="wiflow-os-$VERSION-viettel-nr3053-squashfs-sysupgrade.itb"
+NAME="wiflow-os-$VERSION-wiflow-router-squashfs-sysupgrade.itb"
 python3 "$ROOT/tools/fit-rootfs.py" "$W/stock.itb" "$W/rootfs.sqfs" "$OUT/$NAME"
 "$FWTOOL" -I "$W/meta.json" "$OUT/$NAME"
 cp "$W/meta.json" "$OUT/report/metadata.json"

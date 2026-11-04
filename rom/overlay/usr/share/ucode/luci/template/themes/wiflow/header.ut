@@ -11,7 +11,7 @@
 	import { readfile } from 'fs';
 
 	const boardinfo = ubus.call('system', 'board');
-	const model = striptags(boardinfo?.model ?? 'Wiflow router');
+	const model = 'Wiflow Router';
 	const wiflow_os = trim(readfile('/etc/wiflow_release') ?? '');
 	const device_id = 'WIFDIDNR3053';
 

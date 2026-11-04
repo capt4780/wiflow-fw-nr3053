@@ -1,4 +1,4 @@
-# Wiflow App trên Viettel NR3053
+# Wiflow App trên Wiflow Router
 
 Wiflow App nằm sẵn trong firmware (mục đầu tiên của thanh bên, không cài gói riêng). Nó **liên kết router với tài khoản Wiflow** (WordPress) và **hiển thị tình trạng router**. Nội dung portal, tốc độ, giờ mở cửa và số khách tối đa được đặt trên WordPress.
 

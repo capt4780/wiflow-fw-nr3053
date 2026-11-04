@@ -19,7 +19,7 @@ export function connect() {
 				return { 'access-group': groups };
 			}
 			if (obj == 'session' && method == 'set') return {};
-			if (obj == 'system' && method == 'board') return { hostname: 'Wiflow', model: 'Viettel NR3053', rootfs_type: 'squashfs', release: { distribution: 'ImmortalWrt', version: '25.12-SNAPSHOT', revision: 'r0-495af17', description: 'Wiflow OS 1.0.0' } };
+			if (obj == 'system' && method == 'board') return { hostname: 'Wiflow', model: 'Wiflow Router', rootfs_type: 'squashfs', release: { distribution: 'ImmortalWrt', version: '25.12-SNAPSHOT', revision: 'r0-495af17', description: 'Wiflow OS 1.0.0' } };
 			return null;
 		},
 		error: () => null,

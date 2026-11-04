@@ -1,4 +1,4 @@
-# Nạp Wiflow OS cho Viettel NR3053
+# Nạp Wiflow OS cho Wiflow Router
 
 Dùng cho router **đang chạy ImmortalWrt v2.3.6** (bản `immortalwrt-…-viettel_nr3053-squashfs-sysupgrade.itb` ổn định).
 
@@ -10,7 +10,7 @@ Wiflow App (liên kết WordPress, tình trạng router) nằm sẵn trong firmw
 
 ## Chuẩn bị
 
-- Ở trang **Releases**, tải file `wiflow-os-<phiên bản>-viettel-nr3053-squashfs-sysupgrade.itb` và `SHA256SUMS`.
+- Ở trang **Releases**, tải file `wiflow-os-<phiên bản>-wiflow-router-squashfs-sysupgrade.itb` và `SHA256SUMS`.
 - Giữ lại file v2.3.6 để quay về khi cần.
 - Nối máy tính (hoặc điện thoại có hub USB-LAN) vào **cổng LAN** bằng cáp. Không nạp qua WiFi.
 

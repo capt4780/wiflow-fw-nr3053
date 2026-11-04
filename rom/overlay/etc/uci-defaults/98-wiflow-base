@@ -1,5 +1,5 @@
 #!/bin/sh
-# Wiflow ROM base settings for Viettel NR3053.
+# Wiflow ROM base settings for Wiflow Router.
 # Runs once after flashing and after every factory reset.
 # The Wiflow App service (init.d/wiflow) adds its own settings at start.
 

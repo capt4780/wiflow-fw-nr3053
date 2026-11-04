@@ -1,4 +1,4 @@
-// Wiflow App for Viettel NR3053 (Wiflow OS): links the router to a Wiflow
+// Wiflow App for Wiflow Router (Wiflow OS): links the router to a Wiflow
 // (WordPress) account. Shared code for the LuCI rpcd plugin (ubus "wiflow"),
 // the background job runner (/usr/libexec/wiflow/job) and the agent
 // (/usr/libexec/wiflow/agent). It never touches the WiFi or network setup:
@@ -12,9 +12,9 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.0.1';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.0.2';
 export const GEN = '4';
-export const MODEL = 'Viettel NR3053';
+export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
 export const ROOT = '/etc/wiflow';
 export const RUN = '/tmp/wiflow';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '3.0.1';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '3.0.2';
 };
 
 /* ---------------------------------------------------------------- network */

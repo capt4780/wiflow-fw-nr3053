@@ -45,8 +45,6 @@ return view.extend({
 			row(_('Device name'), (d.st.device || {}).model || '—'),
 			row(_('Device ID'), 'WIFDIDNR3053'),
 			row('Wiflow OS', _('Version %s').format((d.st.device || {}).os || '—')),
-			row(_('Platform'), 'OpenWrt'),
-			row(_('Version'), 'ImmortalWrt 2.3.6'),
 			row(_('IP address'), ip),
 			row(_('MAC address'), (d.st.device || {}).mac || d.mac || '—'),
 			row(_('Time zone'), _('UTC+7 · Vietnam'))

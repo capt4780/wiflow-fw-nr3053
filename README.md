@@ -1,6 +1,6 @@
-# Wiflow OS — Viettel NR3053
+# Wiflow OS — Wiflow Router
 
-Firmware nền cho router Wiflow trên Viettel NR3053 (MediaTek MT7981B, 512 MB RAM, 128 MB NAND).
+Firmware nền cho router Wiflow trên Wiflow Router (MediaTek MT7981B, 512 MB RAM, 128 MB NAND).
 
 Wiflow OS là bản ImmortalWrt v2.3.6 đang chạy ổn định, được **đóng gói lại** chứ không biên dịch lại:
 - **Giữ nguyên từng byte v2.3.6:** kernel, device tree, driver WiFi mt_wifi, firmware WiFi, file cấu hình sóng, script nâng cấp. Bootloader và dữ liệu hiệu chỉnh không bị đụng tới.
