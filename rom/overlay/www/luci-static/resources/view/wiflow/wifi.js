@@ -14,6 +14,8 @@
 const chip = K.chip, btn = K.btn, row = K.row, panel = K.panel, svg = K.svg, band = K.band, sig = K.sig;
 
 const callStatus = rpc.declare({ object: 'wiflow', method: 'status', expect: { '': {} } });
+const callSpeed = rpc.declare({ object: 'wiflow', method: 'speed', expect: { '': {} } });
+const callGuestAuto = rpc.declare({ object: 'wiflow', method: 'guest_auto', params: [ 'on' ], expect: { '': {} } });
 const callChanges = rpc.declare({ object: 'uci', method: 'changes', params: [ 'config' ], expect: { changes: [] } });
 const callRevert = rpc.declare({ object: 'uci', method: 'revert', params: [ 'config' ] });
 const CONFIGS = [ 'wireless', 'network', 'firewall' ];
@@ -132,6 +134,49 @@ return view.extend({
 		return panel('users', _('Guest WiFi'), '', rows, 'w-half');
 	},
 
+	/* Guest speed: a gauge like a speed test (what the guests use now) and the switch for
+	   automatic fair sharing. Updated every 2 s from the light "speed" call. */
+	speedPanel() {
+		const sp = this.sp || {};
+		const val = E('b', {}), sub = E('span', {}, _('Mbps downloading'));
+		const dn = E('b', { 'class': 'w-dn' }), up = E('b', { 'class': 'w-up' }), rt = E('b', {});
+		const sw = E('button', { 'class': 'w-tg', 'type': 'button', 'role': 'switch', 'aria-label': _('Automatic fair sharing') });
+		sw.onclick = () => {
+			const on = sw.getAttribute('aria-checked') != 'true';
+			sw.setAttribute('aria-checked', on); sw.disabled = true;
+			callGuestAuto(on).then(() => callSpeed().then(s => { this.sp = s; this.paintSpeed(); })).finally(() => { sw.disabled = false; });
+		};
+		const svgBox = E('div', { 'class': 'w-gs' });
+		svgBox.innerHTML = '<svg viewBox="0 0 200 112" aria-hidden="true"><path class="w-gt" d="M20 100 A80 80 0 0 1 180 100" pathLength="100"/><path class="w-ga" d="M20 100 A80 80 0 0 1 180 100" pathLength="100"/></svg>';
+		const arc = svgBox.querySelector('.w-ga');
+		this.sv = { arc, val, sub, dn, up, rt, sw };
+		const gauge = E('div', { 'class': 'w-gg' }, [
+			svgBox,
+			E('div', { 'class': 'w-gv' }, [ val, sub ])
+		]);
+		const m = (b, l) => E('div', { 'class': 'w-m' }, [ b, E('i', {}, l) ]);
+		const p = panel('pulse', _('Guest speed'), E('span', { 'class': 'w-tgl' }, [ _('Automatic fair sharing'), sw ]), [
+			gauge,
+			E('div', { 'class': 'w-ms' }, [ m(dn, _('Download speed')), m(up, _('Upload')), m(rt, _('Latency')) ])
+		], 'w-half');
+		this.paintSpeed();
+		return p;
+	},
+
+	paintSpeed() {
+		const v = this.sv, sp = this.sp || {};
+		if (!v) return;
+		const mb = k => (k / 1000).toFixed(k >= 100000 ? 0 : 1);
+		const on = !!sp.active;
+		v.sw.setAttribute('aria-checked', !!sp.auto);
+		v.val.textContent = on ? mb(sp.down_now || 0) : '—';
+		v.dn.textContent = on ? mb(sp.down_now || 0) : '—';
+		v.up.textContent = on ? mb(sp.up_now || 0) : '—';
+		v.rt.textContent = on && sp.rtt ? sp.rtt + ' ms' : '—';
+		const f = on ? Math.min(1, (sp.down_now || 0) / Math.max(sp.down_limit || 1, sp.down_now || 1, 1)) : 0;
+		v.arc.style.strokeDasharray = (f * 100) + ' 100';
+	},
+
 	/* The bar that appears once something is changed. */
 	actionBar() {
 		const n = this.pending();
@@ -149,7 +194,7 @@ return view.extend({
 		const inet = this.st.internet || {};
 		return E('div', {}, [
 			K.head(_('Internet'), inet.online ? chip('ok', _('Has Internet')) : null),
-			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.scanPanel(), this.guestPanel() ]),
+			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.scanPanel(), this.guestPanel(), this.speedPanel() ]),
 			this.actionBar()
 		]);
 	},
@@ -339,11 +384,15 @@ return view.extend({
 	},
 
 	render(st) {
-		this.st = st;
+		this.st = st; this.sp = st.speed;
 		this.body = E('div', {}, this.draw());
 		poll.add(() => {
+			if (document.body.classList.contains('modal-overlay-active') || document.hidden) return;
+			return callSpeed().then(s => { this.sp = s; this.paintSpeed(); }, () => {});
+		}, 2);
+		poll.add(() => {
 			if (document.body.classList.contains('modal-overlay-active')) return;
-			return callStatus().then(s => { this.st = s; this.redraw(); });
+			return callStatus().then(s => { this.st = s; this.sp = s.speed || this.sp; this.redraw(); });
 		}, 10);
 		return this.body;
 	},

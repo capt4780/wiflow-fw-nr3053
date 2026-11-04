@@ -38,7 +38,7 @@ $B x /usr/libexec/wiflow/provision boot
 diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no config rewrite)" || fail "boot rewrote configs"
 rm -rf /tmp/cfg.before
 
-expect "rpcd: only status, pair, unpair, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^job_clear pair status unpair $"
+expect "rpcd: only status, pair, unpair, guest_auto, speed, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^guest_auto job_clear pair speed status unpair $"
 expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Viettel NR3053', '2\.0\.0'\)$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 

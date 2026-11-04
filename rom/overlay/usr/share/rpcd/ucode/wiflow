@@ -16,6 +16,12 @@ const methods = {
 		}
 	},
 
+	speed: {
+		call: function() {
+			return W.speed();
+		}
+	},
+
 	pair: {
 		args: { code: '' },
 		call: function(req) {
@@ -30,6 +36,13 @@ const methods = {
 		args: { force: false },
 		call: function(req) {
 			return W.job_start('unpair', { force: !!req.args.force });
+		}
+	},
+
+	guest_auto: {
+		args: { on: false },
+		call: function(req) {
+			return W.set_auto(!!req.args.on);
 		}
 	},
 

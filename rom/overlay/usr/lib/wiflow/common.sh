@@ -339,7 +339,10 @@ sched_closed(){ [ -f "$SCHED_CLOSED" ]; }
 # Per-guest speed limit (kbit/s, 0 = no limit), policed per IP in nftables.
 guest_policy_apply(){
     portal_nft_ready || return 0
-    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _sig="wf-shape:$_dn/$_up"
+    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 0)"; _sig="wf-shape:$_dn/$_up/$_au"
+    _odn="$_dn"; _oup="$_up"
+    # Auto fair-share shapes with queues (the fixed speeds become the per-guest maximum): no policer then.
+    [ "$_au" = 1 ] && { _dn=0; _up=0; }
     [ "${1:-}" != force ] && /usr/sbin/nft list chain $CAPTIVE_TABLE shape 2>/dev/null | grep -q "\"$_sig\"" && return 0
     {
         printf 'flush chain %s shape\n' "$CAPTIVE_TABLE"
@@ -349,7 +352,20 @@ guest_policy_apply(){
             printf 'add rule %s shape ip saddr 10.10.10.0/24 update @ul { ip saddr limit rate over %s kbytes/second burst %s kbytes } drop\n' "$CAPTIVE_TABLE" $((_up / 8)) "$_b"; fi
         printf 'add rule %s shape counter comment "%s"\n' "$CAPTIVE_TABLE" "$_sig"
     } | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
-    guest_offload_policy "$_dn" "$_up"
+    if [ "$_au" = 1 ]; then guest_offload_policy 1 1; else guest_offload_policy "$_dn" "$_up"; fi
+    shaper_tick
+    return 0
+}
+# Auto fair-share: running only while enabled, not in safe mode and guests are online.
+SHAPER_PID=/tmp/wiflow-shaper.pid
+shaper_running(){ [ -f "$SHAPER_PID" ] && kill -0 "$(cat "$SHAPER_PID" 2>/dev/null)" 2>/dev/null; }
+shaper_stop(){ shaper_running || [ -f /tmp/wiflow-shaper ] || return 0; /usr/lib/wiflow/shaper stop >/dev/null 2>&1; return 0; }
+shaper_tick(){
+    if [ "$(cfg_num guest_auto 0)" != 1 ] || safe_mode_active || sched_closed; then shaper_stop; return 0; fi
+    shaper_running && return 0
+    [ "$(guest_authorized_count)" -gt 0 ] || return 0
+    _e="$(num_or0 "$(state_get shaper_err)")"; [ "$_e" -gt 0 ] && [ $(( $(uptime_s) - _e )) -lt 600 ] && return 0
+    ( setsid /usr/lib/wiflow/shaper run </dev/null >/dev/null 2>&1 & )
     return 0
 }
 # Hardware/software flow offloading bypasses the limit: it is turned off while
@@ -411,7 +427,10 @@ stats_sample(){
     state_set stat_rx_total "$_rx"; state_set stat_tx_total "$_tx"; state_set stat_at "$_up"
     state_set stat_rx_bps $((_drx * 8 / _el)); state_set stat_tx_bps $((_dtx * 8 / _el))
     _auth=0; [ -f "$AUTH_TICKS" ] && { _auth="$(wc -c < "$AUTH_TICKS" | tr -d ' ')"; : > "$AUTH_TICKS"; }
-    _p=''; if [ "$(net_status_read | cut -d' ' -f1)" = 1 ]; then _p="$(ping_ms 1.1.1.1)"; [ -n "$_p" ] || _p="$(ping_ms 8.8.8.8)"; fi
+    _p=''
+    # The auto fair-share controller already measures the delay every second: no extra ping then.
+    if shaper_running && [ -f /tmp/wiflow-shaper ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ "${6:-0}" -gt 0 ] 2>/dev/null && _p="$6"; fi
+    if [ -z "$_p" ] && [ "$(net_status_read | cut -d' ' -f1)" = 1 ]; then _p="$(ping_ms 1.1.1.1)"; [ -n "$_p" ] || _p="$(ping_ms 8.8.8.8)"; fi
     state_set stat_ping "${_p:-}"
     _pv="${_p:-0}"; _pn=0; [ -n "$_p" ] && _pn=1
     [ -f "$STATS" ] || : > "$STATS"
@@ -470,7 +489,7 @@ adstats_take(){
 adstats_ack(){ rm -f "$ADSTATS.sending"; }
 
 # --- Guest settings (local Setup and remote command share this) --------------
-# guest_settings_set DOWN UP SESSION MAX SCHED_ON FROM TO DAYS ; "" keeps a value.
+# guest_settings_set DOWN UP SESSION MAX SCHED_ON FROM TO DAYS WEEK AUTO ; "" keeps a value.
 guest_settings_set(){
     _i=0
     for _pair in "guest_down_kbps:$1:1000000" "guest_up_kbps:$2:1000000" "guest_session_min:$3:1440" "guest_max:$4:250"; do
@@ -483,6 +502,7 @@ guest_settings_set(){
     [ -z "${7:-}" ] || hm_to_min "$7" >/dev/null || return 2
     [ -z "${8:-}" ] || printf '%s' "$8" | grep -Eq '^[1-7]{1,7}$' || return 2
     case "${9:-}" in ''|none) :;; *) sched_week_valid "$9" || return 2;; esac
+    case "${10:-}" in ''|0|1) :;; *) return 2;; esac
     [ -n "$1" ] && uci set "wiflow.core.guest_down_kbps=$1"
     [ -n "$2" ] && uci set "wiflow.core.guest_up_kbps=$2"
     [ -n "$3" ] && uci set "wiflow.core.guest_session_min=$3"
@@ -492,9 +512,12 @@ guest_settings_set(){
     [ -n "${7:-}" ] && uci set "wiflow.core.sched_to=$7"
     [ -n "${8:-}" ] && uci set "wiflow.core.sched_days=$(printf '%s' "$8" | awk '{for(i=1;i<=7;i++) if(index($0,i)) printf "%d", i}')"
     case "${9:-}" in '') :;; none) uci -q delete wiflow.core.sched_week >/dev/null 2>&1 || true;; *) uci set "wiflow.core.sched_week=$9";; esac
+    [ -n "${10:-}" ] && uci set "wiflow.core.guest_auto=${10}"
     uci commit wiflow || return 1
     secure_configs
-    guest_policy_apply >/dev/null 2>&1 || true
+    [ -z "${10:-}" ] || state_set shaper_err ''
+    shaper_stop
+    guest_policy_apply force >/dev/null 2>&1 || true
     guest_sched_tick >/dev/null 2>&1 || true
     wlog guest "Cài đặt khách: tốc độ $(cfg_num guest_down_kbps 0)/$(cfg_num guest_up_kbps 0) kbps, thời gian $(cfg_num guest_session_min 0) phút, tối đa $(cfg_num guest_max 0), giờ phục vụ $(uci -q get wiflow.core.sched_enabled 2>/dev/null || echo 0)"
     return 0
@@ -516,12 +539,17 @@ uplink_active(){
     case "$_rd" in apcli*) printf wifi;; *) printf lan;; esac
 }
 portal_health_json(){
+    _sa=0; _sl=0; _su=0; _sn=0; _sx=0; _sr=0; _ss=off
+    if [ "$(cfg_num guest_auto 0)" = 1 ]; then _sa=1; _ss=waiting
+        if shaper_running && [ -f /tmp/wiflow-shaper ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ $# -ge 9 ] && { _sl="$2"; _su="$3"; _sn="$4"; _sx="$5"; _sr="$6"; _ss="$9"; }; fi
+    fi
     _sm=false; safe_mode_active && _sm=true; _tv=false; time_valid && _tv=true; _sc=false; sched_closed && _sc=true
     _se=false; [ "$(uci -q get wiflow.core.sched_enabled 2>/dev/null)" = 1 ] && _se=true
-    printf '{"clients_now":%s,"clients_connected":%s,"rx_bps":%s,"tx_bps":%s,"ping_ms":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_down_kbps":%s,"guest_up_kbps":%s,"guest_session_min":%s,"guest_max":%s}' \
+    printf '{"clients_now":%s,"clients_connected":%s,"rx_bps":%s,"tx_bps":%s,"ping_ms":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_down_kbps":%s,"guest_up_kbps":%s,"guest_session_min":%s,"guest_max":%s,"auto_share":%s,"auto_state":"%s","speed_limit_down":%s,"speed_limit_up":%s,"speed_down":%s,"speed_up":%s,"speed_rtt":%s}' \
         "$(num_or0 "$(state_get clients_auth)")" "$(num_or0 "$(state_get clients_conn)")" \
         "$(num_or0 "$(state_get stat_rx_bps)")" "$(num_or0 "$(state_get stat_tx_bps)")" "$(num_or0 "$(state_get stat_ping)")" "$(num_or0 "$(state_get wd_restarts)")" \
-        "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_down_kbps 0)" "$(cfg_num guest_up_kbps 0)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)"
+        "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_down_kbps 0)" "$(cfg_num guest_up_kbps 0)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)" \
+        "$_sa" "$_ss" "$(num_or0 "$_sl")" "$(num_or0 "$_su")" "$(num_or0 "$_sn")" "$(num_or0 "$_sx")" "$(num_or0 "$_sr")"
 }
 # One place that turns the guest portal on: a valid content snapshot is on the router and
 # safe mode is not active -> flag on + captive rules. Safe to call again and again.
@@ -543,6 +571,11 @@ watchdog_tick(){
         /etc/init.d/uhttpd restart >/dev/null 2>&1 || true; _fix="$_fix web"; sleep 3
     fi
     pidof dnsmasq >/dev/null 2>&1 || { /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true; _fix="$_fix dnsmasq"; }
+    # Connection table nearly full: say so once an hour (the short timeouts in sysctl.d keep it low).
+    _cc="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)")"; _cm="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null)")"
+    if [ "$_cm" -gt 0 ] && [ $((_cc * 100 / _cm)) -ge 90 ] && [ $(( $(uptime_s) - $(num_or0 "$(state_get ct_warn)") )) -ge 3600 ]; then
+        state_set ct_warn "$(uptime_s)"; wlog watchdog "Bảng kết nối gần đầy: $_cc/$_cm"
+    fi
     [ -n "$_fix" ] || return 0
     state_set wd_restarts $(( $(num_or0 "$(state_get wd_restarts)") + 1 ))
     wlog watchdog "Tự sửa lỗi, khởi động lại:$_fix"

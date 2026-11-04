@@ -78,6 +78,8 @@ $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && pass "self-repai
 rules="$($B x nft list ruleset)"
 expect "Private DNS: DoT (853) passes for guests, web (80) goes to the portal, the rest is rejected until the confirm" "$(printf '%s' "$rules" | grep -c 'dport 853 accept')|$(printf '%s' "$rules" | grep -c 'redirect to :2080')|$(printf '%s' "$rules" | grep -c 'reject')" '^2\|1\|[1-9]'
 
+. "$T/shaper-test.sh"
+
 # Leaving the account clears everything
 r="$(job unpair)"
 expect "unpair: portal off, content and guests cleared" "$r|$(U get wiflow.core.portal_enabled)|$(ls /www-wiflow-portal/runtime/revisions 2>/dev/null | wc -l)|$($B x nft list table inet wiflow_captive >/dev/null 2>&1 && echo table || echo none)|$(ls /tmp/wiflow-client-sessions 2>/dev/null | wc -l)" '^success\|.*\|0\|0\|none\|0$'

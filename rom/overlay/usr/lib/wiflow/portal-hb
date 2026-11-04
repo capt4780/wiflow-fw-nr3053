@@ -63,7 +63,7 @@ guest-settings)
  f="${2:-}"; [ -f "$f" ] || exit 2
  g(){ jsonfilter -i "$f" -e "@.$1" 2>/dev/null || true; }
  se="$(g sched_enabled)"; case "$se" in true|1) se=1;; false|0) se=0;; *) se='';; esac
- guest_settings_set "$(g down_kbps)" "$(g up_kbps)" "$(g session_min)" "$(g max)" "$se" "$(g sched_from)" "$(g sched_to)" "$(g sched_days)" "$(g sched_week)"
+ guest_settings_set "$(g down_kbps)" "$(g up_kbps)" "$(g session_min)" "$(g max)" "$se" "$(g sched_from)" "$(g sched_to)" "$(g sched_days)" "$(g sched_week)" "$(g auto_share | sed 's/^true$/1/;s/^false$/0/')"
  ;;
 *) exit 2 ;;
 esac

@@ -884,8 +884,6 @@ msgstr "Đã kết nối"
 msgid "%d devices"
 msgstr "%d thiết bị"
 
-msgid "Latency"
-msgstr "Độ trễ"
 
 msgid "Signal"
 msgstr "Tín hiệu"
@@ -1268,3 +1266,21 @@ msgstr "Kiểu hiển thị"
 
 msgid "Signing in…"
 msgstr "Đang đăng nhập…"
+
+msgid "Guest speed"
+msgstr "Tốc độ khách"
+
+msgid "Automatic fair sharing"
+msgstr "Tự động chia đều"
+
+msgid "Mbps downloading"
+msgstr "Mbps tải xuống"
+
+msgid "Download speed"
+msgstr "Tải xuống"
+
+msgid "Upload"
+msgstr "Tải lên"
+
+msgid "Latency"
+msgstr "Độ trễ"

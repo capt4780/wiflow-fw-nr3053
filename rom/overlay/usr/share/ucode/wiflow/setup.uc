@@ -323,6 +323,31 @@ function portal_state() {
 	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net, mode: portal_mode(), content_name: portal_content_name() };
 };
 
+// Guest speed (auto fair-share): the controller writes one line each second to RAM.
+// "tick dn_limit up_limit dn_now up_now rtt base guests state" (kbit/s, ms).
+export function speed() {
+	const auto = core('guest_auto', '0') == '1';
+	const f = split(trim(readfile('/tmp/wiflow-shaper') ?? ''), ' ');
+	const pid = trim(readfile('/tmp/wiflow-shaper.pid') ?? '');
+	const live = length(f) >= 9 && match(pid, /^[0-9]+$/) && access(`/proc/${pid}`);
+	return {
+		auto: auto,
+		active: auto && live,
+		fixed_down: num(core('guest_down_kbps', '0'), 0),
+		fixed_up: num(core('guest_up_kbps', '0'), 0),
+		down_limit: live ? num(f[1], 0) : 0, up_limit: live ? num(f[2], 0) : 0,
+		down_now: live ? num(f[3], 0) : 0, up_now: live ? num(f[4], 0) : 0,
+		rtt: live ? num(f[5], 0) : 0, guests: live ? num(f[7], 0) : 0,
+		state: live ? f[8] : (auto ? 'waiting' : 'off')
+	};
+};
+
+// Switch auto fair-share on or off (same path as the WordPress command).
+export function set_auto(on) {
+	const r = run(`. /usr/lib/wiflow/common.sh; guest_settings_set '' '' '' '' '' '' '' '' '' ${on ? 1 : 0}`);
+	return { ok: r.code == 0 };
+};
+
 export function status() {
 	// The Wiflow App page is open: the agent may read the source WiFi signal.
 	rundir();
@@ -350,6 +375,7 @@ export function status() {
 			recovery_reboots: num(core('recovery_reboots', '0'), 0),
 			guest_max: num(core('guest_max', '0'), 0)
 		},
+		speed: speed(),
 		metrics: st.metrics ?? {},
 		clients: st.clients ?? { now: 0, today: 0, band2g: 0, band5g: 0 },
 		networks: st.networks ?? [],
