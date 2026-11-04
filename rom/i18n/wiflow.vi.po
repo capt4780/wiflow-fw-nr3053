@@ -866,8 +866,8 @@ msgstr "Cổng WAN · Chưa cắm dây"
 msgid "Plugged in"
 msgstr "Đã cắm"
 
-msgid "Wiflow router"
-msgstr "Router Wiflow"
+msgid "Wiflow Router"
+msgstr "Wiflow Router"
 
 msgid "Devices"
 msgstr "Thiết bị"

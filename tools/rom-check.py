@@ -292,6 +292,10 @@ checks = {
         not os.path.exists(F + "/www/luci-static/wiflow/ui.css")
         and "w-tabbar" in open(F + "/www/luci-static/wiflow/wiflow.css").read()
         and "M\u00e3 b\u1ea3o m\u1eadt".encode() in open(F + "/usr/lib/lua/luci/i18n/wiflow.vi.lmo", "rb").read(),
+    "Wiflow UI: the Vietnamese catalog (.lmo) is built from the current .po (every translated string is in it)":
+        (lambda pairs, lmo: bool(pairs) and all(t.encode() in lmo for i, t in pairs if t != i))(
+            re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rom", "i18n", "wiflow.vi.po"), encoding="utf8").read(), re.M),
+            open(F + "/usr/lib/lua/luci/i18n/wiflow.vi.lmo", "rb").read()),
     "LuCI package upload accepts an unsigned package file":
         '--allow-untrusted --no-network --repositories-file /dev/null' in open(F + "/usr/libexec/package-manager-call").read(),
     "LuCI pages are not offered for machine translation":
