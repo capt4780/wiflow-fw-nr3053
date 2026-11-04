@@ -91,7 +91,7 @@ if ! sched_closed && /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/nu
 
 event_enqueue portal_view "$cid" "$sid" "$(date +%s)" || true
 cfg="$PORTAL_ACTIVE/portal.json"
-mode="$(uci -q get wiflow.core.portal_mode 2>/dev/null || true)"; case "$mode" in website|image|video) :;; *) mode=""; [ -f "$cfg" ] && mode="$(jsonfilter -i "$cfg" -e '@.mode' 2>/dev/null || true)";; esac
+mode=""; [ -f "$cfg" ] && mode="$(jsonfilter -i "$cfg" -e '@.mode' 2>/dev/null || true)"
 case "$mode" in website|image|video) :;; *) mode='';; esac
 # v1.0.7: while a low-space update has freed the old media, show the same portal
 # layout without background media (website template), so guests can always connect.

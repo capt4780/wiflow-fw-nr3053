@@ -437,6 +437,11 @@ mem_kb(){ awk -v k="$1:" '$1==k{print $2;exit}' /proc/meminfo 2>/dev/null; }
 # Safe mode = captive portal off for 10 minutes so guests keep the Internet
 # when the portal itself cannot be served (fail-open).
 safe_mode_active(){ _u="$(num_or0 "$(state_get safe_until)")"; [ "$_u" -gt 0 ] && [ "$(uptime_s)" -lt "$_u" ]; }
+# Safe mode ends by itself: forget it, the next portal_activate switches the captive portal back on.
+safe_mode_tick(){
+    [ -n "$(state_get safe_until)" ] && ! safe_mode_active || return 0
+    state_set safe_until ''; wlog safe 'Hết chế độ an toàn: bật lại cổng chào'
+}
 safe_mode_enter(){
     state_set safe_until $(( $(uptime_s) + 600 ))
     /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
@@ -529,7 +534,7 @@ portal_activate(){
     /usr/lib/wiflow/portal-firewall ensure >/dev/null 2>&1 || { state_set portal_error 'captive_firewall_enable_failed'; return 1; }
     return 0
 }
-# Every minute from portal-mode-loop: web server and DNS stay up; three failures
+# Every minute from portal-session-loop: web server and DNS stay up; three failures
 # of the portal listener in 10 minutes = safe mode (guests keep the Internet).
 watchdog_tick(){
     [ "$(uptime_s)" -ge 180 ] || return 0

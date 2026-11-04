@@ -52,15 +52,12 @@ class H(BaseHTTPRequestHandler):
             if os.path.exists(D + '/down'):
                 return self.reply({'code': 'rest_no_route'}, 503)
             return self.reply({'ok': True, 'service': 'wiflow-devices', 'api_version': 1, 'data_generation': '4', 'wp_home': 'x', 'rest_root': REST})
-        if self.path.startswith('/wp-json/devices/sync') or self.path.startswith('/wp-json/portal/'):
+        if self.path.startswith('/wp-json/portal/'):
             st = load()
             d, e = self.auth(st)
             if e:
                 return self.reply(e)
             po = st.get('portal') or {}
-            if self.path.startswith('/wp-json/devices/sync'):
-                return self.reply({'ok': True, 'data_generation': '4', 'account_public_id': d['account'],
-                                   'device': {'account_public_id': d['account'], 'desired_portal_revision': po.get('revision', 0), 'portal_mode': po.get('mode', '')}})
             if self.path.startswith('/wp-json/portal/manifest'):
                 if not po:
                     return self.reply(perr('PORTAL_NOT_READY', 'no content'))

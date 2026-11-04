@@ -67,7 +67,7 @@ rules_current(){
 
 resolve_website_ips(){
  cfg="$(portal_active_config)"; [ -n "$cfg" ] || return 1
- mode="$(uci -q get wiflow.core.portal_mode 2>/dev/null || true)"; case "$mode" in website|image|video) :;; *) mode="$(jsonfilter -i "$cfg" -e '@.mode' 2>/dev/null || true)";; esac; [ "$mode" = website ] || return 1
+ mode="$(jsonfilter -i "$cfg" -e '@.mode' 2>/dev/null || true)"; [ "$mode" = website ] || return 1
  url="$(jsonfilter -i "$cfg" -e '@.website_url' 2>/dev/null || true)"; website_url_valid "$url" || return 1
  host="$(website_host_from_url "$url")"; [ -n "$host" ] || return 1
  tmp="/tmp/wiflow-web-dns.$$"; : > "$tmp"

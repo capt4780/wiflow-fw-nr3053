@@ -14,7 +14,7 @@ echo '{"v":3,"name":"Quan Test","slogan":"Ngon","content_name":"Khuyen mai thang
 wp "s['codes']['WIFAPIPORT01']={'account':'WIFUID777000'}; s['commands']=[]"
 r="$(job pair '{"code":"WIFAPIPORT01"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
 wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'},{'role':'intro_image','name':'intro.jpg'}]}"
-# the mode loop is NOT started: the content download alone must switch the portal on
+# the content download alone must switch the portal on
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 7 ] && $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && break; sleep 2; done
 expect "portal: content revision 7 downloaded, checked and active" "$(U get wiflow.core.portal_revision)|$(U get wiflow.core.portal_sync_status)|$(U get wiflow.core.portal_enabled)|$($B x jsonfilter -i /www-wiflow-portal/runtime/active/portal.json -e '@.mode' 2>/dev/null)" '^7\|active\|1\|image$'
 expect "App page: kind and name of the applied content" "$(st "(s['portal']['mode'], s['portal']['content_name'])")" "^\\('image', 'Khuyen mai thang 11'\\)$"
@@ -60,6 +60,10 @@ $B x nft list table inet wiflow_captive >/dev/null 2>&1 && fail "safe mode: capt
 $B x sh -c '. /usr/lib/wiflow/common.sh; state_set safe_until ""'
 $B x /usr/lib/wiflow/portal-firewall ensure
 $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && pass "safe mode over: captive rules back" || fail "captive rules did not return"
+
+# The session loop ends safe mode by itself (what the old mode loop did) and turns the portal back on
+$B x sh -c '. /usr/lib/wiflow/common.sh; safe_mode_enter; state_set safe_until 1; safe_mode_tick; portal_activate'
+$B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && [ -z "$($B x sh -c '. /usr/lib/wiflow/common.sh; state_get safe_until')" ] && pass "safe mode ends by itself: captive rules back" || fail "safe mode did not end by itself"
 
 # A bigger revision than the storage budget allows is refused and reported
 head -c 3000 /dev/urandom > /tmp/mock/wp/media/bg2.jpg

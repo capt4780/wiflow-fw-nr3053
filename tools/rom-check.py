@@ -245,11 +245,11 @@ checks = {
         == [],
     "guest portal: scripts executable, valid shell, web pages, service starts the loops":
         all(os.access(F + x, os.X_OK) for x in ["/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
-            "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
+            "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
             "/usr/libexec/wiflow/guests", "/www-wiflow-portal/cgi-bin/portal", "/www-wiflow-portal/cgi-bin/captive-api",
             "/etc/hotplug.d/iface/60-wiflow-portal"])
         and all(subprocess.run(["sh", "-n", F + x]).returncode == 0 for x in ["/usr/lib/wiflow/common.sh", "/usr/lib/wiflow/portal-client",
-            "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync", "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop",
+            "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync", "/usr/lib/wiflow/portal-session-loop",
             "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot", "/www-wiflow-portal/cgi-bin/portal", "/www-wiflow-portal/cgi-bin/captive-api"])
         and all(os.path.isfile(F + "/www-wiflow-portal/" + x) for x in ["template-website.html", "template-image.html", "template-video.html",
             "connected.html", "runtime/assets/fonts/inter-400.woff2", "runtime/assets/fonts/lexend.woff"])
@@ -267,11 +267,11 @@ checks = {
                 and ".cp-terms>.scr{flex:1 1 auto" in open(F + "/www-wiflow-portal/" + x).read()
                 and "nudge(termsDialog" not in open(F + "/www-wiflow-portal/" + x).read()
                 and "Touch guard" in open(F + "/www-wiflow-portal/" + x).read() for x in ["template-image.html", "template-video.html", "template-website.html"])
-        and "portal-mode-loop" in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
+        and "portal-mode-loop" not in open(F + "/etc/init.d/wiflow").read() and "portal-session-loop" in open(F + "/etc/init.d/wiflow").read(),
     "guest portal: no WiFi-driver access (no iwinfo/iwpriv/hostapd/wifi calls in the portal and agent)":
         not any(re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down|reload))\b", open(F + x).read())
                 for x in ["/usr/lib/wiflow/common.sh", "/usr/lib/wiflow/portal-client", "/usr/lib/wiflow/portal-firewall", "/usr/lib/wiflow/portal-sync",
-                          "/usr/lib/wiflow/portal-mode-loop", "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
+                          "/usr/lib/wiflow/portal-session-loop", "/usr/lib/wiflow/portal-hb", "/usr/lib/wiflow/portal-boot",
                           "/usr/libexec/wiflow/guests", "/usr/share/ucode/wiflow/setup.uc"])
         # the agent restarts the WiFi (wifi reload) only in the uplink recovery (the 15-minute step and the source-WiFi-not-joined back-off), never polls the driver
         and not re.search(r"\b(iwinfo|iwpriv|iwconfig|hostapd|wifi (up|down))\b", open(F + "/usr/libexec/wiflow/agent").read())
