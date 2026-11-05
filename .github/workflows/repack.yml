@@ -139,6 +139,7 @@ jobs:
             echo "- Mới ở 3.0: mỗi thiết bị có tên do WordPress đặt khi thêm thiết bị (ví dụ Khu vực A); tên hiện ở trang Hệ thống và thẻ Liên kết"
             echo "- Mới ở 1.0: bản phát hành chính thức đầu tiên, đánh số lại từ 1.0 (các số 2.0/3.0 phía trên là bản nội bộ trước đó); thanh menu và thanh tab dạng card bo góc cách lề"
             echo "- Mới ở 2.0: thanh menu card cách lề rộng hơn (PC/tablet), thanh tab điện thoại đổ bóng rõ hơn để tách khỏi nội dung"
+            echo "- Mới ở 2.1: bỏ viền quanh thanh tab điện thoại, chỉ giữ bóng đổ đậm"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
