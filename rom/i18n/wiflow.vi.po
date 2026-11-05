@@ -809,6 +809,9 @@ msgstr "Tổng quan"
 msgid "Location"
 msgstr "Địa điểm"
 
+msgid "Device"
+msgstr "Thiết bị"
+
 msgid "Connection code"
 msgstr "Mã kết nối"
 

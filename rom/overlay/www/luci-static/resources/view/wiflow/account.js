@@ -87,6 +87,7 @@ return view.extend({
 			]), { full: true });
 			return panel('link', _('Link'), w.online ? chip('ok', _('Linked')) : chip('warn', _('No contact')), [
 				row(_('Account ID'), w.account || '—', { t: 1 }),
+				row(_('Device'), w.device_name || '—', { t: 1 }),
 				row(_('Location'), w.location || '—', { t: 1 }),
 				row(_('Last contact'), ago(w.last_ok)),
 				E('div', { 'class': 'w-pf' }, unlink)

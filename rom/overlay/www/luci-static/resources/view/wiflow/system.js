@@ -42,7 +42,7 @@ return view.extend({
 	devicePanel(d) {
 		const ip = String(uci.get('network', 'lan', 'ipaddr') || LAN).split('/')[0];
 		return panel('cpu', _('Device information'), '', [
-			row(_('Device name'), (d.st.device || {}).model || '—'),
+			row(_('Device name'), (d.st.wp && d.st.wp.paired && d.st.wp.device_name) || (d.st.device || {}).model || '—'),
 			row(_('Device ID'), 'WIFDIDNR3053'),
 			row('Wiflow OS', _('Version %s').format((d.st.device || {}).os || '—')),
 			row(_('IP address'), ip),

@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.0';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.0';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '2.0';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '3.0';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -363,6 +363,7 @@ export function status() {
 			paired: core('paired', '0') == '1' && !!core('device_token'),
 			account: core('account_public_id'),
 			location: core('location_name'),
+			device_name: core('device_name') || 'Wiflow Router',
 			server: match(REST, /^https?:\/\/([^\/]+)/)?.[1] ?? '',
 			online: !!st_get('wp_online', false),
 			last_ok: st_get('wp_last_ok', 0),
@@ -471,7 +472,7 @@ export function auth() {
 
 export function clear_pairing() {
 	core_set({
-		paired: '0', paired_at: null, device_token: null, account_public_id: null, location_name: null,
+		paired: '0', paired_at: null, device_token: null, account_public_id: null, location_name: null, device_name: null,
 		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
 	});
 	st_set('wp_online', false);

@@ -108,7 +108,7 @@ class H(BaseHTTPRequestHandler):
             tok = secrets.token_urlsafe(36)
             s['devices'][hw] = {'token': tok, 'account': t['account'], 'agent': b.get('agent_version'), 'model': b.get('model')}
             save(s)
-            return self.reply({'ok': True, 'device_token': tok, 'account_public_id': t['account'], 'desired_portal_revision': 0, 'portal_enabled': False, 'data_generation': '4'})
+            return self.reply({'ok': True, 'device_token': tok, 'device_name': 'Khu vực A', 'account_public_id': t['account'], 'desired_portal_revision': 0, 'portal_enabled': False, 'data_generation': '4'})
         d, e = self.auth(s)
         if e:
             log('denied', {'path': p, 'code': e['code']})
@@ -126,7 +126,7 @@ class H(BaseHTTPRequestHandler):
                 if not r or r.get('status') not in ('success', 'failed', 'rebooting', 'running'):
                     cmd = c; break
             save(s)
-            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': (s.get('portal') or {}).get('revision', 0), 'account_public_id': d['account'], 'data_generation': '4', 'server_time': int(time.time())})
+            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': (s.get('portal') or {}).get('revision', 0), 'account_public_id': d['account'], 'device_name': 'Khu vực A', 'data_generation': '4', 'server_time': int(time.time())})
         if p == 'unpair':
             s['revoked'].append([hw, d['token']]); del s['devices'][hw]; save(s)
             return self.reply({'ok': True, 'data_generation': '4'})

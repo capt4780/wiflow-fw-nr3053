@@ -110,7 +110,7 @@ function pair() {
 
 	const acct = (type(b.account_public_id) == 'string' && match(b.account_public_id, /^WIFUID[0-9]{6}$/)) ? b.account_public_id : null;
 	W.core_set({
-		paired: '1', paired_at: W.now(), device_token: b.device_token, account_public_id: acct, location_name: W.clip_text(b.location_name, 200),
+		paired: '1', paired_at: W.now(), device_token: b.device_token, account_public_id: acct, location_name: W.clip_text(b.location_name, 200), device_name: W.clip_text(b.device_name, 60),
 		last_command_id: null, last_command_action: null, last_command_status: null, last_command_message: null
 	});
 	W.st_set('wp_error', null);

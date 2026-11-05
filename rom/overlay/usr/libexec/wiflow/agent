@@ -292,6 +292,8 @@ function heartbeat(online) {
 			W.core_set({ account_public_id: b.account_public_id });
 		if (type(b.location_name) == 'string' && b.location_name != W.core('location_name'))
 			W.core_set({ location_name: W.clip_text(b.location_name, 200) });
+		if (type(b.device_name) == 'string' && b.device_name != W.core('device_name'))
+			W.core_set({ device_name: W.clip_text(b.device_name, 60) });
 		const st = +b.server_time;
 		if (st > 1600000000) {
 			if (W.now() - st <= 300 && st - W.now() <= 300) W.st_set('time_ok', true);
