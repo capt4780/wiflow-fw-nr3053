@@ -383,3 +383,9 @@ html,body{touch-action:pan-x pan-y}
 .w-act{bottom:90px}
 @media (min-width:640px){.w-act{left:84px;bottom:0}}
 @media (min-width:1100px){.w-act{left:244px}}
+
+/* v2.0: roomier floating sidebar, stronger shadow on the mobile tab bar */
+.w-tabbar{left:16px;right:16px;bottom:16px;box-shadow:0 10px 32px rgba(22,27,46,.24),0 0 0 1px rgba(22,27,46,.07)}
+.w-act{bottom:98px}
+@media (min-width:640px){.w-side{margin:16px 0 16px 16px}.w-act{left:88px}}
+@media (min-width:1100px){.w-side{margin:24px 0 24px 24px}.w-act{left:256px}}

@@ -138,6 +138,7 @@ jobs:
             echo "- Mới ở 2.0 (từ nay số phiên bản chỉ có một cấp phụ): tên model/thiết bị là Wiflow Router, bỏ dòng Nền tảng và ImmortalWrt ở trang Hệ thống, card Liên kết chưa liên kết thêm Máy chủ và Kết nối máy chủ"
             echo "- Mới ở 3.0: mỗi thiết bị có tên do WordPress đặt khi thêm thiết bị (ví dụ Khu vực A); tên hiện ở trang Hệ thống và thẻ Liên kết"
             echo "- Mới ở 1.0: bản phát hành chính thức đầu tiên, đánh số lại từ 1.0 (các số 2.0/3.0 phía trên là bản nội bộ trước đó); thanh menu và thanh tab dạng card bo góc cách lề"
+            echo "- Mới ở 2.0: thanh menu card cách lề rộng hơn (PC/tablet), thanh tab điện thoại đổ bóng rõ hơn để tách khỏi nội dung"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'

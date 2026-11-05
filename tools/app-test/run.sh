@@ -39,7 +39,7 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, guest_auto, speed, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^guest_auto job_clear pair speed status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '1\.0'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '2\.0'\)$"
 expect "status: server host shown on the link card" "$(st "s['wp']['server']")" "^[A-Za-z0-9.:-]+$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
@@ -63,7 +63,7 @@ n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
 [ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^1\.0 4  Wiflow 2\.4G (lan|wifi) \[\]$'
+expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^2\.0 4  Wiflow 2\.4G (lan|wifi) \[\]$'
 
 wp "s['commands']=[
  {'id':'c1','action':'change_guest_ssid','payload':{'guest_ssid':'X'}},
