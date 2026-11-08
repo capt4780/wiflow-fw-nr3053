@@ -72,6 +72,21 @@ case "$action" in
   set -- $(net_status_read)
   timing_write prepare "$(date +%s) $(( $(ms_now) - t0 ))ms net=$1"
   exit 0;;
+ guest)
+  # v2.4: information typed in the popup form. Kept in RAM and sent to WordPress with the next heartbeat.
+  sid="$(param session_id 2>/dev/null || true)"; validate_session "$sid" || json_error 'invalid_session'
+  clean(){ v="$(param "$1" 2>/dev/null || true)"; printf '%s' "$v" | tr -d '\000-\037"\\' | cut -c1-"$2"; }
+  gname="$(clean name 240)"; gphone="$(clean phone 20 | tr -cd '0-9+ .-')"; gyear="$(clean year 4 | tr -cd '0-9')"; gmail="$(clean email 120)"; ggen="$(clean gender 4)"
+  case "$ggen" in nam|nu|khac) :;; *) ggen='';; esac
+  [ -n "$gname$gphone$gyear$gmail$ggen" ] || json_error 'empty'
+  seen="/tmp/wiflow-guest-seen.$sid"
+  if [ ! -e "$seen" ]; then
+   : > "$seen"
+   guest_remember "$cid" || true
+   guest_enqueue "$(printf '{"session_id":"%s","client_id":"%s","name":"%s","phone":"%s","year":"%s","email":"%s","gender":"%s","at":%s}' "$sid" "$(json_escape "$cid")" "$(json_escape "$gname")" "$gphone" "$gyear" "$(json_escape "$gmail")" "$ggen" "$(date +%s)")" || true
+   : > "$HEARTBEAT_KICK" 2>/dev/null || true
+  fi
+  headers 'application/json; charset=utf-8'; echo '{"ok":true}'; exit 0;;
  event)
   sid="$(param session_id 2>/dev/null || true)"; validate_session "$sid" || json_error 'invalid_session'
   ev="$(param event 2>/dev/null || true)"; item="$(param item 2>/dev/null || true)"
@@ -111,8 +126,10 @@ if [ "$gz" = 1 ]; then printf 'Content-Type: text/html; charset=utf-8\r\nContent
 closed=0; sched_closed && closed=1
 hours=''; [ "$(uci -q get wiflow.core.sched_enabled 2>/dev/null)" = 1 ] && hours="$(uci -q get wiflow.core.sched_from 2>/dev/null)-$(uci -q get wiflow.core.sched_to 2>/dev/null)"
 hours="$(printf '%s' "$hours" | tr -cd '0-9:-')"
+# v2.4: a guest who filled the form before sees the banner popup instead of the form
+known=0; guest_known "$cid" && known=1
 if [ "$gz" = 1 ]; then
- sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" "$template" | gzip -c -3
+ sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" -e "s/__KNOWN__/$known/g" "$template" | gzip -c -3
 else
- sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" "$template"
+ sed -e "s/__SESSION_ID__/$sid/g" -e "s/__CLOSED__/$closed/g" -e "s/__HOURS__/$hours/g" -e "s/__KNOWN__/$known/g" "$template"
 fi

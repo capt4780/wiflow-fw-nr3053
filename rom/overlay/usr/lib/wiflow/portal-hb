@@ -3,7 +3,7 @@
 # portal engine (shell). The agent calls it; nothing here talks to WordPress
 # except portal-sync (content download) and portal-client (guest sessions).
 #   portal-hb report            one JSON object: events, stats, portal state
-#   portal-hb ack <events>      WordPress accepted the report
+#   portal-hb ack <events> <guests>   WordPress accepted the report
 #   portal-hb content <rev>     fetch the content revision WordPress wants
 #   portal-hb timeok            the router clock was confirmed
 #   portal-hb unpaired          the router left its account: portal off, content and guests cleared
@@ -27,15 +27,19 @@ report)
  batch="/tmp/wiflow-event-batch.$$"
  count="$(event_prepare_batch "$batch" 30 2>/dev/null || echo 0)"; case "$count" in ''|*[!0-9]*) count=0;; esac
  events="$(build_events_json "$batch")"; rm -f "$batch"
+ gbatch="/tmp/wiflow-guest-batch.$$"
+ gcount="$(guest_prepare_batch "$gbatch" 20 2>/dev/null || echo 0)"; case "$gcount" in ''|*[!0-9]*) gcount=0;; esac
+ guests="$(awk 'BEGIN{printf "["} NF{if(n++)printf ","; printf "%s",$0} END{printf "]"}' "$gbatch" 2>/dev/null)"; [ -n "$guests" ] || guests='[]'; rm -f "$gbatch"
  rev="$(cfg_num portal_revision 0)"
  sync="$(uci -q get wiflow.core.portal_sync_status 2>/dev/null || echo idle)"; err="$(uci -q get wiflow.core.portal_sync_error 2>/dev/null || true)"
  ad="$(adstats_take 2>/dev/null || echo '[]')"; [ -n "$ad" ] || ad='[]'
- printf '{"event_count":%s,"events":%s,"ad_stats":%s,"stats":%s,"active_portal_revision":%s,"portal_sync_status":"%s","portal_sync_error":"%s","storage_total_bytes":%s,"media_budget_bytes":%s,"health":%s}\n' \
-  "$count" "$events" "$ad" "$(stats_json)" "$rev" "$(json_escape "$sync")" "$(json_escape "$err")" "$(storage_total_bytes)" "$(media_budget_bytes)" "$(portal_health_json)"
+ printf '{"event_count":%s,"events":%s,"guest_count":%s,"guests":%s,"ad_stats":%s,"stats":%s,"active_portal_revision":%s,"portal_sync_status":"%s","portal_sync_error":"%s","storage_total_bytes":%s,"media_budget_bytes":%s,"health":%s}\n' \
+  "$count" "$events" "$gcount" "$guests" "$ad" "$(stats_json)" "$rev" "$(json_escape "$sync")" "$(json_escape "$err")" "$(storage_total_bytes)" "$(media_budget_bytes)" "$(portal_health_json)"
  ;;
 ack)
  event_ack_batch "${2:-0}" >/dev/null 2>&1 || true
  adstats_ack >/dev/null 2>&1 || true
+ guest_ack_batch "${3:-0}" >/dev/null 2>&1 || true
  ;;
 content)
  desired="${2:-0}"; case "$desired" in ''|*[!0-9]*) exit 0;; esac
@@ -56,7 +60,7 @@ unpaired)
  uci set wiflow.core.portal_enabled='0'
  portal_storage_reset
  uci commit wiflow >/dev/null 2>&1 || true
- rm -f "$EVENT_QUEUE" "$HEARTBEAT_KICK" "$ADSTATS" "$ADSTATS.sending" "$SESSION_SNAP" 2>/dev/null || true
+ rm -f "$GUEST_KNOWN" "$EVENT_QUEUE" "$GUEST_QUEUE" /tmp/wiflow-guest-seen.* "$HEARTBEAT_KICK" "$ADSTATS" "$ADSTATS.sending" "$SESSION_SNAP" 2>/dev/null || true
  rm -rf "$CLIENT_SESSIONS"/* 2>/dev/null || true
  ;;
 guest-settings)

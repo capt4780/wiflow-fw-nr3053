@@ -95,6 +95,17 @@ body{min-height:100vh;min-height:100dvh;font-family:"Inter";font-synthesis:none}
 .cp-go:disabled{opacity:.7;cursor:default;transform:none}
 .cp-go:focus{outline:none}
 .cp-intro{margin:0;font-size:14px;line-height:1.5;color:var(--ink-3);text-align:left;overflow-wrap:anywhere}
+.cp-form{display:grid;gap:10px;margin:0}
+.cp-form[hidden]{display:none}
+.cp-ft{margin:0;font-size:17px;line-height:23px;font-weight:600;color:var(--ink)}
+.cp-fb{margin:-4px 0 2px;font-size:13.5px;line-height:19px;color:var(--ink-3);overflow-wrap:anywhere}
+.cp-formmode .cp-hero{display:none!important}
+.cp-fld{display:grid;gap:4px;font-size:12.5px;line-height:17px;color:var(--ink-2)}
+.cp-fld input,.cp-fld select{appearance:none;-webkit-appearance:none;width:100%;box-sizing:border-box;height:44px;border:1px solid var(--line);border-radius:999px;padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:#fff;outline:0;box-shadow:none}
+.cp-fld input:focus,.cp-fld select:focus{outline:0;box-shadow:none;border-color:var(--acc)}
+.cp-fld.bad input,.cp-fld.bad select{border-color:#E5484D}
+.cp-fld .em{display:none;color:#E5484D;font-size:12px}
+.cp-fld.bad .em{display:block}
 .cp-fine{margin:0;font-size:12.5px;line-height:17px;color:var(--ink-2);text-align:center}
 .cp-fine button{appearance:none;padding:0;border:0;background:none;color:var(--acc-text);font:inherit;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 /* Terms: a fixed frame; only the body scrolls. */
@@ -152,7 +163,7 @@ html,body{overscroll-behavior:none}
 </style>
 </head>
 <body>
-<main class="cp-stage" data-captive-template="captive-portal" data-portal-mode="video" data-preview="0" data-local-session-id="__SESSION_ID__" data-closed="__CLOSED__" data-hours="__HOURS__" data-local-authorize-url="http://10.10.10.1:2080/cgi-bin/portal" data-analytics-url="" data-analytics-token="">
+<main class="cp-stage" data-captive-template="captive-portal" data-portal-mode="video" data-preview="0" data-local-session-id="__SESSION_ID__" data-closed="__CLOSED__" data-hours="__HOURS__" data-known="__KNOWN__" data-local-authorize-url="http://10.10.10.1:2080/cgi-bin/portal" data-analytics-url="" data-analytics-token="">
     <div class="cp-media-stage" aria-hidden="true">
         <div class="cp-video-stage" data-video-stage>
       <video class="cp-video" data-bg-video playsinline webkit-playsinline preload="auto" disablepictureinpicture></video>
@@ -195,6 +206,7 @@ html,body{overscroll-behavior:none}
           <div class="cp-hero-track" data-dialog-track></div>
         </div>
         <div class="cp-cta">
+          <form class="cp-form" data-guest-form hidden novalidate autocomplete="off"></form>
           <p class="cp-intro" data-shop-intro hidden></p>
           <div class="cp-two">
             <button class="cp-no" type="button" data-dialog-cancel><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Hủy</span></button>
@@ -568,6 +580,8 @@ html,body{overscroll-behavior:none}
   const confirm=confirms[0];
   const cancels=[...stage.querySelectorAll('[data-dialog-cancel]')];
   const runtimeError=stage.querySelector('[data-runtime-error]');
+  const guestForm=stage.querySelector('[data-guest-form]');
+  let guestSpec=null;
   const termsOpen=stage.querySelector('[data-terms-open]');
   const termsDialog=stage.querySelector('[data-terms-dialog]');
   const termsCloses=[...stage.querySelectorAll('[data-terms-close]')];
@@ -616,6 +630,29 @@ html,body{overscroll-behavior:none}
     const b0=Array.isArray(shop.banners)&&shop.banners[0]&&typeof shop.banners[0]==='object'?shop.banners[0]:null;
     const intro=Array.from(clip(b0&&b0.detail,600)).slice(0,150).join('');
     all('[data-shop-intro]').forEach(n=>{n.textContent=intro;if(intro)n.removeAttribute('hidden');else n.setAttribute('hidden','');});
+    /* v2.4: the popup can be an information form (title, text, and the fields the shop switched on; every field is required).
+       A guest who filled it before (the router remembers a hashed device id) gets the banner popup instead. Text only, built with DOM calls. */
+    guestSpec=null;
+    const GL={name:'Tên',phone:'Số điện thoại',year:'Năm sinh',email:'Email',gender:'Giới tính'};
+    const fm=shop.form&&typeof shop.form==='object'&&shop.form.enabled===true?shop.form:null;
+    const spec=fm&&Array.isArray(fm.fields)?fm.fields.filter((k,i,a)=>typeof k==='string'&&GL[k]&&a.indexOf(k)===i).slice(0,5).map(k=>({k})):[];
+    const known=stage.dataset.known==='1';
+    if(guestForm&&spec.length&&(!known||preview)){
+      guestSpec=spec;guestForm.textContent='';
+      const ft=clip(fm.title,40),fb=Array.from(clip(fm.body,300)).slice(0,100).join('');
+      if(ft)guestForm.appendChild(make('h3','cp-ft',ft));
+      if(fb)guestForm.appendChild(make('p','cp-fb',fb));
+      spec.forEach(f=>{
+        const lab=make('label','cp-fld');lab.dataset.k=f.k;lab.appendChild(make('span','',GL[f.k]));
+        let inp;
+        if(f.k==='gender'){inp=make('select');[['','Chọn'],['nam','Nam'],['nu','Nữ'],['khac','Khác']].forEach(o=>{const op=make('option','',o[1]);op.value=o[0];inp.appendChild(op);});}
+        else{inp=make('input');inp.type=f.k==='email'?'email':(f.k==='phone'||f.k==='year')?'tel':'text';inp.maxLength=f.k==='name'?60:f.k==='phone'?15:f.k==='year'?4:120;inp.autocomplete='off';if(f.k==='phone'||f.k==='year')inp.inputMode='numeric';}
+        inp.name=f.k;lab.appendChild(inp);lab.appendChild(make('span','em',''));guestForm.appendChild(lab);
+      });
+      guestForm.removeAttribute('hidden');
+      dialog.classList.add('cp-formmode','cp-no-hero');
+      all('[data-shop-intro]').forEach(n=>n.setAttribute('hidden',''));
+    }
     const logo=assetUrl(base,shop.logo);if(logo)setLogo(logo);
     const hide=shop.verified===false||shop.verified===0||shop.verified==='0'||shop.verified==='false';
     all('[data-shop-verified]').forEach(vf=>{if(hide)vf.setAttribute('hidden','');else vf.removeAttribute('hidden');});
@@ -641,13 +678,13 @@ html,body{overscroll-behavior:none}
   /* v1.1.12: one banner (16:9), view only. The first image of the active revision is shown. */
   let slideCount=0,shownPopups=[];
   const seenBanner=new Set();
-  const bannerSeen=()=>{if(!slideCount||dialog.hidden||seenBanner.has(0))return;seenBanner.add(0);trackItem('content_impression',itemOf(shownPopups[0]));};
+  const bannerSeen=()=>{if(!slideCount||guestSpec||dialog.hidden||seenBanner.has(0))return;seenBanner.add(0);trackItem('content_impression',itemOf(shownPopups[0]));};
   const termsShown=()=>Boolean(termsDialog&&!termsDialog.hidden);
   const buildSlider=list=>{
     shownPopups=list.slice(0,1);
     if(sliderBox&&sliderTrack&&shownPopups.length){
       const slide=make('div','cp-hero-slide'),img=make('img');img.alt='';img.decoding='async';img.draggable=false;img.src=shownPopups[0];slide.appendChild(img);sliderTrack.appendChild(slide);
-      slideCount=1;sliderBox.hidden=false;dialog.classList.remove('cp-no-hero');
+      slideCount=1;sliderBox.hidden=false;if(!guestSpec)dialog.classList.remove('cp-no-hero');
     }
   };
   if(sliderBox)sliderBox.addEventListener('click',()=>{track('content_interaction','banner');trackItem('content_interaction',itemOf(shownPopups[0]));});
@@ -719,16 +756,43 @@ html,body{overscroll-behavior:none}
     if(restoreFocus&&termsOpen)termsOpen.focus({preventScroll:true});
   };
   const showInfo=(text)=>{if(runtimeError){runtimeError.hidden=false;runtimeError.textContent=text;}};
+  /* v2.4: check the popup form; returns the values, or null after marking the fields to fix */
+  const guestValues=()=>{
+    if(!guestSpec||!guestForm)return {};
+    const out={};let first=null;const yr=new Date().getFullYear();
+    guestSpec.forEach(f=>{
+      const lab=guestForm.querySelector('[data-k="'+f.k+'"]'),el=lab&&lab.querySelector('input,select');if(!el)return;
+      let v=String(el.value||'').trim(),msg='';
+      if(!v){msg='Hãy nhập thông tin này';}
+      else if(f.k==='phone'){const d=v.replace(/[\s.-]/g,'');if(!/^(?:\+?84|0)\d{8,10}$/.test(d))msg='Số điện thoại chưa đúng';else v=d;}
+      else if(f.k==='year'){const n=Number(v);if(!/^\d{4}$/.test(v)||n<1900||n>yr)msg='Năm sinh chưa đúng';}
+      else if(f.k==='email'){if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)||/[^\x20-\x7E]/.test(v))msg='Email chưa đúng';}
+      lab.classList.toggle('bad',Boolean(msg));lab.querySelector('.em').textContent=msg;
+      if(msg&&!first)first=el;
+      if(v)out[f.k]=v;
+    });
+    if(first){try{first.focus({preventScroll:false});}catch(_e){}return null;}
+    return out;
+  };
   const setConfirmsDisabled=v=>confirms.forEach(b=>{b.disabled=v;});
   const commit=async()=>{
     if(state!=='ready')return;
     if(preview){closeDialog(true);return;}
     if(!validRuntime()){closeDialog(false);setError('Phiên kết nối không hợp lệ. Vui lòng kết nối lại WiFi.');return;}
+    let guestData=null;
+    if(guestSpec&&!preview){guestData=guestValues();if(guestData===null)return;}
     state='committing';
     setConfirmsDisabled(true);
     access.disabled=true;
     access.setAttribute('aria-disabled','true');
     const body=new URLSearchParams({action:'authorize',session_id:sessionId});
+    if(guestData&&Object.keys(guestData).length){
+      /* v2.4: send the form first; a failure here never blocks the connection. */
+      try{
+        const gb=new URLSearchParams({action:'guest',session_id:sessionId,...guestData});
+        await Promise.race([fetch(location.protocol==='http:'?location.origin+'/cgi-bin/portal':authorizeUrl,{method:'POST',body:gb,cache:'no-store',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'}}),new Promise(r=>window.setTimeout(r,3000))]);
+      }catch(_e){}
+    }
     const controller=new AbortController();
     const timeout=window.setTimeout(()=>controller.abort(),12000);
     try{
@@ -792,6 +856,7 @@ html,body{overscroll-behavior:none}
   if(termsOpen)termsOpen.addEventListener('click',openTerms);
   termsCloses.forEach(button=>button.addEventListener('click',()=>closeTerms(true)));
   confirms.forEach(button=>button.addEventListener('click',commit));
+  if(guestForm)guestForm.addEventListener('submit',event=>{event.preventDefault();commit();});
   cancels.forEach(button=>button.addEventListener('click',cancelDialog));
   document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(termsShown()){closeTerms(true);return;}if(!dialog.hidden)cancelDialog();});
   document.addEventListener('visibilitychange',()=>{

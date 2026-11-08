@@ -279,7 +279,7 @@ function heartbeat(online) {
 		active_portal_revision: p.active_portal_revision ?? 0,
 		storage_total_bytes: p.storage_total_bytes ?? df_total(), media_budget_bytes: p.media_budget_bytes ?? 0,
 		portal_sync_status: p.portal_sync_status ?? 'idle', portal_sync_error: p.portal_sync_error ?? '',
-		events: p.events ?? [], command_result: command_result(), health: health(online, p.health),
+		events: p.events ?? [], guests: p.guests ?? [], command_result: command_result(), health: health(online, p.health),
 		stats: p.stats ?? [], ad_stats: p.ad_stats ?? [], log: W.wlog_list(15)
 	}, a, 15);
 
@@ -310,7 +310,7 @@ function heartbeat(online) {
 			}
 		}
 		// WordPress took the events and counters: drop them from the queue.
-		W.run(`/usr/lib/wiflow/portal-hb ack ${W.num(p.event_count, 0)}`);
+		W.run(`/usr/lib/wiflow/portal-hb ack ${W.num(p.event_count, 0)} ${W.num(p.guest_count, 0)}`);
 		portal_content(b.desired_portal_revision);
 		if (b.command)
 			run_command(b.command, online);

@@ -115,6 +115,47 @@ event_ack_batch(){
     _event_unlock
 }
 
+# v2.4: guest information typed into the popup form. One JSON object per line, kept in RAM
+# until WordPress has taken it (and dropped when the router leaves its account).
+GUEST_QUEUE=/tmp/wiflow-guests.queue
+guest_enqueue(){
+    _event_lock || return 1
+    printf '%s\n' "$1" >> "$GUEST_QUEUE"
+    lines="$(wc -l < "$GUEST_QUEUE" 2>/dev/null | tr -d ' ')"; case "$lines" in ''|*[!0-9]*) lines=0;; esac
+    if [ "$lines" -gt 500 ]; then tmp="$GUEST_QUEUE.trim"; tail -n 400 "$GUEST_QUEUE" > "$tmp" 2>/dev/null || true; mv "$tmp" "$GUEST_QUEUE"; fi
+    chmod 600 "$GUEST_QUEUE" 2>/dev/null || true
+    _event_unlock
+}
+guest_prepare_batch(){
+    out="$1"; limit="${2:-20}"; : > "$out"
+    _event_lock || { echo 0; return 1; }
+    [ -f "$GUEST_QUEUE" ] && head -n "$limit" "$GUEST_QUEUE" > "$out" 2>/dev/null || true
+    _event_unlock
+    wc -l < "$out" | tr -d ' '
+}
+guest_ack_batch(){
+    count="$1"; case "$count" in ''|*[!0-9]*) return 1;; esac; [ "$count" -gt 0 ] || return 0
+    _event_lock || return 1
+    if [ -f "$GUEST_QUEUE" ]; then tmp="$GUEST_QUEUE.$$"; awk -v n="$count" 'NR>n' "$GUEST_QUEUE" > "$tmp" 2>/dev/null || : > "$tmp"; mv "$tmp" "$GUEST_QUEUE"; chmod 600 "$GUEST_QUEUE" 2>/dev/null || true; fi
+    _event_unlock
+}
+
+# v2.4: guests (hashed device id only) who already filled the form: they get the banner popup instead of the form.
+# Kept in flash, at most GUEST_KNOWN_MAX entries (the oldest drop first); a factory reset clears it.
+GUEST_KNOWN=/etc/wiflow/guests.known
+GUEST_KNOWN_MAX=20000
+guest_known(){ [ -s "$GUEST_KNOWN" ] && grep -qxF -- "$1" "$GUEST_KNOWN" 2>/dev/null; }
+guest_remember(){
+    case "$1" in ''|*[!0-9A-Za-z]*) return 1;; esac
+    guest_known "$1" && return 0
+    _event_lock || return 1
+    mkdir -p /etc/wiflow 2>/dev/null || true
+    printf '%s\n' "$1" >> "$GUEST_KNOWN"
+    lines="$(wc -l < "$GUEST_KNOWN" 2>/dev/null | tr -d ' ')"; case "$lines" in ''|*[!0-9]*) lines=0;; esac
+    if [ "$lines" -gt $((GUEST_KNOWN_MAX + 500)) ]; then tmp="$GUEST_KNOWN.trim"; tail -n "$GUEST_KNOWN_MAX" "$GUEST_KNOWN" > "$tmp" 2>/dev/null && mv "$tmp" "$GUEST_KNOWN"; fi
+    _event_unlock
+}
+
 website_url_valid(){ case "$1" in http://*|https://*) return 0;; *) return 1;; esac; }
 website_host_from_url(){ printf '%s' "$1" | sed -n 's#^https\{0,1\}://\([^/:?]*\).*#\1#p'; }
 portal_active_config(){ [ -f "$PORTAL_ACTIVE/portal.json" ] && printf '%s' "$PORTAL_ACTIVE/portal.json"; }

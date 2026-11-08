@@ -10,7 +10,7 @@ expect "portal is off before content" "$(U get wiflow.core.portal_enabled || ech
 mkdir -p /tmp/mock/wp/media
 head -c 3000 /dev/urandom > /tmp/mock/wp/media/bg.jpg
 head -c 2000 /dev/urandom > /tmp/mock/wp/media/intro.jpg
-echo '{"v":3,"name":"Quan Test","slogan":"Ngon","content_name":"Khuyen mai thang 11"}' > /tmp/mock/wp/media/shop.json
+echo '{"v":3,"name":"Quan Test","slogan":"Ngon","content_name":"Khuyen mai thang 11","form":{"enabled":true,"title":"Thong tin","body":"Dien nhanh","fields":["name","phone"]}}' > /tmp/mock/wp/media/shop.json
 wp "s['codes']['WIFAPIPORT01']={'account':'WIFUID777000'}; s['commands']=[]"
 r="$(job pair '{"code":"WIFAPIPORT01"}')"; expect "portal: device paired" "$r" 'WIFUID777000'
 wp "s['portal']={'revision':7,'mode':'image','files':[{'role':'image_landscape','name':'bg.jpg'},{'role':'shop_data','name':'shop.json'},{'role':'intro_image','name':'intro.jpg'}]}"
@@ -38,6 +38,32 @@ code="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=autho
 expect "guest: confirm answers 204 (Internet opened)" "$code" '204'
 $B x $PC is-authorized "$sid" && pass "guest: Internet granted by the confirm (nft element present)" || fail "guest not authorized"
 $B x nft list set inet wiflow_captive authed | grep -qi "$ip1 . $mac1" && pass "guest: authorized as IP + MAC pair" || fail "guest pair missing"
+# v2.4: popup form. A new guest gets the form; what is typed waits in RAM and goes to WordPress with the heartbeat.
+expect "form: the page tells a new guest apart (not known yet)" "$page" 'data-known="0"'
+rm -f /tmp/wiflow-guests.queue /tmp/wiflow-guest-seen.* /etc/wiflow/guests.known
+sid2="$($B x $PC ensure $ip1 | sed 's/.*|//')"
+r="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=guest&session_id=$sid2&name=Nguyen%20Van%20An&phone=0903%20112%20345&year=1995&email=an%40example.com&gender=nam" /www-wiflow-portal/cgi-bin/portal | tail -n1)"
+expect "form: details accepted" "$r" '"ok":true'
+expect "form: queued as one JSON line with the device id (hash) and no MAC" "$(python3 -c "import json;l=[json.loads(x) for x in open('/tmp/wiflow-guests.queue')];print(len(l),l[0]['name'],l[0]['phone'],l[0]['year'],l[0]['gender'],l[0]['client_id']=='$cid','$mac1' in open('/tmp/wiflow-guests.queue').read())")" '^1 Nguyen Van An 0903 112 345 1995 nam True False$'
+r="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=guest&session_id=$sid2&name=Again&phone=0911111111" /www-wiflow-portal/cgi-bin/portal | tail -n1)"
+expect "form: a second send in the same session is ignored" "$(wc -l < /tmp/wiflow-guests.queue | tr -d ' ')" '^1$'
+r="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=guest&session_id=zzzz" /www-wiflow-portal/cgi-bin/portal | tail -n1)"
+expect "form: unknown session refused" "$r" 'invalid_session'
+r="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=POST QUERY_STRING="action=guest&session_id=$sid2" /www-wiflow-portal/cgi-bin/portal | tail -n1)"
+expect "form: empty form refused" "$r" '"ok":false'
+expect "form: the router remembers this device (hashed id only) in flash" "$(cat /etc/wiflow/guests.known)" "^$cid\$"
+$B x $PC revoke-session "$sid" >/dev/null 2>&1
+page2="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=GET /www-wiflow-portal/cgi-bin/portal)"
+expect "form: a returning guest is told apart, so the page shows the banner popup" "$page2" 'data-known="1"'
+expect "form: heartbeat report carries the waiting guests" "$($B x /usr/lib/wiflow/portal-hb report | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['guest_count'], b['guests'][0]['name'])")" '^1 Nguyen Van An$'
+for i in $(seq 1 30); do [ ! -s /tmp/wiflow-guests.queue ] && break; sleep 2; done
+[ ! -s /tmp/wiflow-guests.queue ] && pass "form: queue emptied once WordPress took the heartbeat" || fail "form: queue not emptied"
+expect "form: WordPress received the guest in a heartbeat" "$(grep -c '"Nguyen Van An"' /tmp/mock/wp/heartbeat.jsonl)" '^[1-9]'
+for n in $(seq 1 20515); do printf 'k%07d\n' "$n"; done > /etc/wiflow/guests.known
+$B x sh -c '. /usr/lib/wiflow/common.sh; guest_remember Znew1' >/dev/null
+expect "form: the remembered devices are capped (oldest dropped)" "$(wc -l < /etc/wiflow/guests.known | tr -d ' ')|$(head -n1 /etc/wiflow/guests.known)|$(tail -n1 /etc/wiflow/guests.known)" '^20000\|k0000517\|Znew1$'
+rm -f /etc/wiflow/guests.known
+
 bad="$($B x env REMOTE_ADDR=10.10.10.99 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid" /www-wiflow-portal/cgi-bin/portal | head -n1)"
 expect "guest: another phone cannot use this session" "$bad" '403'
 $B x $PC revoke-session "$sid"; $B x $PC is-authorized "$sid" && fail "revoke did not remove" || pass "guest: revoke closes the Internet again"

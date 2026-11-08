@@ -142,6 +142,7 @@ jobs:
             echo "- Mới ở 2.1: bỏ viền quanh thanh tab điện thoại, chỉ giữ bóng đổ đậm"
             echo "- Mới ở 2.2: bỏ thanh Lưu & áp dụng nổi; việc áp dụng là bước 2 của chính hộp thoại chỉnh sửa (Thông tin → Áp dụng)"
             echo "- Mới ở 2.3: đo tốc độ đường truyền (nút Đo tốc độ, lệnh từ WP); thẻ tốc độ khách hai thanh tải xuống/tải lên; Cân bằng mặc định bật; giới hạn tốc độ mỗi khách nhập tay (mờ khi Cân bằng bật)"
+            echo "- Mới ở 2.4: popup có thể là biểu mẫu thông tin khách (Tên, Số điện thoại, Năm sinh, Email, Giới tính; ô nào bật là bắt buộc); khách đã điền sẽ thấy banner thay vì biểu mẫu; thông tin gửi về WordPress qua heartbeat, router chỉ giữ hàng đợi trong RAM và danh sách mã thiết bị đã băm"
             echo
             echo '```'; cat dist/SHA256SUMS; echo '```'
             echo; echo '<details><summary>Kiểm tra</summary>'; echo; echo '```'; cat dist/report/rom-check.txt; echo '```'; echo '</details>'
