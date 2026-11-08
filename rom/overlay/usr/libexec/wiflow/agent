@@ -238,6 +238,13 @@ function run_command(cmd, online) {
 		result(id, action, ok ? 'success' : 'failed', ok ? 'The diagnostics report was sent' : 'The diagnostics report could not be sent');
 		break;
 	}
+	case 'speedtest': {
+		// Measure the Internet line now; the result goes up with the next heartbeat.
+		const r = W.speedtest_start();
+		result(id, action, r.ok ? 'success' : 'failed', r.ok ? 'The speed test started' : 'The speed test could not start');
+		W.kick_agent();
+		break;
+	}
 	case 'guest_settings': {
 		// Speed limit, session time, maximum guests and opening hours (set in WordPress).
 		writefile(`${W.RUN}/guest-settings.json`, sprintf('%J', cmd.payload ?? {}));

@@ -1,0 +1,61 @@
+#!/bin/sh
+# Wiflow line speed test (like speedtest.net): latency, download, upload of the router's
+# own Internet link. The router measures itself, so the guests' queues do not matter.
+#   speedtest run      measure now (one at a time), keep the result
+#   speedtest status   "phase down_kbps up_kbps rtt_ms" (phase: ping down up done failed)
+# Result (kbit/s, ms, time) is kept in wiflow.core st_down st_up st_rtt st_at.
+. /usr/lib/wiflow/common.sh
+ST=/tmp/wiflow-speedtest; PID=/tmp/wiflow-speedtest.pid
+BASE="${SPEEDTEST_BASE:-$(uci -q get wiflow.core.speedtest_base 2>/dev/null)}"; BASE="${BASE:-https://speed.cloudflare.com}"
+SECS="${SPEEDTEST_SECS:-8}"; DOWN_BYTES="${SPEEDTEST_DOWN_BYTES:-250000000}"; UP_BYTES="${SPEEDTEST_UP_BYTES:-12000000}"
+D=/tmp/wiflow-speedtest.d
+put(){ printf '%s %s %s %s\n' "$1" "$2" "$3" "$4" > "$ST.t" && mv "$ST.t" "$ST"; }
+# sum of bytes / slowest stream time -> kbit/s
+rate(){ cat "$D"/"$1"* 2>/dev/null | awk '{b+=$1; if($2>t)t=$2} END{ if(t>0.2) printf "%d", b*8/1000/t; else printf 0 }'; }
+running(){ [ -f "$PID" ] && kill -0 "$(cat "$PID" 2>/dev/null)" 2>/dev/null; }
+case "${1:-}" in
+run)
+    running && exit 0
+    echo $$ > "$PID"; trap 'rm -rf "$D" /tmp/wiflow-speedtest.up "$PID"' EXIT
+    rm -rf "$D"; mkdir -p "$D"
+    put ping 0 0 0
+    rtt="$(ping -c 5 -W 2 -q 1.1.1.1 2>/dev/null | sed -n 's#.*= [0-9.]*/\([0-9]*\)[.0-9]*/.*#\1#p' | head -n1)"
+    [ -n "$rtt" ] || rtt=0
+    put down 0 0 "$rtt"
+    for i in 1 2 3 4; do
+        curl -sS -k -o /dev/null -m "$SECS" -w '%{size_download} %{time_total}\n' "$BASE/__down?bytes=$DOWN_BYTES" > "$D/d$i" 2>/dev/null &
+    done
+    wait
+    dn="$(rate d)"
+    put up "$dn" 0 "$rtt"
+    head -c "$UP_BYTES" /dev/zero > /tmp/wiflow-speedtest.up
+    for i in 1 2 3; do
+        curl -sS -k -o /dev/null -m "$SECS" -X POST --data-binary @/tmp/wiflow-speedtest.up -w '%{size_upload} %{time_total}\n' "$BASE/__up" > "$D/u$i" 2>/dev/null &
+    done
+    wait
+    up="$(rate u)"
+    if [ "$dn" -le 0 ] && [ "$up" -le 0 ]; then
+        put failed 0 0 "$rtt"; wlog system 'Đo tốc độ đường truyền: không đo được (kiểm tra Internet)'
+    else
+        # a stored result is cut at the limits the config can hold (7 digits)
+        [ "$dn" -le 9999999 ] || dn=9999999; [ "$up" -le 9999999 ] || up=9999999
+        at=0; time_valid && at="$(date +%s)"
+        uci set wiflow.core.st_down="$dn"; uci set wiflow.core.st_up="$up"; uci set wiflow.core.st_rtt="$rtt"; uci set wiflow.core.st_at="$at"
+        uci commit wiflow
+        put done "$dn" "$up" "$rtt"
+        wlog system "Đo tốc độ đường truyền: tải xuống $((dn / 1000)) Mbps, tải lên $((up / 1000)) Mbps, độ trễ ${rtt} ms"
+    fi
+    # tell WordPress now instead of at the next minute
+    mkdir -p /tmp/wiflow 2>/dev/null; : > /tmp/wiflow/kick 2>/dev/null
+    ;;
+status)
+    if running; then cat "$ST" 2>/dev/null || echo 'ping 0 0 0'; exit 0; fi
+    [ -f "$ST" ] && { read -r _p _a _b _c < "$ST"; case "$_p" in done|failed) cat "$ST"; exit 0;; esac; }
+    # nothing since boot: the last stored result (if any)
+    if [ "$(cfg_num st_down 0)" -gt 0 ] || [ "$(cfg_num st_up 0)" -gt 0 ]; then
+        printf 'done %s %s %s\n' "$(cfg_num st_down 0)" "$(cfg_num st_up 0)" "$(cfg_num st_rtt 0)"; exit 0
+    fi
+    echo 'idle 0 0 0'
+    ;;
+*) exit 2 ;;
+esac

@@ -15,6 +15,8 @@ const chip = K.chip, btn = K.btn, row = K.row, panel = K.panel, svg = K.svg, ban
 
 const callStatus = rpc.declare({ object: 'wiflow', method: 'status', expect: { '': {} } });
 const callSpeed = rpc.declare({ object: 'wiflow', method: 'speed', expect: { '': {} } });
+const callSpeedtest = rpc.declare({ object: 'wiflow', method: 'speedtest', expect: { '': {} } });
+const callGuestLimit = rpc.declare({ object: 'wiflow', method: 'guest_limit', params: [ 'down', 'up' ], expect: { '': {} } });
 const callGuestAuto = rpc.declare({ object: 'wiflow', method: 'guest_auto', params: [ 'on' ], expect: { '': {} } });
 const callChanges = rpc.declare({ object: 'uci', method: 'changes', params: [ 'config' ], expect: { changes: [] } });
 const callRevert = rpc.declare({ object: 'uci', method: 'revert', params: [ 'config' ] });
@@ -136,47 +138,98 @@ return view.extend({
 		return panel('users', _('Guest WiFi'), sp.tgl, rows.concat(sp.body), 'w-half');
 	},
 
-	/* Guest speed: a gauge like a speed test (what the guests use now) and the switch for
-	   automatic fair sharing. Updated every 2 s from the light "speed" call. */
+	/* Guest speed: one card with two bars (download, upload; the end of the bar is the speed of the
+	   Internet line from the last speed test), the speed test button and the fixed speed per guest.
+	   The balance switch decides which of the two is in use; the other one is dimmed. */
 	speedBody() {
 		const sp = this.sp || {};
-		const val = E('b', {}), sub = E('span', {}, _('Mbps downloading'));
-		const dn = E('b', { 'class': 'w-dn' }), up = E('b', { 'class': 'w-up' }), rt = E('b', {});
 		const sw = E('button', { 'class': 'w-tg', 'type': 'button', 'role': 'switch', 'aria-label': _('Balance') });
 		sw.onclick = () => {
 			const on = sw.getAttribute('aria-checked') != 'true';
 			sw.setAttribute('aria-checked', on); sw.disabled = true;
 			callGuestAuto(on).then(() => callSpeed().then(s => { this.sp = s; this.paintSpeed(); })).finally(() => { sw.disabled = false; });
 		};
-		const svgBox = E('div', { 'class': 'w-gs' });
-		svgBox.innerHTML = '<svg viewBox="0 0 200 112" aria-hidden="true"><path class="w-gt" d="M20 100 A80 80 0 0 1 180 100" pathLength="100"/><path class="w-ga" d="M20 100 A80 80 0 0 1 180 100" pathLength="100"/></svg>';
-		const arc = svgBox.querySelector('.w-ga');
-		this.sv = { arc, val, sub, dn, up, rt, sw };
-		const gauge = E('div', { 'class': 'w-gg' }, [
-			svgBox,
-			E('div', { 'class': 'w-gv' }, [ val, sub ])
-		]);
-		const m = (b, l) => E('div', { 'class': 'w-m' }, [ b, E('i', {}, l) ]);
-		this.paintSpeed();
-		return {
-			tgl: E('span', { 'class': 'w-tgl' }, [ _('Balance'), sw ]),
-			body: [ E('div', { 'class': 'w-sub' }, _('Guest speed')), gauge,
-				E('div', { 'class': 'w-ms' }, [ m(dn, _('Download speed')), m(up, _('Upload')), m(rt, _('Latency')) ]) ]
+		const bar = (cls, label) => {
+			const v = E('b', {}), mx = E('span', { 'class': 'w-mx' }), fill = E('i', {});
+			return { v, mx, fill, el: E('div', { 'class': 'w-sr ' + cls }, [
+				E('div', { 'class': 'w-srh' }, [ E('span', { 'class': 'w-srl' }, label), E('span', {}, [ v, mx ]) ]),
+				E('div', { 'class': 'w-bar' }, fill) ]) };
 		};
+		const dn = bar('w-dn', '\u2193 ' + _('Download speed')), up = bar('w-up', '\u2191 ' + _('Upload'));
+		const info = E('span', { 'class': 'w-si' }), again = btn('s', _('Measure'), b => this.measure(b), { sm: true, cls: 'w-fit w-meas' });
+		const warn = E('div', { 'class': 'w-sw' });
+		const card = E('div', { 'class': 'w-spc' }, [ dn.el, up.el, E('div', { 'class': 'w-sf' }, [ info, again ]), warn ]);
+		const lim = this.lim = this.lim || { dn: sp.fixed_down > 0 ? String(Math.round(sp.fixed_down / 1000)) : '', up: sp.fixed_up > 0 ? String(Math.round(sp.fixed_up / 1000)) : '', dirty: {} };
+		const inp = (k, label) => {
+			const i = E('input', { 'type': 'number', 'min': '0', 'max': '1000', 'step': '1', 'inputmode': 'numeric', 'placeholder': '\u2014', 'aria-label': label, 'value': lim[k] });
+			i.addEventListener('input', () => { lim[k] = i.value; lim.dirty[k] = true; });
+			return { i, el: E('div', { 'class': 'w-lf' }, [ E('div', { 'class': 'w-in' }, [ i, E('span', { 'class': 'w-lu' }, label + ' Mbps') ]) ]) };
+		};
+		const ld = inp('dn', '\u2193'), lu = inp('up', '\u2191');
+		const save = btn('p', _('Save'), b => this.saveLimit(b), { sm: true, cls: 'w-fit' });
+		const limits = E('div', { 'class': 'w-lim' }, [ E('div', { 'class': 'w-ll' }, _('Speed limit per guest') + ' \u00b7 ' + _('empty = no limit')), E('div', { 'class': 'w-lr' }, [ ld.el, lu.el, save ]) ]);
+		this.sv = { sw, dn, up, info, again, warn, card, limits, inputs: [ ld.i, lu.i ], keys: [ 'dn', 'up' ], save };
+		this.paintSpeed();
+		return { tgl: E('span', { 'class': 'w-tgl' }, [ _('Balance'), sw ]), body: [ E('div', { 'class': 'w-sub' }, _('Guest speed')), card, limits ] };
 	},
 
 	paintSpeed() {
 		const v = this.sv, sp = this.sp || {};
 		if (!v) return;
 		const mb = k => (k / 1000).toFixed(k >= 100000 ? 0 : 1);
-		const on = !!sp.active;
-		v.sw.setAttribute('aria-checked', !!sp.auto);
-		v.val.textContent = on ? mb(sp.down_now || 0) : '—';
-		v.dn.textContent = on ? mb(sp.down_now || 0) : '—';
-		v.up.textContent = on ? mb(sp.up_now || 0) : '—';
-		v.rt.textContent = on && sp.rtt ? sp.rtt + ' ms' : '—';
-		const f = on ? Math.min(1, (sp.down_now || 0) / Math.max(sp.down_limit || 1, sp.down_now || 1, 1)) : 0;
-		v.arc.style.strokeDasharray = (f * 100) + ' 100';
+		const ln = sp.line || {}, on = !!sp.active, auto = !!sp.auto;
+		v.sw.setAttribute('aria-checked', auto);
+		// end of the bar: the speed of the Internet line (last test), else what the balance may give
+		const mxd = ln.down > 0 ? ln.down : (on ? sp.down_limit || 0 : 0), mxu = ln.up > 0 ? ln.up : (on ? sp.up_limit || 0 : 0);
+		const set = (b, now, mx) => {
+			b.v.textContent = on ? mb(now || 0) : '\u2014';
+			b.mx.textContent = (mx > 0 ? ' / ' + mb(mx) : '') + ' Mbps';
+			b.fill.style.width = (on && mx > 0 ? Math.min(100, (now || 0) / mx * 100) : 0) + '%';
+		};
+		set(v.dn, sp.down_now, mxd); set(v.up, sp.up_now, mxu);
+		const t = ln.at > 0 ? new Date(ln.at * 1000) : null;
+		const hm = t ? ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2) : '';
+		const phase = { ping: _('Testing latency…'), down: _('Testing download…'), up: _('Testing upload…') }[ln.phase];
+		let txt;
+		if (ln.running) txt = phase || _('Testing latency…');
+		else if (ln.phase == 'failed') txt = _('Could not measure');
+		else {
+			const parts = [];
+			if (ln.phase == 'done') { if (ln.rtt > 0) parts.push(ln.rtt + ' ms'); if (hm) parts.push(hm); }
+			else parts.push(_('Not measured yet'));
+			if (auto && on && sp.guests > 0) parts.push(_('%d guests').format(sp.guests));
+			txt = parts.join(' \u00b7 ');
+		}
+		v.info.textContent = txt;
+		v.again.disabled = !!ln.running; v.again.textContent = ln.running ? _('Measuring…') : _('Measure');
+		v.warn.textContent = !ln.running && sp.guests > 0 ? _('Guests are online: the test takes about 20 seconds and may slow them down.') : '';
+		// balance on: the fixed speed is dimmed; balance off: the sharing numbers are
+		v.limits.classList.toggle('w-dim', auto);
+		v.inputs.forEach((i, n) => {
+			i.disabled = auto;
+			const k = v.keys[n], fx = k == 'dn' ? sp.fixed_down : sp.fixed_up;
+			if (this.lim && !this.lim.dirty[k] && document.activeElement !== i && sp.fixed_down != null) { this.lim[k] = fx > 0 ? String(Math.round(fx / 1000)) : ''; i.value = this.lim[k]; }
+		});
+		v.save.disabled = auto;
+		v.card.classList.toggle('w-balo', !auto);
+	},
+
+	measure(b) {
+		b.disabled = true;
+		callSpeedtest().then(() => callSpeed().then(s => { this.sp = s; this.paintSpeed(); }), () => { b.disabled = false; });
+	},
+
+	saveLimit(b) {
+		const num = v => v === '' ? 0 : Number(v);
+		const d = num(this.lim.dn), u = num(this.lim.up);
+		if (!Number.isInteger(d) || !Number.isInteger(u) || d < 0 || u < 0 || d > 1000 || u > 1000) {
+			b.textContent = _('0 to 1000 Mbps'); window.setTimeout(() => { b.textContent = _('Save'); }, 2500); return;
+		}
+		b.disabled = true;
+		callGuestLimit(d * 1000, u * 1000).then(r => {
+			if (r && r.ok) this.lim.dirty = {};
+			b.textContent = r && r.ok ? _('Saved') : _('Not saved');
+		}, () => { b.textContent = _('Not saved'); }).finally(() => window.setTimeout(() => { b.disabled = !!(this.sp || {}).auto; b.textContent = _('Save'); }, 1800));
 	},
 
 	/* The two steps of a change: 1 = the form, 2 = review and apply. */
@@ -406,7 +459,7 @@ return view.extend({
 			return callSpeed().then(s => { this.sp = s; this.paintSpeed(); }, () => {});
 		}, 2);
 		poll.add(() => {
-			if (document.body.classList.contains('modal-overlay-active')) return;
+			if (document.body.classList.contains('modal-overlay-active') || (document.activeElement && document.activeElement.closest && document.activeElement.closest('.w-lim'))) return;
 			return callStatus().then(s => { this.st = s; this.sp = s.speed || this.sp; this.redraw(); });
 		}, 10);
 		return this.body;

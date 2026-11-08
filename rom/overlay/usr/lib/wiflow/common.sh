@@ -339,7 +339,7 @@ sched_closed(){ [ -f "$SCHED_CLOSED" ]; }
 # Per-guest speed limit (kbit/s, 0 = no limit), policed per IP in nftables.
 guest_policy_apply(){
     portal_nft_ready || return 0
-    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 0)"; _sig="wf-shape:$_dn/$_up/$_au/c1"
+    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 1)"; _sig="wf-shape:$_dn/$_up/$_au/c1"
     _odn="$_dn"; _oup="$_up"
     # Auto fair-share shapes with queues (the fixed speeds become the per-guest maximum): no policer then.
     [ "$_au" = 1 ] && { _dn=0; _up=0; }
@@ -365,7 +365,7 @@ SHAPER_PID=/tmp/wiflow-shaper.pid
 shaper_running(){ [ -f "$SHAPER_PID" ] && kill -0 "$(cat "$SHAPER_PID" 2>/dev/null)" 2>/dev/null; }
 shaper_stop(){ shaper_running || [ -f /tmp/wiflow-shaper ] || return 0; /usr/lib/wiflow/shaper stop >/dev/null 2>&1; return 0; }
 shaper_tick(){
-    if [ "$(cfg_num guest_auto 0)" != 1 ] || safe_mode_active || sched_closed; then shaper_stop; return 0; fi
+    if [ "$(cfg_num guest_auto 1)" != 1 ] || safe_mode_active || sched_closed; then shaper_stop; return 0; fi
     shaper_running && return 0
     [ "$(guest_authorized_count)" -gt 0 ] || return 0
     _e="$(num_or0 "$(state_get shaper_err)")"; [ "$_e" -gt 0 ] && [ $(( $(uptime_s) - _e )) -lt 600 ] && return 0
@@ -544,16 +544,19 @@ uplink_active(){
 }
 portal_health_json(){
     _sa=0; _sl=0; _su=0; _sn=0; _sx=0; _sr=0; _ss=off
-    if [ "$(cfg_num guest_auto 0)" = 1 ]; then _sa=1; _ss=waiting
+    if [ "$(cfg_num guest_auto 1)" = 1 ]; then _sa=1; _ss=waiting
         if shaper_running && [ -f /tmp/wiflow-shaper ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ $# -ge 9 ] && { _sl="$2"; _su="$3"; _sn="$4"; _sx="$5"; _sr="$6"; _ss="$9"; }; fi
     fi
+    _lp=idle; _ld=0; _lu=0; _lr=0
+    set -- $(/usr/lib/wiflow/speedtest status 2>/dev/null); [ $# -ge 4 ] && { _lp="$1"; _ld="$(num_or0 "$2")"; _lu="$(num_or0 "$3")"; _lr="$(num_or0 "$4")"; }
     _sm=false; safe_mode_active && _sm=true; _tv=false; time_valid && _tv=true; _sc=false; sched_closed && _sc=true
     _se=false; [ "$(uci -q get wiflow.core.sched_enabled 2>/dev/null)" = 1 ] && _se=true
-    printf '{"clients_now":%s,"clients_connected":%s,"rx_bps":%s,"tx_bps":%s,"ping_ms":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_down_kbps":%s,"guest_up_kbps":%s,"guest_session_min":%s,"guest_max":%s,"auto_share":%s,"auto_state":"%s","speed_limit_down":%s,"speed_limit_up":%s,"speed_down":%s,"speed_up":%s,"speed_rtt":%s}' \
+    printf '{"clients_now":%s,"clients_connected":%s,"rx_bps":%s,"tx_bps":%s,"ping_ms":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_down_kbps":%s,"guest_up_kbps":%s,"guest_session_min":%s,"guest_max":%s,"auto_share":%s,"auto_state":"%s","speed_limit_down":%s,"speed_limit_up":%s,"speed_down":%s,"speed_up":%s,"speed_rtt":%s,"line_state":"%s","line_down":%s,"line_up":%s,"line_rtt":%s,"line_at":%s}' \
         "$(num_or0 "$(state_get clients_auth)")" "$(num_or0 "$(state_get clients_conn)")" \
         "$(num_or0 "$(state_get stat_rx_bps)")" "$(num_or0 "$(state_get stat_tx_bps)")" "$(num_or0 "$(state_get stat_ping)")" "$(num_or0 "$(state_get wd_restarts)")" \
         "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_down_kbps 0)" "$(cfg_num guest_up_kbps 0)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)" \
-        "$_sa" "$_ss" "$(num_or0 "$_sl")" "$(num_or0 "$_su")" "$(num_or0 "$_sn")" "$(num_or0 "$_sx")" "$(num_or0 "$_sr")"
+        "$_sa" "$_ss" "$(num_or0 "$_sl")" "$(num_or0 "$_su")" "$(num_or0 "$_sn")" "$(num_or0 "$_sx")" "$(num_or0 "$_sr")" \
+        "$_lp" "$_ld" "$_lu" "$_lr" "$(cfg_num st_at 0)"
 }
 # One place that turns the guest portal on: a valid content snapshot is on the router and
 # safe mode is not active -> flag on + captive rules. Safe to call again and again.

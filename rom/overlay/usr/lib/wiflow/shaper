@@ -16,11 +16,13 @@ run)
     ip link set "$IFB" up >/dev/null 2>&1
     tgt=1.1.1.1; [ -n "$(ping_ms $tgt)" ] || tgt=8.8.8.8
     sd=0; su=0; if [ -f "$ST" ]; then set -- $(cat "$ST" 2>/dev/null); sd="${2:-0}"; su="${3:-0}"; fi
+    # first start: the last line speed test (about 90 %) is the starting rate
+    if [ "$sd" = 0 ]; then sd=$(( $(cfg_num st_down 0) * 9 / 10 )); su=$(( $(cfg_num st_up 0) * 9 / 10 )); fi
     wlog guest 'Tự động chia đều: bắt đầu'
     ping -n -i 1 -W 1 "$tgt" 2>/dev/null | awk -f /usr/lib/wiflow/shaper.awk \
         -v BR="$BR" -v IFB="$IFB" -v TC="$TC" -v SYS="/sys/class/net/$BR/statistics" \
         -v GCMD="awk -F'|' '\$6+0>0{print \$4}' $CLIENT_SESSIONS/* 2>/dev/null" \
-        -v MAXDN="$(cfg_num guest_down_kbps 0)" -v MAXUP="$(cfg_num guest_up_kbps 0)" \
+        -v MAXDN=0 -v MAXUP=0 \
         -v START_DN="$sd" -v START_UP="$su" -v STATUS="$ST"
     rc=$?
     shaper_clean; rm -f "$PID"

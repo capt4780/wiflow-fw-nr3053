@@ -404,3 +404,30 @@ html,body{touch-action:pan-x pan-y}
 .w-btn.w-sm.w-fit{width:auto;min-width:0;padding:0 16px;white-space:nowrap}
 .w-btn.w-fit.w-l0{padding-left:0;justify-content:flex-start}
 .w-chip.w-clk{cursor:pointer}
+
+/* v2.3: guest speed card (two bars), speed test, fixed speed per guest */
+.w-spc{background:var(--soft);border-radius:18px;padding:14px 16px 12px;display:grid;gap:12px;margin-top:10px}
+.w-srh{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.w-srl{font-size:13px;font-weight:700}
+.w-dn .w-srl{color:var(--pri)}.w-up .w-srl{color:var(--ok)}
+.w-srh b{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.w-mx{font-size:12px;font-weight:500;color:var(--mut);margin-left:3px}
+.w-bar{height:10px;border-radius:999px;background:#E3E8F2;margin-top:8px;overflow:hidden}
+.w-bar i{display:block;height:100%;width:0;border-radius:999px;transition:width .6s}
+.w-dn .w-bar i{background:linear-gradient(90deg,#35C6FF,var(--pri))}
+.w-up .w-bar i{background:linear-gradient(90deg,#6FE0A8,var(--ok))}
+.w-sf{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--hair);padding-top:8px;font-size:12px;color:var(--mut)}
+.w-si{min-width:0}
+.w-sf .w-btn.w-sm{width:auto;min-width:0;height:34px;padding:0 14px;font-size:13px;flex:none}
+.w-sw{font-size:12px;color:var(--mut);margin-top:-4px}.w-sw:empty{display:none}
+.w-spc.w-balo .w-si{opacity:.55}
+.w-lim{margin-top:12px;transition:opacity .15s}
+.w-ll{font-size:12px;color:var(--mut);margin-bottom:6px}
+.w-lr{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.w-lf{min-width:0}
+.w-lim .w-in{height:40px;padding:0 10px;border:1px solid var(--line);background:#fff;gap:4px}
+.w-lim .w-in input{flex:1;min-width:0;width:100%;border:0;background:transparent;padding:0;font-size:14px;font-weight:600;color:var(--ink);outline:0;-moz-appearance:textfield}
+.w-lim .w-in input::-webkit-outer-spin-button,.w-lim .w-in input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.w-lu{font-size:12px;color:var(--mut);flex:none}
+.w-lr .w-btn.w-sm{width:auto;min-width:0;height:40px;padding:0 18px;flex:none}
+.w-lim.w-dim{opacity:.4;pointer-events:none}

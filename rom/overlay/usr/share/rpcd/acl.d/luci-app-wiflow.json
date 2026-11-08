@@ -110,6 +110,8 @@
 					"pair",
 					"unpair",
 					"guest_auto",
+					"guest_limit",
+					"speedtest",
 					"job_clear"
 				],
 				"file": [

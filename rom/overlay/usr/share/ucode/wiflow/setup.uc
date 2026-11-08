@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.2';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.3';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '2.2';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '2.3';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -325,8 +325,40 @@ function portal_state() {
 
 // Guest speed (auto fair-share): the controller writes one line each second to RAM.
 // "tick dn_limit up_limit dn_now up_now rtt base guests state" (kbit/s, ms).
+export function linetest() {
+	const pid = trim(readfile('/tmp/wiflow-speedtest.pid') ?? '');
+	const run_ = match(pid, /^[0-9]+$/) && access(`/proc/${pid}`);
+	const f = split(trim(readfile('/tmp/wiflow-speedtest') ?? ''), ' ');
+	let phase = 'idle', down = 0, up = 0, rtt = 0;
+	if (length(f) >= 4 && (run_ || f[0] == 'done' || f[0] == 'failed')) {
+		phase = f[0]; down = num(f[1], 0); up = num(f[2], 0); rtt = num(f[3], 0);
+		if (run_ && (phase == 'done' || phase == 'failed'))
+			phase = 'ping';
+	} else if (num(core('st_down', '0'), 0) > 0 || num(core('st_up', '0'), 0) > 0) {
+		phase = 'done'; down = num(core('st_down', '0'), 0); up = num(core('st_up', '0'), 0); rtt = num(core('st_rtt', '0'), 0);
+	}
+	return { phase: phase, running: !!run_, down: down, up: up, rtt: rtt, at: num(core('st_at', '0'), 0) };
+};
+
+// Measure the Internet line now (the router downloads and uploads from a speed server).
+export function speedtest_start() {
+	if (linetest().running)
+		return { ok: true, running: true };
+	run('(setsid /usr/lib/wiflow/speedtest run </dev/null >/dev/null 2>&1 &)');
+	return { ok: true, running: true };
+};
+
+// Fixed speed per guest (Mbit/s as kbit/s), used while the automatic balance is off.
+export function set_limits(down, up) {
+	const ok_ = v => type(v) == 'int' && v >= 0 && v <= 1000000;
+	if (!ok_(down) || !ok_(up))
+		return { ok: false, error: 'The speed is not valid.' };
+	const r = run(`. /usr/lib/wiflow/common.sh; guest_settings_set '${down}' '${up}'`);
+	return { ok: r.code == 0 };
+};
+
 export function speed() {
-	const auto = core('guest_auto', '0') == '1';
+	const auto = core('guest_auto', '1') == '1';
 	const f = split(trim(readfile('/tmp/wiflow-shaper') ?? ''), ' ');
 	const pid = trim(readfile('/tmp/wiflow-shaper.pid') ?? '');
 	const live = length(f) >= 9 && match(pid, /^[0-9]+$/) && access(`/proc/${pid}`);
@@ -338,7 +370,8 @@ export function speed() {
 		down_limit: live ? num(f[1], 0) : 0, up_limit: live ? num(f[2], 0) : 0,
 		down_now: live ? num(f[3], 0) : 0, up_now: live ? num(f[4], 0) : 0,
 		rtt: live ? num(f[5], 0) : 0, guests: live ? num(f[7], 0) : 0,
-		state: live ? f[8] : (auto ? 'waiting' : 'off')
+		state: live ? f[8] : (auto ? 'waiting' : 'off'),
+		line: linetest()
 	};
 };
 

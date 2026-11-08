@@ -46,6 +46,19 @@ const methods = {
 		}
 	},
 
+	speedtest: {
+		call: function() {
+			return W.speedtest_start();
+		}
+	},
+
+	guest_limit: {
+		args: { down: 0, up: 0 },
+		call: function(req) {
+			return W.set_limits(req.args.down, req.args.up);
+		}
+	},
+
 	job_clear: {
 		call: function() {
 			if (!W.job_busy())

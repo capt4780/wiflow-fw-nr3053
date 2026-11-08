@@ -1323,3 +1323,45 @@ msgstr "Thay đổi đã lưu trên router"
 
 msgid "Password changed"
 msgstr "Đã đổi mật khẩu"
+
+msgid "Measure"
+msgstr "Đo tốc độ"
+
+msgid "Measuring…"
+msgstr "Đang đo…"
+
+msgid "Testing latency…"
+msgstr "Đang đo độ trễ…"
+
+msgid "Testing download…"
+msgstr "Đang đo tải xuống…"
+
+msgid "Testing upload…"
+msgstr "Đang đo tải lên…"
+
+msgid "Could not measure"
+msgstr "Không đo được"
+
+msgid "Not measured yet"
+msgstr "Chưa đo"
+
+msgid "%d guests"
+msgstr "%d khách"
+
+msgid "Guests are online: the test takes about 20 seconds and may slow them down."
+msgstr "Đang có khách: phép đo mất khoảng 20 giây và có thể làm khách chậm đi."
+
+msgid "Speed limit per guest"
+msgstr "Giới hạn tốc độ mỗi khách"
+
+msgid "0 to 1000 Mbps"
+msgstr "Từ 0 đến 1000 Mbps"
+
+msgid "Saved"
+msgstr "Đã lưu"
+
+msgid "Not saved"
+msgstr "Chưa lưu được"
+
+msgid "empty = no limit"
+msgstr "để trống = không giới hạn"
