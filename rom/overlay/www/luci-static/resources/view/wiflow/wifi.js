@@ -45,6 +45,7 @@ function encLabel(enc) {
 
 return view.extend({
 	mem: 0,
+	log: [],
 
 	load() {
 		return Promise.all([ uci.load(CONFIGS), callStatus(), this.serverCount() ]).then(r => r[1]);
@@ -95,7 +96,7 @@ return view.extend({
 			E('div', { 'class': 'w-k' }, [ sta.ssid, E('small', {}, band(bandOf(sta.device)) + ' · ' + _('Client mode')) ]), acts
 		]) ];
 		let state;
-		if (changed) state = chip('warn', _('Waiting to save'));
+		if (changed) { state = chip('warn', _('Waiting to save')); state.classList.add('w-clk'); state.setAttribute('role', 'button'); state.addEventListener('click', () => this.applyStep()); }
 		else if (off) state = chip('', _('Turned off'));
 		else if (on) state = chip('ok', _('Connected'));
 		else state = chip('warn', _('Not connected yet'));
@@ -178,25 +179,43 @@ return view.extend({
 		v.arc.style.strokeDasharray = (f * 100) + ' 100';
 	},
 
-	/* The bar that appears once something is changed. */
-	actionBar() {
-		const n = this.pending();
-		const bar = E('div', { 'class': 'w-act', 'hidden': n ? null : '' });
-		if (!n) return bar;
-		bar.appendChild(E('div', { 'class': 'w-t' }, [ E('span', {}, _('%d unsaved changes').format(n)), btn('t', _('Reset changes'), () => this.reset(), { sm: true }) ]));
-		const b = E('div', { 'class': 'w-b' });
-		if (this.mem > 0) b.appendChild(btn('s', _('Save'), () => this.saveOnly()));
-		b.appendChild(btn('p', _('Save & apply'), () => this.apply()));
-		bar.appendChild(b);
-		return bar;
+	/* The two steps of a change: 1 = the form, 2 = review and apply. */
+	stepper(at) {
+		const dot = (n, t) => E('span', { 'class': 'w-stpi' + (at == n ? ' w-on' : '') }, [ E('i', {}, at > n ? '\u2713' : String(n)), t ]);
+		return E('div', { 'class': 'w-stp' }, [ dot(1, _('Details')), E('span', { 'class': 'w-ln' }), dot(2, _('Apply')) ]);
+	},
+
+	/* Step 2: what is about to be written, then Save & apply. */
+	applyStep() {
+		const rows = this.log.map(l => E('div', { 'class': 'w-cr' }, [ E('span', {}, l[0]), E('b', {}, l[1]) ]));
+		if (this.srv > 0) rows.push(E('div', { 'class': 'w-cr' }, [ E('span', {}, _('Changes saved on the router')), E('b', {}, String(this.srv)) ]));
+		const n = rows.length;
+		if (!n) return ui.hideModal();
+		K.dialog(_('Apply changes'), [
+			this.stepper(2),
+			E('div', { 'class': 'w-cn' }, _('%d changes not applied yet').format(n)),
+			E('div', { 'class': 'w-cl' }, rows),
+			E('div', { 'class': 'w-note' }, _('Applying makes the WiFi drop for a few seconds, then it reconnects.')),
+			E('div', {}, btn('t', _('Reset changes'), () => { ui.hideModal(); this.reset(); }, { sm: true, cls: 'w-fit w-l0' }))
+		], [
+			btn('g', _('Go back'), ui.hideModal),
+			btn('p', _('Save & apply'), () => this.apply())
+		]);
+	},
+
+	/* The change was collected: continue straight to step 2. */
+	staged(what, value) {
+		if (what) this.log.push([ what, value ]);
+		ui.hideModal();
+		this.redraw();
+		this.applyStep();
 	},
 
 	draw() {
 		const inet = this.st.internet || {};
 		return E('div', {}, [
-			K.head(_('Internet'), inet.online ? chip('ok', _('Has Internet')) : null),
-			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.guestPanel() ]),
-			this.actionBar()
+			K.head(_('Internet'), this.pending() ? btn('s', _('%d changes not applied yet').format(this.log.length + (this.srv > 0 ? 1 : 0)), () => this.applyStep(), { sm: true, cls: 'w-fit' }) : (inet.online ? chip('ok', _('Has Internet')) : null)),
+			E('div', { 'class': 'w-gr' }, [ this.flowPanel(), this.sourcePanel(), this.guestPanel() ])
 		]);
 	},
 
@@ -207,33 +226,33 @@ return view.extend({
 	/* ---- changes ---- */
 
 	toggle(sta) {
-		if (sta.disabled == '1') this.unset('wireless', sta['.name'], 'disabled');
+		const was = sta.disabled == '1';
+		if (was) this.unset('wireless', sta['.name'], 'disabled');
 		else this.set('wireless', sta['.name'], 'disabled', '1');
-		this.redraw();
+		this.staged(_('Source WiFi'), (was ? _('Turn on') : _('Disable')) + ' \u00b7 ' + sta.ssid);
 	},
 
 	drop(sta) {
-		K.dialog(_('Remove WiFi'), E('p', {}, _('Remove the source WiFi %s from this router?').format(sta.ssid)), [
+		K.dialog(_('Remove WiFi'), [ this.stepper(1), E('p', {}, _('Remove the source WiFi %s from this router?').format(sta.ssid)) ], [
 			btn('g', _('Close dialog'), ui.hideModal),
-			btn('d', _('Remove WiFi'), () => { this.remove('wireless', sta['.name']); ui.hideModal(); this.redraw(); })
+			btn('p', _('Continue'), () => { this.remove('wireless', sta['.name']); this.staged(_('Source WiFi'), _('Remove WiFi') + ' \u00b7 ' + sta.ssid); })
 		]);
 	},
 
 	edit(sta) {
 		const pw = E('input', { 'type': 'password', 'autocomplete': 'off', 'placeholder': _('Leave empty to keep it'), 'aria-label': _('WPA password') });
-		K.dialog(_('Wireless network: %s').format(sta.ssid), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
+		K.dialog(_('Wireless network: %s').format(sta.ssid), [ this.stepper(1), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
 			K.field(_('Source WiFi name'), E('input', { 'type': 'text', 'value': sta.ssid, 'readonly': '' }), { rd: 1 }),
 			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': band(bandOf(sta.device)), 'readonly': '' }), { rd: 1 }),
 			K.field(_('WPA password'), pw, { pw: 1 })
-		]), [
+		]) ], [
 			btn('g', _('Not now'), ui.hideModal),
-			btn('p', _('Save'), () => {
+			btn('p', _('Continue'), () => {
 				if (pw.value) {
 					if (pw.value.length < 8) return ui.addNotification(null, E('p', {}, _('The password needs at least 8 characters.')), 'danger');
 					this.set('wireless', sta['.name'], 'key', pw.value);
 				}
-				ui.hideModal();
-				this.redraw();
+				this.staged(_('Source WiFi'), pw.value ? _('Password changed') : sta.ssid);
 			})
 		]);
 	},
@@ -294,12 +313,12 @@ return view.extend({
 	},
 
 	review(bss, key) {
-		K.dialog(_('Wireless network: %s').format(bss.ssid), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
+		K.dialog(_('Wireless network: %s').format(bss.ssid), [ this.stepper(1), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
 			K.field(_('Source WiFi name'), E('input', { 'type': 'text', 'value': bss.ssid, 'readonly': '' }), { rd: 1 }),
 			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': band(bss.band), 'readonly': '' }), { rd: 1 })
-		]), [
+		]) ], [
 			btn('g', _('Not now'), ui.hideModal),
-			btn('p', _('Save'), () => { this.stage(bss, key); ui.hideModal(); this.redraw(); })
+			btn('p', _('Continue'), () => { this.stage(bss, key); this.staged(_('Source WiFi'), bss.ssid + ' \u00b7 ' + band(bss.band)); })
 		]);
 	},
 
@@ -346,14 +365,9 @@ return view.extend({
 	},
 
 	reset() {
-		const go = () => { this.mem = 0; uci.unload(CONFIGS); return uci.load(CONFIGS).then(() => this.serverCount()).then(() => this.redraw()); };
+		const go = () => { this.mem = 0; this.log = []; uci.unload(CONFIGS); return uci.load(CONFIGS).then(() => this.serverCount()).then(() => this.redraw()); };
 		if (this.srv > 0) return Promise.all(CONFIGS.map(c => callRevert(c))).then(go, go);
 		return go();
-	},
-
-	saveOnly() {
-		return uci.save().then(() => { this.mem = 0; return this.serverCount(); }).then(() => this.redraw())
-			.catch(e => ui.addNotification(null, E('p', {}, String(e && e.message || e)), 'danger'));
 	},
 
 	/* Write everything and wait while the router restarts its WiFi (the page may lose contact). */
@@ -366,7 +380,7 @@ return view.extend({
 		const tick = window.setInterval(() => { msg.textContent = _('Please wait… %d seconds').format(left()); }, 1000);
 		const finish = () => {
 			window.clearInterval(tick);
-			this.mem = 0;
+			this.mem = 0; this.log = [];
 			uci.unload(CONFIGS);
 			return uci.load(CONFIGS).then(() => Promise.all([ callStatus().then(s => { this.st = s; }, () => {}), this.serverCount() ])).then(() => {
 				ui.hideModal();

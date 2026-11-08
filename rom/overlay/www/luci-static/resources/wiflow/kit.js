@@ -48,7 +48,7 @@ function sig(dbm) {
 /* A button. kind: p (primary) | s (soft) | g (outline) | d (danger) | t (text); o.sm, o.full */
 function btn(kind, text, fn, o) {
 	o = o || {};
-	const b = E('button', { 'class': 'w-btn w-' + (kind == 't' ? 'txt' : kind) + (o.sm ? ' w-sm' : '') + (o.full ? ' w-full' : ''), 'type': 'button' }, text);
+	const b = E('button', { 'class': 'w-btn w-' + (kind == 't' ? 'txt' : kind) + (o.sm ? ' w-sm' : '') + (o.full ? ' w-full' : '') + (o.cls ? ' ' + o.cls : ''), 'type': 'button' }, text);
 	if (fn) b.addEventListener('click', ev => fn(ev.currentTarget, ev));
 	return b;
 }

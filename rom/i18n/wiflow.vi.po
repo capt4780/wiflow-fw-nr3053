@@ -1299,3 +1299,27 @@ msgstr "Sẵn sàng"
 
 msgid "Not ready"
 msgstr "Chưa sẵn sàng"
+
+msgid "Details"
+msgstr "Thông tin"
+
+msgid "Apply"
+msgstr "Áp dụng"
+
+msgid "Apply changes"
+msgstr "Áp dụng thay đổi"
+
+msgid "%d changes not applied yet"
+msgstr "%d thay đổi chưa áp dụng"
+
+msgid "Go back"
+msgstr "Quay lại"
+
+msgid "Applying makes the WiFi drop for a few seconds, then it reconnects."
+msgstr "Khi áp dụng, WiFi sẽ ngắt vài giây rồi tự kết nối lại."
+
+msgid "Changes saved on the router"
+msgstr "Thay đổi đã lưu trên router"
+
+msgid "Password changed"
+msgstr "Đã đổi mật khẩu"
