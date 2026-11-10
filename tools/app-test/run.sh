@@ -39,7 +39,7 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, guest_auto, guest_limit, speed, speedtest, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^guest_auto guest_limit job_clear pair speed speedtest status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '2\.4'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '2\.5'\)$"
 expect "status: server host shown on the link card" "$(st "s['wp']['server']")" "^[A-Za-z0-9.:-]+$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
@@ -63,7 +63,7 @@ n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
 [ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^2\.4 4  Wiflow 2\.4G (lan|wifi) \[\]$'
+expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^2\.5 4  Wiflow 2\.4G (lan|wifi) \[\]$'
 
 wp "s['commands']=[
  {'id':'c1','action':'change_guest_ssid','payload':{'guest_ssid':'X'}},
@@ -90,6 +90,13 @@ wp "s['codes']['WIFAPIQWER56']={'account':'WIFUID555111'}; s['commands']=[]"
 r="$(job pair '{"code":"WIFAPIQWER56"}')"; expect "pair again" "$r" 'WIFUID555111'
 expect "status: device name from WordPress" "$(st "s['wp']['device_name']")" '^Khu vực A$'
 expect "device name stored" "$(U get wiflow.core.device_name)" '^Khu vực A$'
+# usage plan: WordPress turns the guest page off when the plan ends, and back on after renewal
+wp "s['plan']={'active':False,'expires':int(__import__('time').time())-5}"
+wait_for 90 "s['portal']['state']=='plan'" && pass "plan ended: guest page off" || fail "plan end: $(st "s['portal']")"
+expect "plan ended: stored for offline use" "$(U get wiflow.core.plan_active)|$(U get wiflow.core.plan_expires | grep -c '^[0-9]\{9,\}$')" '^0\|1$'
+wp "s['plan']={'active':True,'expires':int(__import__('time').time())+86400*365}"
+wait_for 90 "s['portal']['state']!='plan'" && pass "plan renewed: guest page may run again" || fail "plan renew: $(st "s['portal']")"
+expect "plan renewed: stored" "$(U get wiflow.core.plan_active)" '^1$'
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
 echo '{}' > /tmp/rq.json; $B x /usr/libexec/wiflow/job diag /tmp/rq.json
 r="$(st "(s['job'] or {}).get('state','')")"; expect "diagnostic report (keys hidden)" "$r|$(grep -c '== wireless' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234' /tmp/wiflow/diag.txt)" '^success\|1\|0$'

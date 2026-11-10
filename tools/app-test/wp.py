@@ -126,7 +126,7 @@ class H(BaseHTTPRequestHandler):
                 if not r or r.get('status') not in ('success', 'failed', 'rebooting', 'running'):
                     cmd = c; break
             save(s)
-            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': (s.get('portal') or {}).get('revision', 0), 'account_public_id': d['account'], 'device_name': 'Khu vực A', 'data_generation': '4', 'server_time': int(time.time())})
+            return self.reply({'ok': True, 'command': cmd, 'desired_portal_revision': (s.get('portal') or {}).get('revision', 0), 'account_public_id': d['account'], 'device_name': 'Khu vực A', 'data_generation': '4', 'server_time': int(time.time()), 'plan_active': (s.get('plan') or {}).get('active', True), 'plan_expires': (s.get('plan') or {}).get('expires', 0)})
         if p == 'unpair':
             s['revoked'].append([hw, d['token']]); del s['devices'][hw]; save(s)
             return self.reply({'ok': True, 'data_generation': '4'})

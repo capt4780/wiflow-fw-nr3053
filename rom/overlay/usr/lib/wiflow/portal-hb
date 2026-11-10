@@ -55,6 +55,10 @@ enable)
  portal_activate
  ;;
 timeok) state_set wp_time_ok 1 ;;
+plan)
+ # the plan of the account changed (or was just read): switch the guest page off or on
+ portal_activate
+ ;;
 unpaired)
  /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true
  uci set wiflow.core.portal_enabled='0'

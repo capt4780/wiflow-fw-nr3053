@@ -114,6 +114,7 @@ enable(){
 ensure(){
  # v1.0.26: safe mode (fail-open) keeps the captive rules off until it ends.
  safe_mode_active && return 0
+ plan_locked && return 0
  # Fast path, called every 15 s: nothing to do while the rules are current.
  if rules_current && portal_nft_ready && [ ! -f "$LEGACY_FILE" ]; then return 0; fi
  enable

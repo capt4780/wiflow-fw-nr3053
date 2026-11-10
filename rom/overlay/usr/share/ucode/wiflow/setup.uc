@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.4';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '2.5';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '2.4';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '2.5';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -316,7 +316,9 @@ function portal_state() {
 	const safe = su && num(su[2], 0) > uptime();
 	const rev = num(core('portal_revision', '0'), 0);
 	let state = 'off';
-	if (safe) state = 'safe';
+	const pend = num(core('plan_expires', '0'), 0);
+	if (core('plan_active', '1') == '0' || (pend > 0 && time() >= pend && (trim(readfile('/tmp/wiflow/st/time_ok') ?? '') == 'true' || !!match(st, /(^|\n)wp_time_ok=1/)))) state = 'plan';
+	else if (safe) state = 'safe';
 	else if (core('portal_enabled', '0') == '1') state = 'on';
 	else if (core('portal_sync_status') == 'syncing') state = 'syncing';
 	else if (core('portal_sync_status') == 'failed') state = 'error';

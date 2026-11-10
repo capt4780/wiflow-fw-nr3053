@@ -311,6 +311,14 @@ function heartbeat(online) {
 		}
 		// WordPress took the events and counters: drop them from the queue.
 		W.run(`/usr/lib/wiflow/portal-hb ack ${W.num(p.event_count, 0)} ${W.num(p.guest_count, 0)}`);
+		if (type(b.plan_active) == 'bool') {
+			const pa = b.plan_active ? '1' : '0', pe = `${+b.plan_expires || 0}`;
+			if (W.core('plan_active', '1') != pa || W.core('plan_expires', '0') != pe) {
+				W.core_set({ plan_active: pa, plan_expires: pe });
+				W.run('/usr/lib/wiflow/portal-hb plan');
+				W.wlog('system', b.plan_active ? 'The usage plan is active' : 'The usage plan has ended: the guest page is off');
+			}
+		}
 		portal_content(b.desired_portal_revision);
 		if (b.command)
 			run_command(b.command, online);

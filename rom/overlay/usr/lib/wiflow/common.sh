@@ -601,7 +601,16 @@ portal_health_json(){
 }
 # One place that turns the guest portal on: a valid content snapshot is on the router and
 # safe mode is not active -> flag on + captive rules. Safe to call again and again.
+# Usage plan (v2.5): WordPress says whether the plan runs and when it ends. The end date is kept here, so a router
+# that cannot reach WordPress still turns the guest page off on that day (needs a clock that was confirmed).
+# Guests keep the Internet, like in safe mode.
+plan_locked(){
+    [ "$(uci -q get wiflow.core.plan_active 2>/dev/null || echo 1)" = 0 ] && return 0
+    _pe="$(num_or0 "$(uci -q get wiflow.core.plan_expires 2>/dev/null)")"
+    [ "$_pe" -gt 0 ] && time_valid && [ "$(date +%s)" -ge "$_pe" ]
+}
 portal_activate(){
+    if plan_locked; then /usr/lib/wiflow/portal-firewall disable >/dev/null 2>&1 || true; return 0; fi
     safe_mode_active && return 0
     [ -f "$PORTAL_ACTIVE/portal.json" ] || return 0
     if [ "$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)" != 1 ]; then

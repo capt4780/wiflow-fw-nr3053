@@ -948,6 +948,9 @@ msgstr "Thông tin liên hệ"
 msgid "Content"
 msgstr "Nội dung"
 
+msgid "Plan ended"
+msgstr "Gói đã hết hạn"
+
 msgid "Content not received"
 msgstr "Chưa nhận nội dung"
 
