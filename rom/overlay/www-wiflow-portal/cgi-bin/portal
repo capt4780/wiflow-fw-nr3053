@@ -109,6 +109,18 @@ esac
 
 enabled="$(uci -q get wiflow.core.portal_enabled 2>/dev/null || echo 0)"; [ "$enabled" = 1 ] || { printf 'Status: 204 No Content\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
 ip="${REMOTE_ADDR:-}"; valid_guest_ip "$ip" || { printf 'Status: 403 Forbidden\r\nCache-Control: no-store\r\n\r\n'; exit 0; }
+# v3.4: a plain web request the firewall redirected here (the phone's Internet check, or a page the guest typed: any host
+# but the router's own address) is answered in a few steps. A guest who is already let in gets what the phone expects,
+# everybody else is sent on to the portal page. No session and no statistics are created for these requests; that
+# happens when the portal page itself is opened. A busy hour of phones probing the network costs the router almost nothing.
+qhost="$(printf '%s' "${HTTP_HOST:-}" | tr 'A-Z' 'a-z')"; qhost="${qhost%%:*}"
+case "$qhost" in ''|10.10.10.1) :;; *)
+ case "${REQUEST_METHOD:-GET}" in GET|HEAD)
+  qmac="$(guest_mac_for_ip "$ip" 2>/dev/null || true)"
+  if [ -n "$qmac" ] && ! sched_closed && portal_nft_pair_authorized "$ip" "$qmac"; then authorized_reply; fi
+  printf 'Status: 302 Found\r\nLocation: http://10.10.10.1:2080/cgi-bin/portal\r\nCache-Control: no-store\r\nPragma: no-cache\r\nX-Wiflow-Portal: 1\r\n\r\n'; exit 0;;
+ esac;;
+esac
 session="$(/usr/lib/wiflow/portal-client ensure "$ip" 2>/dev/null || true)"; [ -n "$session" ] || { headers 'text/html; charset=utf-8'; echo '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="2"><p>Đang chuẩn bị kết nối WiFi…</p>'; exit 0; }
 cid="${session%%|*}"; sid="${session#*|}"
 if ! sched_closed && /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then authorized_reply; fi

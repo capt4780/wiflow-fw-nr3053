@@ -39,7 +39,7 @@ install_files() {
 case "$1" in
 start)
 	$0 stop 2>/dev/null
-	rm -rf /etc/config /etc/wiflow /tmp/wiflow /tmp/mock /tmp/wiflow-* /www-wiflow-portal
+	rm -rf /etc/config /etc/wiflow /tmp/wiflow /tmp/mock /tmp/wiflow-* /tmp/dhcp.leases /www-wiflow-portal
 	mkdir -p /etc/config /tmp/mock /var/run/ubus
 	cp "$WFT"/cfg/* /etc/config/
 	cat > /tmp/mock/world.json <<'EOF'

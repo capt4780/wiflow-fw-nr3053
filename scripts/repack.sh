@@ -41,8 +41,9 @@ rm -f "$F/etc/uci-defaults/99-viettel-custom-defaults" "$F/etc/uci-defaults/99-v
 
 step "Wiflow files and defaults"
 cp -a "$ROOT/rom/overlay/." "$F/"
-chmod 0755 "$F/etc/init.d/wiflow-hnat-off" "$F/etc/uci-defaults/98-wiflow-base"
+chmod 0755 "$F/etc/init.d/wiflow-hnat-off" "$F/etc/init.d/wiflow-captive" "$F/etc/uci-defaults/98-wiflow-base"
 ln -sf ../init.d/wiflow-hnat-off "$F/etc/rc.d/S21wiflow-hnat-off"
+ln -sf ../init.d/wiflow-captive "$F/etc/rc.d/S22wiflow-captive"
 
 # Wiflow App (service, agent, LuCI page): part of the firmware, not a separate package
 chmod 0755 "$F/etc/init.d/wiflow" "$F/etc/hotplug.d/ntp/20-wiflow" "$F/etc/hotplug.d/iface/60-wiflow-portal" "$F"/usr/libexec/wiflow/* "$F"/usr/lib/wiflow/* "$F"/www-wiflow-portal/cgi-bin/*

@@ -16,7 +16,8 @@ if url and ('connectivitycheck' in url or 'detectportal' in url):
     import json, subprocess
     rr = subprocess.run(['ip', 'route', 'get', '1.1.1.1'], capture_output=True, text=True).stdout.split()
     dev = rr[rr.index('dev') + 1] if 'dev' in rr else None
-    ok = bool(dev) and json.load(open('/tmp/mock/world.json')).get('inet', {}).get(dev, False)
+    w = json.load(open('/tmp/mock/world.json'))
+    ok = bool(dev) and w.get('inet', {}).get(dev, False) and not w.get('block_https', False)
     if not ok:
         sys.stderr.write('Connection error: mock world offline\n'); sys.exit(4)
     sys.exit(0)

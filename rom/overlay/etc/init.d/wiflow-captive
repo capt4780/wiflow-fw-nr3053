@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# Wiflow: put the captive rules in place early, before the guest WiFi is on the air, so that no phone can join in the
+# first seconds after a start and get the Internet without the portal. Needs content that was synced before (kept in
+# flash); on a router that never had content nothing is done and the wiflow service takes over later.
+
+START=22
+
+boot() {
+	start
+}
+
+start() {
+	[ -x /usr/lib/wiflow/portal-firewall ] || return 0
+	/bin/sh -c '. /usr/lib/wiflow/common.sh; portal_activate' >/dev/null 2>&1
+	return 0
+}

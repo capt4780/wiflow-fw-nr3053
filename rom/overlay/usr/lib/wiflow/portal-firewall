@@ -11,28 +11,25 @@ MARK='wiflow-captive-v4'
 apply_rules(){
  # One atomic transaction. Declaring an existing set keeps its elements,
  # so re-applying never drops an authorized guest.
+ # v3.4: "authed" is a dynamic set with an idle timeout: every packet of an authorized guest renews its own entry
+ # (the "update" rule in the forward chain), so a guest that keeps using the Internet is never dropped and one that is
+ # silent for guest_idle_min minutes (default 30) is dropped by the kernel itself. No program watches the guests.
+ idle="$(guest_idle_secs)"
  /usr/sbin/nft -f - <<NFT
 table inet wiflow_captive {
- set authed { type ipv4_addr . ether_addr; flags timeout; timeout 30d; }
+ set authed { type ipv4_addr . ether_addr; flags dynamic,timeout; timeout ${idle}s; size 4096; }
  set web4 { type ipv4_addr; }
- set dl { type ipv4_addr; flags dynamic,timeout; timeout 2m; size 1024; }
- set ul { type ipv4_addr; flags dynamic,timeout; timeout 2m; size 1024; }
- chain shape { }
+ set ncl { type ipv4_addr; flags dynamic,timeout; timeout 1m; size 1024; }
  chain sched_fwd { }
  chain sched_nat { }
  chain prerouting { type nat hook prerouting priority -110; policy accept; }
  chain forward { type filter hook forward priority -10; policy accept; }
- chain input { type filter hook input priority -10; policy accept; }
- chain postrouting { type filter hook postrouting priority 50; policy accept; }
 }
 flush chain inet wiflow_captive prerouting
 flush chain inet wiflow_captive forward
-flush chain inet wiflow_captive input
-flush chain inet wiflow_captive postrouting
 table inet wiflow_captive {
  chain prerouting {
   ip saddr 10.10.10.0/24 ip daddr 10.0.0.1 return
-  ip saddr 10.10.10.0/24 ip daddr 10.0.0.2 return
   jump sched_nat
   ip saddr . ether saddr @authed return
   ip saddr 10.10.10.0/24 ip daddr @web4 return
@@ -40,21 +37,15 @@ table inet wiflow_captive {
  }
  chain forward {
   jump sched_fwd
-  ip daddr 10.10.10.0/24 counter comment "guest-in"
-  jump shape
-  ip saddr . ether saddr @authed counter return comment "guest-authed"
+  # One phone cannot flood the router with new connections (port scans, P2P): only the first packet of a
+  # connection is looked at, normal browsing never gets near the rate.
+  ct state new ip saddr 10.10.10.0/24 update @ncl { ip saddr limit rate over 500/second burst 1000 packets } drop
+  ip saddr . ether saddr @authed update @authed { ip saddr . ether saddr timeout ${idle}s } return
   ip saddr 10.10.10.0/24 tcp dport 853 accept
   ip saddr 10.10.10.0/24 udp dport 853 accept
   ip saddr 10.10.10.0/24 ip daddr @web4 tcp dport { 80, 443 } accept
   ip saddr 10.10.10.0/24 meta l4proto tcp reject with tcp reset
   ip saddr 10.10.10.0/24 reject comment "$MARK"
- }
- # Counters only (never drop): read by /cgi-bin/diag to show where guest traffic stops.
- chain input {
-  ip saddr 10.10.10.0/24 udp dport 53 counter comment "guest-dns"
- }
- chain postrouting {
-  ip saddr 10.10.10.0/24 oifname != "br-wiflow" counter comment "guest-out"
  }
 }
 NFT
@@ -101,13 +92,16 @@ fw4_portal_rule(){
 
 enable(){
  fw4_portal_rule || return 1
- apply_rules >/dev/null 2>&1 || return 1
+ had=0; portal_nft_ready && had=1
+ # A set that exists with other settings (the idle time was changed) cannot be re-declared: start the table over.
+ apply_rules >/dev/null 2>&1 || { /usr/sbin/nft delete table inet wiflow_captive >/dev/null 2>&1; had=0; apply_rules >/dev/null 2>&1 || return 1; }
  portal_nft_ready || return 1
  refresh || true
- # v1.0.26: speed limit and opening hours live in their own chains.
- guest_policy_apply force >/dev/null 2>&1 || true
+ # The rules were off (safe mode, plan ended, no content): guests who are online keep their Internet.
+ [ "$had" = 1 ] || guest_carry_over >/dev/null 2>&1 || true
  guest_sched_tick >/dev/null 2>&1 || true
  state_set portal_error ''
+ : > /tmp/wiflow-portal-on
  return 0
 }
 
@@ -123,7 +117,7 @@ ensure(){
 disable(){
  changed=0; [ -f "$LEGACY_FILE" ] && changed=1; uci -q get firewall.wiflow_guest_portal >/dev/null 2>&1 && changed=1
  /usr/sbin/nft delete table inet wiflow_captive >/dev/null 2>&1 || true
- rm -f "$LEGACY_FILE" "$LEGACY_FILE.tmp"; uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true; uci commit firewall >/dev/null 2>&1 || true
+ rm -f /tmp/wiflow-portal-on "$LEGACY_FILE" "$LEGACY_FILE.tmp"; uci -q delete firewall.wiflow_guest_portal >/dev/null 2>&1 || true; uci commit firewall >/dev/null 2>&1 || true
  [ "$changed" = 1 ] && /etc/init.d/firewall reload >/dev/null 2>&1 || true
 }
 case "$MODE" in enable) enable;; ensure) ensure;; refresh) refresh;; disable) disable;; *) exit 2;; esac

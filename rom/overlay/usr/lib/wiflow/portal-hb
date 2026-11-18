@@ -35,7 +35,7 @@ report)
  sync="$(uci -q get wiflow.core.portal_sync_status 2>/dev/null || echo idle)"; err="$(uci -q get wiflow.core.portal_sync_error 2>/dev/null || true)"
  ad="$(adstats_take 2>/dev/null || echo '[]')"; [ -n "$ad" ] || ad='[]'
  printf '{"event_count":%s,"events":%s,"guest_count":%s,"guests":%s,"ad_stats":%s,"stats":%s,"active_portal_revision":%s,"portal_sync_status":"%s","portal_sync_error":"%s","storage_total_bytes":%s,"media_budget_bytes":%s,"health":%s}\n' \
-  "$count" "$events" "$gcount" "$guests" "$ad" "$(stats_json)" "$rev" "$(json_escape "$sync")" "$(json_escape "$err")" "$(storage_total_bytes)" "$(media_budget_bytes)" "$(portal_health_json)"
+  "$count" "$events" "$gcount" "$guests" "$ad" "[]" "$rev" "$(json_escape "$sync")" "$(json_escape "$err")" "$(storage_total_bytes)" "$(media_budget_bytes)" "$(portal_health_json)"
  ;;
 ack)
  event_ack_batch "${2:-0}" >/dev/null 2>&1 || true
@@ -65,14 +65,14 @@ unpaired)
  uci set wiflow.core.portal_enabled='0'
  portal_storage_reset
  uci commit wiflow >/dev/null 2>&1 || true
- rm -f "$GUEST_KNOWN" "$EVENT_QUEUE" "$GUEST_QUEUE" /tmp/wiflow-guest-seen.* "$HEARTBEAT_KICK" "$ADSTATS" "$ADSTATS.sending" "$SESSION_SNAP" 2>/dev/null || true
+ rm -f "$GUEST_KNOWN" "$EVENT_QUEUE" "$GUEST_QUEUE" /tmp/wiflow-guest-seen.* "$HEARTBEAT_KICK" "$ADSTATS" "$ADSTATS.sending" 2>/dev/null || true
  rm -rf "$CLIENT_SESSIONS"/* 2>/dev/null || true
  ;;
 guest-settings)
  f="${2:-}"; [ -f "$f" ] || exit 2
  g(){ jsonfilter -i "$f" -e "@.$1" 2>/dev/null || true; }
  se="$(g sched_enabled)"; case "$se" in true|1) se=1;; false|0) se=0;; *) se='';; esac
- guest_settings_set "$(g down_kbps)" "$(g up_kbps)" "$(g session_min)" "$(g max)" "$se" "$(g sched_from)" "$(g sched_to)" "$(g sched_days)" "$(g sched_week)" "$(g auto_share | sed 's/^true$/1/;s/^false$/0/')"
+ guest_settings_set "$(g session_min)" "$(g max)" "$se" "$(g sched_from)" "$(g sched_to)" "$(g sched_days)" "$(g sched_week)"
  ;;
 guest-ssid)
  f="${2:-}"; [ -f "$f" ] || exit 2

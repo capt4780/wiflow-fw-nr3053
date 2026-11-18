@@ -7,12 +7,12 @@ if ! valid_guest_ip "$ip"; then
   printf '{"captive":true,"user-portal-url":"http://10.10.10.1:2080/cgi-bin/portal"}\n'
   exit 0
 fi
-session="$(/usr/lib/wiflow/portal-client ensure "$ip" 2>/dev/null || true)"
-if [ -n "$session" ]; then
-  sid="${session#*|}"
-  if ! sched_closed && /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then
-    printf '{"captive":false}\n'
-    exit 0
-  fi
+# v3.4: answers from the firewall alone (no session is created here). Captive rules off (safe mode, plan ended, no
+# content): the guest already has the Internet, so the phone is told so; otherwise a guest who is let in is "not captive".
+portal_nft_ready || { printf '{"captive":false}\n'; exit 0; }
+mac="$(guest_mac_for_ip "$ip" 2>/dev/null || true)"
+if [ -n "$mac" ] && ! sched_closed && portal_nft_pair_authorized "$ip" "$mac"; then
+  printf '{"captive":false}\n'
+  exit 0
 fi
 printf '{"captive":true,"user-portal-url":"http://10.10.10.1:2080/cgi-bin/portal"}\n'

@@ -185,7 +185,7 @@ for s in sorted(os.listdir(F + "/etc/init.d")):
 ok("services: " + " ".join(sorted(os.listdir(F + "/etc/init.d"))))
 
 # --- Wiflow defaults and theme ---
-need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc/rc.d/S21wiflow-hnat-off",
+need = ["/etc/uci-defaults/98-wiflow-base", "/etc/init.d/wiflow-hnat-off", "/etc/rc.d/S21wiflow-hnat-off", "/etc/init.d/wiflow-captive", "/etc/rc.d/S22wiflow-captive",
         "/usr/share/ucode/luci/template/themes/wiflow/header.ut",
         "/usr/share/ucode/luci/template/themes/wiflow/footer.ut",
         "/usr/share/ucode/luci/template/themes/wiflow/sysauth.ut",
@@ -254,8 +254,8 @@ checks = {
         and all(os.path.isfile(F + "/www-wiflow-portal/" + x) for x in ["template-website.html", "template-image.html", "template-video.html",
             "connected.html", "runtime/assets/fonts/inter-400.woff2", "runtime/assets/fonts/lexend.woff"])
         and not any(os.path.exists(F + "/www-wiflow-portal/runtime/assets/" + x) for x in ["bg-landscape.webp", "bg-portrait.webp"])
-        # v1.1.9: a router start (uptime under 5 minutes) forgets the old guests; the agent retries the link after 2, 5, 10, then every 15 minutes
-        and 'uptime_s)" -lt 300' in open(F + "/usr/lib/wiflow/portal-boot").read() and 'rm -f "$SESSION_SNAP"' in open(F + "/usr/lib/wiflow/portal-boot").read()
+        # v1.1.9: a router start (uptime under 5 minutes) is logged and the guests confirm again; the agent retries the link after 2, 5, 10, then every 15 minutes
+        and 'uptime_s)" -lt 300' in open(F + "/usr/lib/wiflow/portal-boot").read() and "portal_activate" in open(F + "/usr/lib/wiflow/portal-boot").read()
         and "WS_STEPS = [ 120 / RS, 300 / RS, 600 / RS, 900 / RS ]" in open(F + "/usr/libexec/wiflow/agent").read()
         # v1.1.8: no hotline/email in the brand introduction; Confirm goes straight to the success page (no outside link)
         and all("hotline" not in open(F + "/www-wiflow-portal/" + x).read() and "mailto:" not in open(F + "/www-wiflow-portal/" + x).read()

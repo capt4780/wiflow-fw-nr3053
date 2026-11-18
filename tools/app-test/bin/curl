@@ -16,11 +16,18 @@ if 'connectivitycheck' in url or 'detectportal' in url:
     if 'generate_204' in url:
         sys.stdout.write('204' if ok else '000'); sys.exit(0 if ok else 7)
     sys.stdout.write('success\n' if ok else ''); sys.exit(0 if ok else 7)
-if ':853' in url:
-    # private DNS (DoT) probe: connects only while the mock world has Internet on the default route
+if ':853' in url or url.rstrip('/') in ('https://1.1.1.1', 'https://1.1.1.1:443'):
+    # TCP probes: private DNS (DoT, :853, block_dot blocks all four servers, dot_ok lists the only ones that answer) and
+    # the 1.1.1.1:443 connect of the Internet check; they connect only while the mock world has Internet on the default route
     r = subprocess.run(['ip', 'route', 'get', '1.1.1.1'], capture_output=True, text=True).stdout.split()
     dev = r[r.index('dev') + 1] if 'dev' in r else None
     w = json.load(open('/tmp/mock/world.json'))
-    ok = bool(dev) and w.get('inet', {}).get(dev, False) and not w.get('block_dot', False)
+    ok = bool(dev) and w.get('inet', {}).get(dev, False)
+    if ':853' in url:
+        host = url.split('://')[-1].split(':')[0]
+        ok = ok and not w.get('block_dot', False) and (host in w['dot_ok'] if 'dot_ok' in w else True)
+    else:
+        ok = ok and not w.get('block_443', False)
+    with open('/tmp/mock/calls.log', 'a') as f: f.write('tcp %s %s\n' % (url, ok))
     sys.stdout.write('0.012000' if ok else '0.000000'); sys.exit(0 if ok else 7)
 os.execv(os.environ.get("REAL_CURL", "/usr/bin/curl"), ['curl', '--noproxy', '*'] + a)

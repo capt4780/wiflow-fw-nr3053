@@ -16,12 +16,6 @@ const methods = {
 		}
 	},
 
-	speed: {
-		call: function() {
-			return W.speed();
-		}
-	},
-
 	pair: {
 		args: { code: '' },
 		call: function(req) {
@@ -36,26 +30,6 @@ const methods = {
 		args: { force: false },
 		call: function(req) {
 			return W.job_start('unpair', { force: !!req.args.force });
-		}
-	},
-
-	guest_auto: {
-		args: { on: false },
-		call: function(req) {
-			return W.set_auto(!!req.args.on);
-		}
-	},
-
-	speedtest: {
-		call: function() {
-			return W.speedtest_start();
-		}
-	},
-
-	guest_limit: {
-		args: { down: 0, up: 0 },
-		call: function(req) {
-			return W.set_limits(req.args.down, req.args.up);
 		}
 	},
 

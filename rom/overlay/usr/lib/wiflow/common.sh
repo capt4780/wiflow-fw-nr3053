@@ -86,9 +86,12 @@ portal_nft_del(){ ipx="$1"; mac="$2"; printf 'delete element %s authed { %s . %s
 portal_nft_add(){
     ipx="$1"; mac="$2"; valid_guest_ip "$ipx" || return 1; portal_nft_ready || return 1
     portal_nft_pair_authorized "$ipx" "$mac" && return 0
-    printf 'add element %s authed { %s . %s timeout 30d }\n' "$CAPTIVE_TABLE" "$ipx" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
+    printf 'add element %s authed { %s . %s timeout %ss }\n' "$CAPTIVE_TABLE" "$ipx" "$mac" "$(guest_idle_secs)" | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
     portal_nft_pair_authorized "$ipx" "$mac"
 }
+# v3.4: how long an authorized guest may stay silent. Every packet the guest sends renews the timer inside the
+# firewall (see portal-firewall), so nothing has to watch the guest; silence for this long ends the access.
+guest_idle_secs(){ _gi="$(uci -q get wiflow.core.guest_idle_min 2>/dev/null)"; case "$_gi" in ''|*[!0-9]*) _gi=30;; esac; [ "$_gi" -ge 5 ] 2>/dev/null && [ "$_gi" -le 1440 ] || _gi=30; printf '%s' $((_gi * 60)); }
 portal_nft_pair_authorized(){ ipx="$1"; mac="$2"; /usr/sbin/nft list set $CAPTIVE_TABLE authed 2>/dev/null | grep -Fiq "$ipx . $mac"; }
 _event_lock(){ i=0; while ! mkdir "$EVENT_LOCK" 2>/dev/null; do i=$((i+1)); if [ "$i" -ge 3 ]; then rmdir "$EVENT_LOCK" 2>/dev/null || true; i=0; fi; sleep 1; done; }
 _event_unlock(){ rmdir "$EVENT_LOCK" 2>/dev/null || true; }
@@ -165,37 +168,86 @@ portal_active_config(){ [ -f "$PORTAL_ACTIVE/portal.json" ] && printf '%s' "$POR
 # ---------------------------------------------------------------------------
 uptime_s(){ u="$(cut -d. -f1 /proc/uptime 2>/dev/null)"; case "$u" in ''|*[!0-9]*) u=0;; esac; printf '%s' "$u"; }
 
-# Authorized guest sessions survive reboot and power loss. Snapshot is written
-# at most every 10 minutes (and on a clean stop) and only when it changed, to
-# keep NAND writes low. A power cut loses at most the last 10 minutes.
-SESSION_SNAP=$ROOT/sessions.snap
-session_snapshot(){
-    tmp="$SESSION_SNAP.tmp.$$"; : > "$tmp" || return 1
-    for f in "$CLIENT_SESSIONS"/*; do
-        [ -f "$f" ] || continue
-        IFS='|' read -r _m _c _s _i _cn _a _l _ab < "$f" 2>/dev/null || continue
-        case "${_a:-0}" in ''|0|*[!0-9]*) continue;; esac
-        printf '%s|%s|%s|%s|%s|%s|%s|0\n' "$_m" "$_c" "$_s" "$_i" "$_cn" "$_a" "$_l" >> "$tmp"
-    done
-    sort -o "$tmp" "$tmp" 2>/dev/null || true
-    if [ -f "$SESSION_SNAP" ] && [ "$(sha256sum < "$tmp")" = "$(sha256sum < "$SESSION_SNAP")" ]; then rm -f "$tmp"; return 0; fi
-    chmod 600 "$tmp" 2>/dev/null || true
-    mv "$tmp" "$SESSION_SNAP" && sync
+# v3.4: guest sessions live in RAM only. A restart of the router starts every guest from the portal again; a restart
+# of the service keeps them (RAM and the firewall table stay). The firewall decides who is still authorized; once a
+# minute one pass (sessions_sweep) brings the session files in line with it. No guest is polled.
+LEASE_SECS=14400
+# New session for a guest: prints "cid|sid".
+session_open(){
+    _so_mac="$1"; _so_ip="$2"; _so_f="$(client_file_for_mac "$_so_mac")" || return 1; _so_now="$(date +%s)"
+    _so_cid="$(client_id_for_mac "$_so_mac")"; _so_sid="$(new_token | cut -c1-24)"
+    client_session_write "$_so_f" "$_so_mac" "$_so_cid" "$_so_sid" "$_so_ip" "$_so_now" 0 "$_so_now" 0 || return 1
+    event_enqueue connected "$_so_cid" "$_so_sid" "$_so_now" || true
+    printf '%s|%s' "$_so_cid" "$_so_sid"
 }
-# Restored sessions start as "present"; the session loop re-adds each client to
-# the firewall set when it reconnects, or drops it after the disconnect grace.
-session_restore(){
-    [ -s "$SESSION_SNAP" ] || return 0
-    mkdir -p "$CLIENT_SESSIONS"; now="$(date +%s)"; n=0
-    while IFS='|' read -r _m _c _s _i _cn _a _l _ab; do
-        printf '%s' "$_m" | grep -Eq '^([0-9A-F]{2}:){5}[0-9A-F]{2}$' || continue
-        printf '%s' "$_s" | grep -Eq '^[0-9a-fA-F]{16,64}$' || continue
-        case "$_a" in ''|0|*[!0-9]*) continue;; esac
-        f="$(client_file_for_mac "$_m")" || continue
-        [ -f "$f" ] && continue
-        client_session_write "$f" "$_m" "$_c" "$_s" "$_i" "$_cn" "$_a" "$now" 0 && n=$((n+1))
-    done < "$SESSION_SNAP"
-    printf '%s' "$n"
+# The guest's access ended (silent too long): report it once.
+guest_gone(){
+    _gf="$1"; _gm="$2"; _gc="$3"; _gs="$4"; _gi="$5"; _gcn="$6"; _gl="$7"; _gw="$8"
+    client_session_write "$_gf" "$_gm" "$_gc" "$_gs" "$_gi" "$_gcn" 0 "$_gl" "$_gw" || return 1
+    event_enqueue disconnected "$_gc" "$_gs" "$_gw" || true
+    : > "$HEARTBEAT_KICK" 2>/dev/null || true
+}
+# Once a minute (portal-session-loop): sessions against the firewall set and the DHCP leases. In a quiet minute this is
+# three programs in total (nft, awk, one more awk), however many guests there are.
+sessions_sweep(){
+    portal_nft_ready || return 0
+    _sw_now="$(date +%s)"; _sw_idle="$(guest_idle_secs)"; _sw_lim=$(( $(cfg_num guest_session_min 0) * 60 )); _sw_tv=0
+    [ "$_sw_lim" -gt 0 ] && time_valid && _sw_tv=1
+    set -- "$CLIENT_SESSIONS"/*
+    if [ -e "$1" ]; then
+        { /usr/sbin/nft list set $CAPTIVE_TABLE authed 2>/dev/null | grep -oEi '10\.10\.10\.[0-9]+ \. ([0-9a-f]{2}:){5}[0-9a-f]{2}' | tr 'a-f' 'A-F' | sed 's/^/S /'
+          cat "$CLIENT_SESSIONS"/* 2>/dev/null; } | awk -F'|' -v now="$_sw_now" -v idle="$_sw_idle" -v lim="$_sw_lim" -v tv="$_sw_tv" '
+            /^S / { split($1, a, " "); inset[a[4] " " a[2]] = 1; next }
+            NF >= 8 {
+                au = $6 + 0; ab = $8 + 0; k = $1 " " $4
+                if (au > 0) {
+                    if (!(k in inset)) { w = now - idle; if (w < au) w = au; print "GONE|" $0 "|" w }
+                    else if (lim > 0 && tv && au > 1700000000 && now - au >= lim) print "LIM|" $0
+                } else if (ab > 0) { if (now - ab >= 7200) print "DEL|" $0 }
+                else if (now - $7 >= 1800) print "IDLE|" $0
+            }' | while IFS='|' read -r _a _m _c _s _i _cn _au _l _ab _w; do
+                _f="$(client_file_for_mac "$_m")" || continue
+                case "$_a" in
+                    GONE) guest_gone "$_f" "$_m" "$_c" "$_s" "$_i" "$_cn" "$_l" "${_w:-$_sw_now}";;
+                    LIM) portal_nft_del "$_i" "$_m"; client_session_write "$_f" "$_m" "$_c" "$_s" "$_i" "$_cn" 0 "$_sw_now" 0; wlog guest "Khách hết thời gian sử dụng, cần xác nhận lại";;
+                    DEL) rm -f "$_f";;
+                    IDLE) event_enqueue disconnected "$_c" "$_s" "$_l"; rm -f "$_f";;
+                esac
+            done
+    fi
+    # Guests that just got a DHCP lease are new visitors: a session and the "connected" event.
+    [ -s /tmp/dhcp.leases ] || return 0
+    awk -v now="$_sw_now" -v ls="$LEASE_SECS" '$1 + 0 > 0 && $1 - ls >= now - 150 { print toupper($2), $3 }' /tmp/dhcp.leases 2>/dev/null | while read -r _m _i; do
+        valid_guest_ip "$_i" || continue
+        _f="$(client_file_for_mac "$_m")" || continue
+        [ -f "$_f" ] || session_open "$_m" "$_i" >/dev/null
+    done
+    return 0
+}
+# v3.4: the captive rules come back after being off (safe mode, plan ended, no content): the guests who were online
+# meanwhile had the Internet without the portal. They keep it (the same idle timer applies); nothing is recorded for
+# them. After a restart of the router the lease file is empty, so everybody starts from the portal.
+guest_carry_over(){
+    [ -s /tmp/dhcp.leases ] || return 0
+    _co_now="$(date +%s)"; _co_t="$(guest_idle_secs)"; _co_n=0; _co_s="/tmp/wiflow-carry.$$"; : > "$_co_s"
+    while read -r _ex _mac _ip _rest; do
+        valid_guest_ip "$_ip" || continue
+        case "$_ex" in ''|*[!0-9]*) continue;; esac
+        [ "$_ex" = 0 ] || [ "$_ex" -gt "$_co_now" ] || continue
+        _mac="$(printf '%s' "$_mac" | tr 'a-f' 'A-F')"
+        _f="$(client_file_for_mac "$_mac")" || continue
+        printf 'add element %s authed { %s . %s timeout %ss }\n' "$CAPTIVE_TABLE" "$_ip" "$_mac" "$_co_t" >> "$_co_s"
+        if [ -f "$_f" ]; then
+            IFS='|' read -r _m2 _c2 _s2 _i2 _cn2 _a2 _l2 _ab2 < "$_f" 2>/dev/null || _s2=''
+            [ -n "${_s2:-}" ] || { rm -f "$_f"; _c2="$(client_id_for_mac "$_mac")"; _s2="$(new_token | cut -c1-24)"; _cn2="$_co_now"; _a2=0; }
+            case "${_a2:-0}" in ''|0) _a2="$_co_now";; esac
+        else _c2="$(client_id_for_mac "$_mac")"; _s2="$(new_token | cut -c1-24)"; _cn2="$_co_now"; _a2="$_co_now"; fi
+        client_session_write "$_f" "$_mac" "$_c2" "$_s2" "$_ip" "${_cn2:-$_co_now}" "$_a2" "$_co_now" 0 && _co_n=$((_co_n+1))
+    done < /tmp/dhcp.leases
+    [ -s "$_co_s" ] && /usr/sbin/nft -f "$_co_s" >/dev/null 2>&1
+    rm -f "$_co_s"
+    [ "$_co_n" = 0 ] || wlog portal "Cổng chào bật lại: giữ mạng cho $_co_n khách đang dùng"
+    return 0
 }
 
 # Only an explicit DEVICE_UNPAIRED from WordPress, seen 3 times in a row over
@@ -253,12 +305,22 @@ net_status_read(){
     case "$_sv" in 0|1) :;; *) _sv='?';; esac; case "$_st" in ''|*[!0-9]*) _st=0;; esac
     printf '%s %s' "$_sv" $(( $(date +%s) - _st ))
 }
-# One real Internet check, hard limit about 2 s.
+# One real Internet check, about 3 s at most: an HTTPS request to the connectivity-check server and a TCP connect to
+# 1.1.1.1:443 run side by side; either one answering means "online". v3.4: a single failed check does not flip the
+# status to offline (a weak source WiFi loses one now and then); the second failure in a row does.
+NET_FAILS=/tmp/wiflow-net-fails
 net_check_now(){
-    if net_link_up && uclient-fetch -q -T 2 -O /dev/null 'https://connectivitycheck.gstatic.com/generate_204' >/dev/null 2>&1; then
-        net_status_write 1; return 0
+    _nd="/tmp/wiflow-netchk.$$"; rm -rf "$_nd"; mkdir -p "$_nd" 2>/dev/null || return 1
+    if net_link_up; then
+        ( uclient-fetch -q -T 3 -O /dev/null 'https://connectivitycheck.gstatic.com/generate_204' >/dev/null 2>&1 && : > "$_nd/a" ) &
+        ( _tc="$(curl -sk -m 3 --connect-timeout 3 -o /dev/null -w '%{time_connect}' 'https://1.1.1.1/' 2>/dev/null)"; awk -v t="${_tc:-0}" 'BEGIN{exit !(t+0>0)}' && : > "$_nd/b" ) &
+        wait
     fi
-    net_status_write 0; return 1
+    if [ -e "$_nd/a" ] || [ -e "$_nd/b" ]; then rm -rf "$_nd"; rm -f "$NET_FAILS"; net_status_write 1; return 0; fi
+    rm -rf "$_nd"
+    _nf="$(cat "$NET_FAILS" 2>/dev/null)"; case "$_nf" in ''|*[!0-9]*) _nf=0;; esac; _nf=$((_nf+1)); printf '%s\n' "$_nf" > "$NET_FAILS" 2>/dev/null
+    if [ "$_nf" -ge 2 ] || ! net_link_up; then net_status_write 0; fi
+    return 1
 }
 # v3.1: run a command for at most $1 seconds (no dependency on a timeout applet); 124 when it was stopped.
 run_limited(){
@@ -271,14 +333,16 @@ run_limited(){
 }
 # v3.1: a guest is only let in (and remembered) when the way out really works:
 # the router's Internet, DNS through the router, and private DNS (DoT, port 853).
-# The three checks run together, about 4 s at most. wiflow.core.grant_dot=0 stops requiring DoT.
+# The checks run together, about 4 s at most. v3.4: any one of four public DoT servers answering is enough; when none
+# answers twice in a row while Internet and DNS are fine, the network blocks port 853 and the DoT check is skipped for
+# 30 minutes (the log says so). wiflow.core.grant_dot=0 never requires DoT.
 grant_verify(){
     _gd="/tmp/wiflow-grant.$$"; rm -rf "$_gd"; mkdir -p "$_gd" 2>/dev/null || return 0
     set -- $(net_status_read)
     if [ "$1" = 1 ] && [ "$2" -lt 10 ]; then : > "$_gd/net"
     else ( net_check_now >/dev/null 2>&1 && : > "$_gd/net" ) & fi
     ( run_limited 3 nslookup connectivitycheck.gstatic.com 127.0.0.1 >/dev/null 2>&1 && : > "$_gd/dns" ) &
-    for _dt in 1.1.1.1 8.8.8.8; do
+    for _dt in 1.1.1.1 8.8.8.8 9.9.9.9 8.8.4.4; do
         ( _tc="$(curl -sk -m 4 --connect-timeout 3 -o /dev/null -w '%{time_connect}' "https://$_dt:853/" 2>/dev/null)"
           awk -v t="${_tc:-0}" 'BEGIN{exit !(t+0>0)}' && : > "$_gd/dot.$_dt" ) &
     done
@@ -287,6 +351,12 @@ grant_verify(){
     [ -e "$_gd/net" ] && _gn=1; [ -e "$_gd/dns" ] && _gs=1; ls "$_gd"/dot.* >/dev/null 2>&1 && _gt=1
     rm -rf "$_gd"
     _gq=1; [ "$(uci -q get wiflow.core.grant_dot 2>/dev/null)" = 0 ] && _gq=0
+    _gk="$(num_or0 "$(state_get dot_skip_until)")"; [ "$_gk" -gt 0 ] && [ "$(uptime_s)" -lt "$_gk" ] && _gq=0
+    if [ "$_gt" = 1 ]; then state_set dot_fails 0
+    elif [ "$_gn" = 1 ] && [ "$_gs" = 1 ] && [ "$_gq" = 1 ]; then
+        _gf=$(( $(num_or0 "$(state_get dot_fails)") + 1 )); state_set dot_fails "$_gf"
+        [ "$_gf" -lt 2 ] || { state_set dot_skip_until $(( $(uptime_s) + 1800 )); state_set dot_fails 0; wlog portal 'DNS riêng tư (cổng 853) không đi được: tạm không yêu cầu trong 30 phút'; }
+    fi
     state_set grant_last "$(date +%s) net=$_gn dns=$_gs dot=$_gt" 2>/dev/null || true
     [ "$_gn" = 1 ] && [ "$_gs" = 1 ] && { [ "$_gt" = 1 ] || [ "$_gq" = 0 ]; } && return 0
     wlog portal "Không cấp mạng cho khách: Internet=$_gn DNS=$_gs DNS riêng tư=$_gt"
@@ -436,124 +506,18 @@ guest_sched_tick(){
     fi
 }
 sched_closed(){ [ -f "$SCHED_CLOSED" ]; }
-# Per-guest speed limit (kbit/s, 0 = no limit), policed per IP in nftables.
-guest_policy_apply(){
-    portal_nft_ready || return 0
-    _dn="$(cfg_num guest_down_kbps 0)"; _up="$(cfg_num guest_up_kbps 0)"; _au="$(cfg_num guest_auto 1)"; _sig="wf-shape:$_dn/$_up/$_au/c1"
-    _odn="$_dn"; _oup="$_up"
-    # Auto fair-share shapes with queues (the fixed speeds become the per-guest maximum): no policer then.
-    [ "$_au" = 1 ] && { _dn=0; _up=0; }
-    [ "${1:-}" != force ] && /usr/sbin/nft list chain $CAPTIVE_TABLE shape 2>/dev/null | grep -q "\"$_sig\"" && return 0
-    {
-        printf 'add set %s ncl { type ipv4_addr; flags dynamic,timeout; timeout 1m; size 1024; }\n' "$CAPTIVE_TABLE"
-        printf 'flush chain %s shape\n' "$CAPTIVE_TABLE"
-        # One phone cannot flood the router with new connections (port scans, P2P): only the
-        # first packet of a connection is looked at, normal browsing never gets near the rate.
-        printf 'add rule %s shape ct state new ip saddr 10.10.10.0/24 update @ncl { ip saddr limit rate over 500/second burst 1000 packets } drop\n' "$CAPTIVE_TABLE"
-        if [ "$_dn" -gt 0 ]; then _b=$((_dn / 8)); [ "$_b" -ge 32 ] || _b=32
-            printf 'add rule %s shape ip daddr 10.10.10.0/24 update @dl { ip daddr limit rate over %s kbytes/second burst %s kbytes } drop\n' "$CAPTIVE_TABLE" $((_dn / 8)) "$_b"; fi
-        if [ "$_up" -gt 0 ]; then _b=$((_up / 8)); [ "$_b" -ge 32 ] || _b=32
-            printf 'add rule %s shape ip saddr 10.10.10.0/24 update @ul { ip saddr limit rate over %s kbytes/second burst %s kbytes } drop\n' "$CAPTIVE_TABLE" $((_up / 8)) "$_b"; fi
-        printf 'add rule %s shape counter comment "%s"\n' "$CAPTIVE_TABLE" "$_sig"
-    } | /usr/sbin/nft -f - >/dev/null 2>&1 || return 1
-    if [ "$_au" = 1 ]; then guest_offload_policy 1 1; else guest_offload_policy "$_dn" "$_up"; fi
-    shaper_tick
-    return 0
-}
-# Auto fair-share: running only while enabled, not in safe mode and guests are online.
-SHAPER_PID=/tmp/wiflow-shaper.pid
-shaper_running(){ [ -f "$SHAPER_PID" ] && kill -0 "$(cat "$SHAPER_PID" 2>/dev/null)" 2>/dev/null; }
-shaper_stop(){ shaper_running || [ -f /tmp/wiflow-shaper ] || return 0; /usr/lib/wiflow/shaper stop >/dev/null 2>&1; return 0; }
-shaper_tick(){
-    if [ "$(cfg_num guest_auto 1)" != 1 ] || safe_mode_active || sched_closed; then shaper_stop; return 0; fi
-    shaper_running && return 0
-    [ "$(guest_authorized_count)" -gt 0 ] || return 0
-    _e="$(num_or0 "$(state_get shaper_err)")"; [ "$_e" -gt 0 ] && [ $(( $(uptime_s) - _e )) -lt 600 ] && return 0
-    ( setsid /usr/lib/wiflow/shaper run </dev/null >/dev/null 2>&1 & )
-    return 0
-}
-# Hardware/software flow offloading bypasses the limit: it is turned off while
-# a limit is set and given back (as it was) when the limit is removed.
-guest_offload_policy(){
-    [ -f /etc/config/firewall ] || return 0
-    _lim=0; { [ "$1" -gt 0 ] || [ "$2" -gt 0 ]; } && _lim=1
-    _cur="$(uci -q get 'firewall.@defaults[0].flow_offloading' 2>/dev/null || echo 0)"
-    _hw="$(uci -q get 'firewall.@defaults[0].flow_offloading_hw' 2>/dev/null || echo 0)"
-    _saved="$(uci -q get wiflow.core.saved_offload 2>/dev/null || true)"
-    if [ "$_lim" = 1 ] && [ "$_cur" = 1 ]; then
-        uci set "wiflow.core.saved_offload=$_cur$_hw"; uci commit wiflow >/dev/null 2>&1 || true
-        uci set 'firewall.@defaults[0].flow_offloading=0'; uci set 'firewall.@defaults[0].flow_offloading_hw=0'; uci commit firewall >/dev/null 2>&1 || true
-        /etc/init.d/firewall reload >/dev/null 2>&1 || true; wlog guest 'Tắt tăng tốc chuyển tiếp để giới hạn tốc độ khách chính xác'
-    elif [ "$_lim" = 0 ] && [ -n "$_saved" ]; then
-        uci set "firewall.@defaults[0].flow_offloading=$(printf '%s' "$_saved" | cut -c1)"; uci set "firewall.@defaults[0].flow_offloading_hw=$(printf '%s' "$_saved" | cut -c2)"; uci commit firewall >/dev/null 2>&1 || true
-        uci -q delete wiflow.core.saved_offload >/dev/null 2>&1 || true; uci commit wiflow >/dev/null 2>&1 || true
-        /etc/init.d/firewall reload >/dev/null 2>&1 || true; wlog guest 'Bật lại tăng tốc chuyển tiếp'
-    fi
-    return 0
-}
 guest_authorized_count(){ _n=0; for _f in "$CLIENT_SESSIONS"/*; do [ -f "$_f" ] || continue; IFS='|' read -r _a _b _c _d _e _au _g _h < "$_f" 2>/dev/null || continue; case "${_au:-0}" in ''|0|*[!0-9]*) :;; *) _n=$((_n+1));; esac; done; printf '%s' "$_n"; }
 guest_connected_count(){ _n=0; for _f in "$CLIENT_SESSIONS"/*; do [ -f "$_f" ] || continue; IFS='|' read -r _a _b _c _d _e _au _g _ab < "$_f" 2>/dev/null || continue; [ "$(num_or0 "$_ab")" = 0 ] && _n=$((_n+1)); done; printf '%s' "$_n"; }
-# Session time: after N minutes the guest sees the portal again (one confirm
-# opens the Internet for another N minutes). Only with a trusted clock.
-guest_session_expire(){
-    _min="$(cfg_num guest_session_min 0)"; [ "$_min" -gt 0 ] || return 0
-    time_valid || return 0
-    _now="$(date +%s)"; _lim=$((_min * 60)); _n=0
-    for _f in "$CLIENT_SESSIONS"/*; do
-        [ -f "$_f" ] || continue
-        IFS='|' read -r _mac _cid _sid _ip _cn _au _last _ab < "$_f" 2>/dev/null || continue
-        case "${_au:-0}" in ''|0|*[!0-9]*) continue;; esac
-        [ "$_au" -le "$_now" ] || continue
-        [ $((_now - _au)) -ge "$_lim" ] || continue
-        portal_nft_del "$_ip" "$_mac"
-        client_session_write "$_f" "$_mac" "$_cid" "$_sid" "$_ip" "$_cn" 0 "$_now" "$(num_or0 "$_ab")" || true
-        _n=$((_n+1))
-    done
-    [ "$_n" = 0 ] || wlog guest "$_n khách hết thời gian sử dụng, cần xác nhận lại"
-    return 0
-}
+# Session time (guest_session_min): sessions_sweep ends a session after N minutes; one confirm opens the Internet again.
 guest_full(){ _max="$(cfg_num guest_max 0)"; [ "$_max" -gt 0 ] || return 1; [ "$(guest_authorized_count)" -ge "$_max" ]; }
 
-# --- Statistics (RAM, last 48 hours, aggregated counts only) ------------------
-STATS=/tmp/wiflow-stats
-AUTH_TICKS=/tmp/wiflow-auth-ticks
-nft_counter_bytes(){ /usr/sbin/nft list chain $CAPTIVE_TABLE "$1" 2>/dev/null | sed -n "s/.*counter packets [0-9]* bytes \([0-9]*\) comment \"$2\".*/\1/p" | head -n1; }
-ping_ms(){ ping -c 1 -W 1 -q "${1:-1.1.1.1}" 2>/dev/null | sed -n 's#.*= [0-9.]*/\([0-9]*\)[.0-9]*/.*#\1#p' | head -n1; }
+# --- Statistics (RAM) ---------------------------------------------------------
+# v3.4: only the number of guests; WordPress gets the visits from the events.
 # Once a minute from portal-session-loop.
 stats_sample(){
-    _now="$(date +%s)"; _up="$(uptime_s)"; _hour=$((_now / 3600 * 3600))
-    _a="$(guest_authorized_count)"; _c="$(guest_connected_count)"
-    _rx="$(num_or0 "$(nft_counter_bytes forward guest-in)")"; _tx="$(num_or0 "$(nft_counter_bytes postrouting guest-out)")"
-    _prx="$(num_or0 "$(state_get stat_rx_total)")"; _ptx="$(num_or0 "$(state_get stat_tx_total)")"; _pup="$(num_or0 "$(state_get stat_at)")"
-    _drx=$((_rx - _prx)); [ "$_drx" -ge 0 ] || _drx="$_rx"; _dtx=$((_tx - _ptx)); [ "$_dtx" -ge 0 ] || _dtx="$_tx"
-    [ "$_pup" -gt 0 ] || { _drx=0; _dtx=0; }
-    _el=$((_up - _pup)); [ "$_el" -gt 0 ] || _el=60
-    state_set stat_rx_total "$_rx"; state_set stat_tx_total "$_tx"; state_set stat_at "$_up"
-    state_set stat_rx_bps $((_drx * 8 / _el)); state_set stat_tx_bps $((_dtx * 8 / _el))
-    _auth=0; [ -f "$AUTH_TICKS" ] && { _auth="$(wc -c < "$AUTH_TICKS" | tr -d ' ')"; : > "$AUTH_TICKS"; }
-    _p=''
-    # The auto fair-share controller already measures the delay every second: no extra ping then.
-    if shaper_running && [ -n "$(find /tmp/wiflow-shaper -mmin -1 2>/dev/null)" ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ "${6:-0}" -gt 0 ] 2>/dev/null && _p="$6"; fi
-    if [ -z "$_p" ] && [ "$(net_status_read | cut -d' ' -f1)" = 1 ]; then _p="$(ping_ms 1.1.1.1)"; [ -n "$_p" ] || _p="$(ping_ms 8.8.8.8)"; fi
-    state_set stat_ping "${_p:-}"
-    _pv="${_p:-0}"; _pn=0; [ -n "$_p" ] && _pn=1
-    [ -f "$STATS" ] || : > "$STATS"
-    awk -F'|' -v h="$_hour" -v a="$_a" -v n="$(num_or0 "$_auth")" -v rx="$_drx" -v tx="$_dtx" -v p="$_pv" -v pn="$_pn" '
-        $1==h {f=1; pk=($2>a?$2:a); printf "%s|%s|%.0f|%.0f|%.0f|%.0f|%.0f\n",h,pk,$3+n,$4+rx,$5+tx,$6+p,$7+pn; next}
-        {print}
-        END{ if(!f) printf "%s|%s|%.0f|%.0f|%.0f|%.0f|%.0f\n",h,a,n,rx,tx,p,pn }' "$STATS" | tail -n 48 > "$STATS.$$" && mv -f "$STATS.$$" "$STATS"
-    state_set clients_auth "$_a"; state_set clients_conn "$_c"
-    # One line per minute for the last 24 hours: time|ping|guests|uplink|ram%|load%|rx bytes
-    _mt="$(num_or0 "$(mem_kb MemTotal)")"; _ma="$(num_or0 "$(mem_kb MemAvailable)")"; _mp=0; [ "$_mt" -gt 0 ] && _mp=$(( (_mt - _ma) * 100 / _mt ))
-    _ld="$(awk '{printf "%d", $1*25}' /proc/loadavg 2>/dev/null)"; _ld="$(num_or0 "$_ld")"; [ "$_ld" -le 100 ] || _ld=100
-    _ul="$(uplink_active)"; [ "$(net_status_read | cut -d' ' -f1)" = 1 ] || _ul=none
-    printf '%s|%s|%s|%s|%s|%s|%s\n' "$_now" "${_p:-}" "$_a" "$_ul" "$_mp" "$_ld" "$_drx" >> "$MINUTES"
-    _ml="$(wc -l < "$MINUTES" 2>/dev/null | tr -d ' ')"; [ "$(num_or0 "$_ml")" -le 1500 ] || { tail -n 1440 "$MINUTES" > "$MINUTES.$$" && mv -f "$MINUTES.$$" "$MINUTES"; }
+    state_set clients_auth "$(guest_authorized_count)"; state_set clients_conn "$(guest_connected_count)"
     return 0
 }
-MINUTES=/tmp/wiflow-minutes
-# Last 3 hours for the heartbeat (WordPress keeps them; repeated hours replace).
-stats_json(){ [ -s "$STATS" ] || { printf '[]'; return; }; tail -n 3 "$STATS" | awk -F'|' 'BEGIN{printf "["} {if(NR>1)printf ","; printf "{\"hour\":%s,\"peak\":%s,\"auth\":%s,\"rx\":%s,\"tx\":%s,\"ping\":%d}",$1,$2,$3,$4,$5,($7>0?$6/$7:0)} END{printf "]"}'; }
 mem_kb(){ awk -v k="$1:" '$1==k{print $2;exit}' /proc/meminfo 2>/dev/null; }
 
 # --- Watchdog and safe mode ---------------------------------------------------
@@ -593,37 +557,29 @@ adstats_take(){
 adstats_ack(){ rm -f "$ADSTATS.sending"; }
 
 # --- Guest settings (local Setup and remote command share this) --------------
-# guest_settings_set DOWN UP SESSION MAX SCHED_ON FROM TO DAYS WEEK AUTO ; "" keeps a value.
+# guest_settings_set SESSION MAX SCHED_ON FROM TO DAYS WEEK ; "" keeps a value.
 guest_settings_set(){
-    _i=0
-    for _pair in "guest_down_kbps:$1:1000000" "guest_up_kbps:$2:1000000" "guest_session_min:$3:1440" "guest_max:$4:250"; do
-        _k="${_pair%%:*}"; _r="${_pair#*:}"; _v="${_r%%:*}"; _mx="${_r##*:}"
+    for _pair in "guest_session_min:$1:1440" "guest_max:$2:250"; do
+        _r="${_pair#*:}"; _v="${_r%%:*}"; _mx="${_r##*:}"
         [ -n "$_v" ] || continue
         case "$_v" in *[!0-9]*) return 2;; esac; [ "${#_v}" -le 7 ] && [ "$_v" -le "$_mx" ] || return 2
     done
-    case "${5:-}" in ''|0|1) :;; *) return 2;; esac
-    [ -z "${6:-}" ] || hm_to_min "$6" >/dev/null || return 2
-    [ -z "${7:-}" ] || hm_to_min "$7" >/dev/null || return 2
-    [ -z "${8:-}" ] || printf '%s' "$8" | grep -Eq '^[1-7]{1,7}$' || return 2
-    case "${9:-}" in ''|none) :;; *) sched_week_valid "$9" || return 2;; esac
-    case "${10:-}" in ''|0|1) :;; *) return 2;; esac
-    [ -n "$1" ] && uci set "wiflow.core.guest_down_kbps=$1"
-    [ -n "$2" ] && uci set "wiflow.core.guest_up_kbps=$2"
-    [ -n "$3" ] && uci set "wiflow.core.guest_session_min=$3"
-    [ -n "$4" ] && uci set "wiflow.core.guest_max=$4"
-    [ -n "${5:-}" ] && uci set "wiflow.core.sched_enabled=$5"
-    [ -n "${6:-}" ] && uci set "wiflow.core.sched_from=$6"
-    [ -n "${7:-}" ] && uci set "wiflow.core.sched_to=$7"
-    [ -n "${8:-}" ] && uci set "wiflow.core.sched_days=$(printf '%s' "$8" | awk '{for(i=1;i<=7;i++) if(index($0,i)) printf "%d", i}')"
-    case "${9:-}" in '') :;; none) uci -q delete wiflow.core.sched_week >/dev/null 2>&1 || true;; *) uci set "wiflow.core.sched_week=$9";; esac
-    [ -n "${10:-}" ] && uci set "wiflow.core.guest_auto=${10}"
+    case "${3:-}" in ''|0|1) :;; *) return 2;; esac
+    [ -z "${4:-}" ] || hm_to_min "$4" >/dev/null || return 2
+    [ -z "${5:-}" ] || hm_to_min "$5" >/dev/null || return 2
+    [ -z "${6:-}" ] || printf '%s' "$6" | grep -Eq '^[1-7]{1,7}$' || return 2
+    case "${7:-}" in ''|none) :;; *) sched_week_valid "$7" || return 2;; esac
+    [ -n "$1" ] && uci set "wiflow.core.guest_session_min=$1"
+    [ -n "$2" ] && uci set "wiflow.core.guest_max=$2"
+    [ -n "${3:-}" ] && uci set "wiflow.core.sched_enabled=$3"
+    [ -n "${4:-}" ] && uci set "wiflow.core.sched_from=$4"
+    [ -n "${5:-}" ] && uci set "wiflow.core.sched_to=$5"
+    [ -n "${6:-}" ] && uci set "wiflow.core.sched_days=$(printf '%s' "$6" | awk '{for(i=1;i<=7;i++) if(index($0,i)) printf "%d", i}')"
+    case "${7:-}" in '') :;; none) uci -q delete wiflow.core.sched_week >/dev/null 2>&1 || true;; *) uci set "wiflow.core.sched_week=$7";; esac
     uci commit wiflow || return 1
     secure_configs
-    [ -z "${10:-}" ] || state_set shaper_err ''
-    shaper_stop
-    guest_policy_apply force >/dev/null 2>&1 || true
     guest_sched_tick >/dev/null 2>&1 || true
-    wlog guest "Cài đặt khách: tốc độ $(cfg_num guest_down_kbps 0)/$(cfg_num guest_up_kbps 0) kbps, thời gian $(cfg_num guest_session_min 0) phút, tối đa $(cfg_num guest_max 0), giờ phục vụ $(uci -q get wiflow.core.sched_enabled 2>/dev/null || echo 0)"
+    wlog guest "Cài đặt khách: thời gian $(cfg_num guest_session_min 0) phút, tối đa $(cfg_num guest_max 0), giờ phục vụ $(uci -q get wiflow.core.sched_enabled 2>/dev/null || echo 0)"
     return 0
 }
 
@@ -636,27 +592,21 @@ secure_configs(){ [ -f /etc/config/wiflow ] && chmod 600 /etc/config/wiflow 2>/d
 net_link_up(){ ip route show default 2>/dev/null | grep -q default; }
 # The agent keeps the clock state in /tmp/wiflow/st (NTP hotplug or WordPress time).
 time_valid(){ [ "$(cat /tmp/wiflow/st/time_ok 2>/dev/null)" = true ] || [ "$(state_get wp_time_ok)" = 1 ]; }
-# Which uplink carries the traffic: lan (a cable/WAN device), wifi (apcli*) or none.
-uplink_active(){
-    _rd="$(ip route get 1.1.1.1 2>/dev/null | head -n1 | sed -n 's/.* dev \([^ ]*\).*/\1/p')"
-    [ -n "$_rd" ] || { printf none; return 0; }
-    case "$_rd" in apcli*) printf wifi;; *) printf lan;; esac
+# What the guest portal is doing: on (captive rules in force), plan (usage plan ended), safe (safe mode), nocontent
+# (nothing synced yet) or off. Guests have the Internet without the portal in every state but "on".
+portal_state_name(){
+    plan_locked && { printf plan; return; }
+    safe_mode_active && { printf safe; return; }
+    [ -f "$PORTAL_ACTIVE/portal.json" ] || { printf nocontent; return; }
+    portal_nft_ready && { printf on; return; }
+    printf off
 }
 portal_health_json(){
-    _sa=0; _sl=0; _su=0; _sn=0; _sx=0; _sr=0; _ss=off
-    if [ "$(cfg_num guest_auto 1)" = 1 ]; then _sa=1; _ss=waiting
-        if shaper_running && [ -f /tmp/wiflow-shaper ]; then set -- $(cat /tmp/wiflow-shaper 2>/dev/null); [ $# -ge 9 ] && { _sl="$2"; _su="$3"; _sn="$4"; _sx="$5"; _sr="$6"; _ss="$9"; }; fi
-    fi
-    _lp=idle; _ld=0; _lu=0; _lr=0
-    set -- $(/usr/lib/wiflow/speedtest status 2>/dev/null); [ $# -ge 4 ] && { _lp="$1"; _ld="$(num_or0 "$2")"; _lu="$(num_or0 "$3")"; _lr="$(num_or0 "$4")"; }
     _sm=false; safe_mode_active && _sm=true; _tv=false; time_valid && _tv=true; _sc=false; sched_closed && _sc=true
     _se=false; [ "$(uci -q get wiflow.core.sched_enabled 2>/dev/null)" = 1 ] && _se=true
-    printf '{"clients_now":%s,"clients_connected":%s,"rx_bps":%s,"tx_bps":%s,"ping_ms":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_down_kbps":%s,"guest_up_kbps":%s,"guest_session_min":%s,"guest_max":%s,"auto_share":%s,"auto_state":"%s","speed_limit_down":%s,"speed_limit_up":%s,"speed_down":%s,"speed_up":%s,"speed_rtt":%s,"line_state":"%s","line_down":%s,"line_up":%s,"line_rtt":%s,"line_at":%s}' \
-        "$(num_or0 "$(state_get clients_auth)")" "$(num_or0 "$(state_get clients_conn)")" \
-        "$(num_or0 "$(state_get stat_rx_bps)")" "$(num_or0 "$(state_get stat_tx_bps)")" "$(num_or0 "$(state_get stat_ping)")" "$(num_or0 "$(state_get wd_restarts)")" \
-        "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_down_kbps 0)" "$(cfg_num guest_up_kbps 0)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)" \
-        "$_sa" "$_ss" "$(num_or0 "$_sl")" "$(num_or0 "$_su")" "$(num_or0 "$_sn")" "$(num_or0 "$_sx")" "$(num_or0 "$_sr")" \
-        "$_lp" "$_ld" "$_lu" "$_lr" "$(cfg_num st_at 0)"
+    printf '{"clients_now":%s,"clients_connected":%s,"watchdog_restarts":%s,"safe_mode":%s,"time_ok":%s,"sched_closed":%s,"sched_enabled":%s,"sched_week":"%s","guest_session_min":%s,"guest_max":%s,"portal_state":"%s"}' \
+        "$(num_or0 "$(state_get clients_auth)")" "$(num_or0 "$(state_get clients_conn)")" "$(num_or0 "$(state_get wd_restarts)")" \
+        "$_sm" "$_tv" "$_sc" "$_se" "$(sched_week_effective)" "$(cfg_num guest_session_min 0)" "$(cfg_num guest_max 0)" "$(portal_state_name)"
 }
 # One place that turns the guest portal on: a valid content snapshot is on the router and
 # safe mode is not active -> flag on + captive rules. Safe to call again and again.

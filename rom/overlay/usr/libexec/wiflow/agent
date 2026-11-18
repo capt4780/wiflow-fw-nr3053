@@ -35,11 +35,7 @@ function wan_carrier() {
 }
 
 function internet_tick() {
-	// The auto fair-share controller pings every second: reuse its delay instead of a second probe.
-	const sh = split(trim(readfile('/tmp/wiflow-shaper') ?? ''), ' ');
-	const shp = trim(readfile('/tmp/wiflow-shaper.pid') ?? '');
-	const sms = length(sh) >= 9 && match(shp, /^[0-9]+$/) && access(`/proc/${shp}`) && time() - (stat('/tmp/wiflow-shaper')?.mtime ?? 0) <= 5 ? +sh[5] : 0;
-	const ms = W.has_default_route() ? (sms > 0 ? sms : W.probe_ms(4)) : -1;
+	const ms = W.has_default_route() ? W.probe_ms(4) : -1;
 	const online = ms >= 0;
 	const prev = W.st_get('online', false);
 	if (online && !prev) W.st_set('online_since', W.uptime());
@@ -169,7 +165,7 @@ function health(online, extra) {
 		boot_reason: W.st_get('boot_reason', 'power_or_manual'), recovery_stage: W.st_get('recovery', {}).stage ?? 0,
 		recovery_reboots: W.num(W.core('recovery_reboots', '0'), 0)
 	};
-	// Guest portal numbers (authorized guests, speed, safe mode, opening hours).
+	// Guest portal numbers (authorized guests, safe mode, opening hours, portal state).
 	for (let k, v in extra ?? {})
 		h[k] = v;
 	return h;
@@ -242,15 +238,8 @@ function run_command(cmd, online) {
 		result(id, action, ok ? 'success' : 'failed', ok ? 'The diagnostics report was sent' : 'The diagnostics report could not be sent');
 		break;
 	}
-	case 'speedtest': {
-		// Measure the Internet line now; the result goes up with the next heartbeat.
-		const r = W.speedtest_start();
-		result(id, action, r.ok ? 'success' : 'failed', r.ok ? 'The speed test started' : 'The speed test could not start');
-		W.kick_agent();
-		break;
-	}
 	case 'guest_settings': {
-		// Speed limit, session time, maximum guests and opening hours (set in WordPress).
+		// Session time, maximum guests and opening hours (set in WordPress).
 		writefile(`${W.RUN}/guest-settings.json`, sprintf('%J', cmd.payload ?? {}));
 		const ok = W.run(`/usr/lib/wiflow/portal-hb guest-settings ${W.RUN}/guest-settings.json`).code == 0;
 		result(id, action, ok ? 'success' : 'failed', ok ? 'Guest WiFi settings applied' : 'Guest WiFi settings are not valid');

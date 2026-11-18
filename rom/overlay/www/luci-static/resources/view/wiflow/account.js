@@ -113,7 +113,7 @@ return view.extend({
 		if (!w.paired) st = chip('warn', _('Not updated'));
 		else if (p.state == 'plan') st = chip('warn', _('Plan ended'));
 		else if (p.state == 'on') st = chip('ok', _('Up to date'));
-		else if (p.state == 'safe') st = chip('warn', _('Paused'));
+		else if (p.state == 'safe' || p.state == 'off') st = chip('warn', _('Paused'));
 		else if (p.state == 'syncing') st = chip('warn', _('Updating'));
 		else if (p.state == 'error') st = chip('warn', _('Content not received'));
 		else st = chip('warn', _('Not updated'));

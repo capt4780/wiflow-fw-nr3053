@@ -71,10 +71,10 @@ bad="$($B x env REMOTE_ADDR=10.10.10.99 REQUEST_METHOD=POST QUERY_STRING="action
 expect "guest: another phone cannot use this session" "$bad" '403'
 $B x $PC revoke-session "$sid"; $B x $PC is-authorized "$sid" && fail "revoke did not remove" || pass "guest: revoke closes the Internet again"
 
-# Settings from WordPress: speed limit stays 0 (shared equally), session time and guest limit
-wp "s['commands']=[{'id':'g1','action':'guest_settings','payload':{'down_kbps':0,'up_kbps':0,'session_min':60,'max':20}}]"
+# Settings from WordPress: session time and guest limit (speed settings of older plugins are ignored)
+wp "s['commands']=[{'id':'g1','action':'guest_settings','payload':{'down_kbps':5000,'up_kbps':0,'auto_share':True,'session_min':60,'max':20}}]"
 for i in $(seq 1 30); do [ "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('g1',{}).get('status',''))")" = success ] && break; sleep 2; done
-expect "settings: guest_settings command applied" "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('g1',{}).get('status',''))")|$(U get wiflow.core.guest_session_min)|$(U get wiflow.core.guest_max)|$(U get wiflow.core.guest_down_kbps || echo 0)" '^success\|60\|20\|0?$'
+expect "settings: guest_settings command applied" "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('g1',{}).get('status',''))")|$(U get wiflow.core.guest_session_min)|$(U get wiflow.core.guest_max)|$(U get wiflow.core.guest_down_kbps || echo none)|$(U get wiflow.core.guest_auto || echo none)" '^success\|60\|20\|none\|none$'
 
 # Guest WiFi name from WordPress: every guest radio gets the new name, a bad one is refused
 $B x sh -c "uci -q get wireless.wfgap >/dev/null || { uci set wireless.wfgap=wifi-iface; uci set wireless.wfgap.device=MT7981_1_1; uci set wireless.wfgap.mode=ap; uci set wireless.wfgap.network=guest; uci set wireless.wfgap.ssid=Wiflow; uci commit wireless; }"
@@ -85,26 +85,6 @@ expect "guest name: renamed from WordPress" "$(rs n1)|$($B x uci get wireless.wf
 wp "s['commands']=[{'id':'n2','action':'guest_ssid','payload':{'ssid':'0123456789012345678901234567890123456789'}}]"
 for i in $(seq 1 30); do [ "$(rs n2)" = failed ] && break; sleep 2; done
 expect "guest name: a name over 32 bytes is refused and the old one stays" "$(rs n2)|$($B x uci get wireless.wfgap.ssid)" '^failed\|Quán Cà Phê A$'
-
-# Line speed test (a mock speed server stands in for the Internet): started from WordPress
-$B x setsid python3 "$T/speedsrv.py" 8098 >/tmp/mock/speed.log 2>&1 &
-sleep 1
-U set wiflow.core.speedtest_base=http://127.0.0.1:8098; U commit wiflow
-expect "speedtest: nothing measured yet" "$(st "s['speed']['line']['phase']")" '^idle$'
-wp "s['commands']=[{'id':'st1','action':'speedtest'}]"
-for i in $(seq 1 30); do [ "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('st1',{}).get('status',''))")" = success ] && break; sleep 2; done
-expect "speedtest: command from WordPress started it" "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('st1',{}).get('status',''))")" '^success$'
-for i in $(seq 1 40); do [ "$(st "s['speed']['line']['phase']")" = done ] && break; sleep 1; done
-expect "speedtest: result (down, up, latency) in status and stored in the config" "$(st "(s['speed']['line']['phase'], s['speed']['line']['down'] > 1000, s['speed']['line']['up'] > 1000, s['speed']['line']['running'])")|$(U get wiflow.core.st_down | awk '$1>1000{print "ok"}')|$(U get wiflow.core.st_up | awk '$1>1000{print "ok"}')" "^\\('done', True, True, False\\)\\|ok\\|ok$"
-expect "speedtest: result goes up with the health numbers" "$($B x /usr/lib/wiflow/portal-hb report | python3 -c "import json,sys; h=json.load(sys.stdin)['health']; print(h['line_state'], h['line_down']>1000, h['line_up']>1000)")" '^done True True$'
-rm -f /tmp/mock/wp-hb.json
-expect "speedtest: from the router page (rpc), one at a time" "$(call speedtest | tr -d ' \n\t')|$(call speedtest | tr -d ' \n\t')" '^\{"ok":true,"running":true\}\|\{"ok":true,"running":true\}$'
-for i in $(seq 1 40); do [ "$(st "s['speed']['line']['running']")" = False ] && break; sleep 1; done
-expect "speedtest: the second run finished" "$(st "(s['speed']['line']['running'], s['speed']['line']['phase'])")" "^\\(False, 'done'\\)$"
-U set wiflow.core.speedtest_base=http://127.0.0.1:1; U commit wiflow
-$B x /usr/lib/wiflow/speedtest run
-expect "speedtest: no Internet / server -> failed, the last good result is kept" "$(st "s['speed']['line']['phase']")|$(U get wiflow.core.st_down | awk '$1>1000{print "kept"}')" '^failed\|kept$'
-U delete wiflow.core.speedtest_base; U commit wiflow
 
 # What WordPress received: guest events and numbers, no guest personal data
 sleep 8
@@ -167,7 +147,7 @@ $B x nft list set inet wiflow_captive authed >/dev/null 2>&1 && pass "self-repai
 rules="$($B x nft list ruleset)"
 expect "Private DNS: DoT (853) passes for guests, web (80) goes to the portal, the rest is rejected until the confirm" "$(printf '%s' "$rules" | grep -c 'dport 853 accept')|$(printf '%s' "$rules" | grep -c 'redirect to :2080')|$(printf '%s' "$rules" | grep -c 'reject')" '^2\|1\|[1-9]'
 
-. "$T/shaper-test.sh"
+. "$T/session-test.sh"
 
 # Leaving the account clears everything
 r="$(job unpair)"

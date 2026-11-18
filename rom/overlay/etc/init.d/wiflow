@@ -25,8 +25,3 @@ start_service() {
 
 	( /usr/lib/wiflow/portal-boot ) </dev/null >/dev/null 2>&1 &
 }
-
-# Clean stop / reboot: keep the authorized guests for the next start.
-stop_service() {
-	( . /usr/lib/wiflow/common.sh; session_snapshot ) >/dev/null 2>&1 || true
-}

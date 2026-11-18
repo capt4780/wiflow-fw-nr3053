@@ -38,19 +38,27 @@ ensure)
         [ -n "${sid:-}" ] || rm -f "$f"
     fi
     if [ ! -f "$f" ]; then
-        cid="$(client_id_for_mac "$mac")"; sid="$(new_token | cut -c1-24)"; connected="$now"; authorized=0
-        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0 || exit 1
-        event_enqueue connected "$cid" "$sid" "$now" || true
+        session_open "$mac" "$ip" >/dev/null || exit 1
+        IFS='|' read -r _mac cid sid _oi _cn _au _l _ab < "$f" 2>/dev/null || exit 1
         log_client_event connected "$sid" ok
     else
         if [ "${authorized:-0}" != 0 ]; then
-            # Add the new IP before removing the old one: no access gap.
-            if ! portal_nft_add "$ip" "$mac"; then log_client_event policy_restore_failed "$sid" nft; fi
-            [ -z "$oldip" ] || [ "$oldip" = "$ip" ] || portal_nft_del "$oldip" "$mac"
+            # v3.4: the firewall set is the truth. Same address and still in the set: nothing to do. A new address
+            # (the phone got another lease): move the entry (add the new one before removing the old, no gap). Not in
+            # the set any more (silent for too long): the authorization has ended, report it once.
+            if portal_nft_pair_authorized "$ip" "$mac"; then :
+            elif [ -n "$oldip" ] && [ "$oldip" != "$ip" ] && portal_nft_pair_authorized "$oldip" "$mac" && portal_nft_add "$ip" "$mac"; then
+                portal_nft_del "$oldip" "$mac"
+            else
+                guest_gone "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$now" "$now"
+                authorized=0; absent="$now"
+            fi
         fi
+        # Back after the access had ended: a new visit with the same session.
+        if [ "${absent:-0}" != 0 ] && [ "${authorized:-0}" = 0 ]; then event_enqueue connected "$cid" "$sid" "$now" || true; absent=0; fi
         # Re-read: a confirm may have authorized this guest a moment ago.
         IFS='|' read -r _m _c _s _i _cn authorized _l _ab < "$f" 2>/dev/null || true
-        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" 0 || exit 1
+        client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "${authorized:-0}" "$now" "${absent:-0}" || exit 1
     fi
     printf '%s|%s\n' "$cid" "$sid"
     ;;
@@ -66,15 +74,17 @@ authorize-session)
     valid_guest_ip "$ip" || { log_client_event authorize_failed "$sid" invalid_ip; exit 1; }
     # v1.0.26: outside opening hours (exit 7) / all places taken (exit 6).
     sched_closed && { log_client_event authorize_failed "$sid" closed; exit 7; }
+    # v3.4: only the firewall set says who is authorized; a session flag the set no longer backs counts as not authorized.
+    case "${authorized:-0}" in ''|0) :;; *) portal_nft_pair_authorized "$ip" "$mac" || authorized=0;; esac
     case "${authorized:-0}" in ''|0) guest_full && { log_client_event authorize_failed "$sid" full; exit 6; };; esac
     # v3.1: a new guest is only let in when the way out works (Internet, DNS, private DNS); nothing is stored otherwise.
     case "${authorized:-0}" in ''|0) grant_verify || { log_client_event authorize_failed "$sid" verify; exit 8; };; esac
-    printf 'add element %s authed { %s . %s timeout 30d }\n' "$CAPTIVE_TABLE" "$ip" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
+    printf 'add element %s authed { %s . %s timeout %ss }\n' "$CAPTIVE_TABLE" "$ip" "$mac" "$(guest_idle_secs)" | /usr/sbin/nft -f - >/dev/null 2>&1 || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
     now="$(date +%s)"; newly=0
     case "${authorized:-0}" in ''|0) authorized="$now"; newly=1;; esac
     client_session_write "$f" "$mac" "$cid" "$sid" "$ip" "$connected" "$authorized" "$now" 0 || true
     # Bookkeeping after the grant, detached so the reply is not held back.
-    ( [ "$newly" = 0 ] || { event_enqueue authorized "$cid" "$sid" "$now"; printf . >> "$AUTH_TICKS"; }; : > "$HEARTBEAT_KICK"; log_client_event authorized "$sid" granted ) </dev/null >/dev/null 2>&1 &
+    ( [ "$newly" = 0 ] || event_enqueue authorized "$cid" "$sid" "$now"; : > "$HEARTBEAT_KICK"; log_client_event authorized "$sid" granted ) </dev/null >/dev/null 2>&1 &
     exit 0
     ;;
 revoke-session)

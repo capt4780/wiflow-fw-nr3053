@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.3';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.4';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -195,7 +195,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '3.3';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '3.4';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -319,68 +319,11 @@ function portal_state() {
 	const pend = num(core('plan_expires', '0'), 0);
 	if (core('plan_active', '1') == '0' || (pend > 0 && time() >= pend && (trim(readfile('/tmp/wiflow/st/time_ok') ?? '') == 'true' || !!match(st, /(^|\n)wp_time_ok=1/)))) state = 'plan';
 	else if (safe) state = 'safe';
-	else if (core('portal_enabled', '0') == '1') state = 'on';
+	else if (access('/tmp/wiflow-portal-on')) state = 'on';
+	else if (core('portal_enabled', '0') == '1' && access('/www-wiflow-portal/runtime/active/portal.json')) state = 'off';
 	else if (core('portal_sync_status') == 'syncing') state = 'syncing';
 	else if (core('portal_sync_status') == 'failed') state = 'error';
 	return { state: state, revision: rev, error: core('portal_sync_error', ''), network: net, mode: portal_mode(), content_name: portal_content_name() };
-};
-
-// Guest speed (auto fair-share): the controller writes one line each second to RAM.
-// "tick dn_limit up_limit dn_now up_now rtt base guests state" (kbit/s, ms).
-export function linetest() {
-	const pid = trim(readfile('/tmp/wiflow-speedtest.pid') ?? '');
-	const run_ = match(pid, /^[0-9]+$/) && access(`/proc/${pid}`);
-	const f = split(trim(readfile('/tmp/wiflow-speedtest') ?? ''), ' ');
-	let phase = 'idle', down = 0, up = 0, rtt = 0;
-	if (length(f) >= 4 && (run_ || f[0] == 'done' || f[0] == 'failed')) {
-		phase = f[0]; down = num(f[1], 0); up = num(f[2], 0); rtt = num(f[3], 0);
-		if (run_ && (phase == 'done' || phase == 'failed'))
-			phase = 'ping';
-	} else if (num(core('st_down', '0'), 0) > 0 || num(core('st_up', '0'), 0) > 0) {
-		phase = 'done'; down = num(core('st_down', '0'), 0); up = num(core('st_up', '0'), 0); rtt = num(core('st_rtt', '0'), 0);
-	}
-	return { phase: phase, running: !!run_, down: down, up: up, rtt: rtt, at: num(core('st_at', '0'), 0) };
-};
-
-// Measure the Internet line now (the router downloads and uploads from a speed server).
-export function speedtest_start() {
-	if (linetest().running)
-		return { ok: true, running: true };
-	run('(setsid /usr/lib/wiflow/speedtest run </dev/null >/dev/null 2>&1 &)');
-	return { ok: true, running: true };
-};
-
-// Fixed speed per guest (Mbit/s as kbit/s), used while the automatic balance is off.
-export function set_limits(down, up) {
-	const ok_ = v => type(v) == 'int' && v >= 0 && v <= 1000000;
-	if (!ok_(down) || !ok_(up))
-		return { ok: false, error: 'The speed is not valid.' };
-	const r = run(`. /usr/lib/wiflow/common.sh; guest_settings_set '${down}' '${up}'`);
-	return { ok: r.code == 0 };
-};
-
-export function speed() {
-	const auto = core('guest_auto', '1') == '1';
-	const f = split(trim(readfile('/tmp/wiflow-shaper') ?? ''), ' ');
-	const pid = trim(readfile('/tmp/wiflow-shaper.pid') ?? '');
-	const live = length(f) >= 9 && match(pid, /^[0-9]+$/) && access(`/proc/${pid}`);
-	return {
-		auto: auto,
-		active: auto && live,
-		fixed_down: num(core('guest_down_kbps', '0'), 0),
-		fixed_up: num(core('guest_up_kbps', '0'), 0),
-		down_limit: live ? num(f[1], 0) : 0, up_limit: live ? num(f[2], 0) : 0,
-		down_now: live ? num(f[3], 0) : 0, up_now: live ? num(f[4], 0) : 0,
-		rtt: live ? num(f[5], 0) : 0, guests: live ? num(f[7], 0) : 0,
-		state: live ? f[8] : (auto ? 'waiting' : 'off'),
-		line: linetest()
-	};
-};
-
-// Switch auto fair-share on or off (same path as the WordPress command).
-export function set_auto(on) {
-	const r = run(`. /usr/lib/wiflow/common.sh; guest_settings_set '' '' '' '' '' '' '' '' '' ${on ? 1 : 0}`);
-	return { ok: r.code == 0 };
 };
 
 export function status() {
@@ -412,7 +355,6 @@ export function status() {
 			recovery_reboots: num(core('recovery_reboots', '0'), 0),
 			guest_max: num(core('guest_max', '0'), 0)
 		},
-		speed: speed(),
 		metrics: st.metrics ?? {},
 		clients: st.clients ?? { now: 0, today: 0, band2g: 0, band5g: 0 },
 		networks: st.networks ?? [],
