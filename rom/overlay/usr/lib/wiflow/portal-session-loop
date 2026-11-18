@@ -14,6 +14,7 @@ while true; do
     # the periodic check). Link loss is seen at once without network traffic;
     # while offline the check repeats every 5 s so guests get Internet back fast.
     net_maintain
+    net_down_tick
     # v1.0.26: opening hours + session time every 30 s, statistics every minute.
     tick=$((tick+1))
     if [ $((tick % 6)) = 0 ]; then

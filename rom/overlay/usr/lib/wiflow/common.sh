@@ -260,6 +260,65 @@ net_check_now(){
     fi
     net_status_write 0; return 1
 }
+# v3.1: run a command for at most $1 seconds (no dependency on a timeout applet); 124 when it was stopped.
+run_limited(){
+    _rs="$1"; shift; "$@" & _rp=$!; _ri=0
+    while kill -0 "$_rp" 2>/dev/null; do
+        _ri=$((_ri+1)); [ "$_ri" -le $((_rs*5)) ] || { kill "$_rp" 2>/dev/null; wait "$_rp" 2>/dev/null; return 124; }
+        sleep 0.2 2>/dev/null || sleep 1
+    done
+    wait "$_rp"
+}
+# v3.1: a guest is only let in (and remembered) when the way out really works:
+# the router's Internet, DNS through the router, and private DNS (DoT, port 853).
+# The three checks run together, about 4 s at most. wiflow.core.grant_dot=0 stops requiring DoT.
+grant_verify(){
+    _gd="/tmp/wiflow-grant.$$"; rm -rf "$_gd"; mkdir -p "$_gd" 2>/dev/null || return 0
+    set -- $(net_status_read)
+    if [ "$1" = 1 ] && [ "$2" -lt 10 ]; then : > "$_gd/net"
+    else ( net_check_now >/dev/null 2>&1 && : > "$_gd/net" ) & fi
+    ( run_limited 3 nslookup connectivitycheck.gstatic.com 127.0.0.1 >/dev/null 2>&1 && : > "$_gd/dns" ) &
+    for _dt in 1.1.1.1 8.8.8.8; do
+        ( _tc="$(curl -sk -m 4 --connect-timeout 3 -o /dev/null -w '%{time_connect}' "https://$_dt:853/" 2>/dev/null)"
+          awk -v t="${_tc:-0}" 'BEGIN{exit !(t+0>0)}' && : > "$_gd/dot.$_dt" ) &
+    done
+    wait
+    _gn=0; _gs=0; _gt=0
+    [ -e "$_gd/net" ] && _gn=1; [ -e "$_gd/dns" ] && _gs=1; ls "$_gd"/dot.* >/dev/null 2>&1 && _gt=1
+    rm -rf "$_gd"
+    _gq=1; [ "$(uci -q get wiflow.core.grant_dot 2>/dev/null)" = 0 ] && _gq=0
+    state_set grant_last "$(date +%s) net=$_gn dns=$_gs dot=$_gt" 2>/dev/null || true
+    [ "$_gn" = 1 ] && [ "$_gs" = 1 ] && { [ "$_gt" = 1 ] || [ "$_gq" = 0 ]; } && return 0
+    wlog portal "Không cấp mạng cho khách: Internet=$_gn DNS=$_gs DNS riêng tư=$_gt"
+    return 1
+}
+# v3.1: the router lost its Internet for good: every guest must sign in again.
+guest_revoke_all(){
+    [ -n "$(ls "$CLIENT_SESSIONS" 2>/dev/null)" ] || { /usr/sbin/nft flush set $CAPTIVE_TABLE authed >/dev/null 2>&1 || true; return 0; }
+    for _f in "$CLIENT_SESSIONS"/*; do
+        [ -f "$_f" ] || continue
+        IFS='|' read -r _m _c _s _i _cn _au _l _ab < "$_f" 2>/dev/null || continue
+        [ "${_au:-0}" != 0 ] || continue
+        client_session_write "$_f" "$_m" "$_c" "$_s" "$_i" "$_cn" 0 "$(date +%s)" "${_ab:-0}" || true
+    done
+    /usr/sbin/nft flush set $CAPTIVE_TABLE authed >/dev/null 2>&1 || true
+    wlog portal "Mất Internet quá lâu: khách phải đăng nhập lại portal"
+}
+# v3.1: called every 5 s with the background check: Internet gone for 60 s -> guests sign in again.
+NET_DOWN_SINCE=/tmp/wiflow-net-down-since
+net_down_tick(){
+    set -- $(net_status_read)
+    if [ "$1" = 0 ]; then
+        [ -f "$NET_DOWN_SINCE" ] || date +%s > "$NET_DOWN_SINCE"
+        read -r _ds _dr < "$NET_DOWN_SINCE" 2>/dev/null || return 0
+        case "$_ds" in ''|*[!0-9]*) return 0;; esac
+        if [ $(( $(date +%s) - _ds )) -ge "${NET_DOWN_REVOKE:-60}" ] && [ "${_dr:-}" != done ]; then
+            portal_nft_ready && guest_revoke_all
+            printf '%s done\n' "$_ds" > "$NET_DOWN_SINCE"
+        fi
+    elif [ "$1" = 1 ]; then rm -f "$NET_DOWN_SINCE"; fi
+    return 0
+}
 ms_now(){ awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null; }
 # Last timing lines for /cgi-bin/diag (own files, no lock).
 timing_write(){ _tt="/tmp/wiflow-timing-$1.$$"; printf '%s\n' "$2" > "$_tt" 2>/dev/null && mv -f "$_tt" "/tmp/wiflow-timing-$1" 2>/dev/null; }

@@ -115,6 +115,34 @@ t=json.dumps(hb).upper()
 ev=sorted({e['event_type'] for h in hb for e in h.get('events',[])})
 print(ev, max(h.get('active_portal_revision',0) for h in hb), '$mac1' in t, '$ip1' in t, 'GUEST-PHONE' in t)")" "^\\['authorized', 'connected'.*\\] 7 False False False$"
 
+# v3.1: a guest is only let in (and remembered) when the way out really works.
+mac3=A4:83:E7:33:44:55; ip3=10.10.10.77
+printf '1999999999 %s %s guest-three *\n' "$(echo $mac3 | tr A-F a-f)" "$ip3" >> /tmp/dhcp.leases
+out3="$($B x $PC ensure $ip3)"; sid3="${out3#*|}"; cid3="${out3%%|*}"
+$B x env REMOTE_ADDR=$ip3 REQUEST_METHOD=POST QUERY_STRING="action=guest&session_id=$sid3&name=Tran%20Thi%20Binh&phone=0912000111" /www-wiflow-portal/cgi-bin/portal >/dev/null
+$B world 'w["block_dot"]=True'
+code="$($B x env REMOTE_ADDR=$ip3 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid3" /www-wiflow-portal/cgi-bin/portal | head -n1)"
+expect "grant check: private DNS (853) blocked -> 503, the guest is not let in" "$code" '503'
+$B x $PC is-authorized "$sid3" && fail "grant check: guest authorized although DoT is blocked" || pass "grant check: no Internet and no authed entry after a failed check"
+expect "grant check: nothing remembered or sent for a guest who was not let in" "$(cat /etc/wiflow/guests.known 2>/dev/null | grep -c "$cid3")|$(cat /tmp/wiflow-guests.queue 2>/dev/null | grep -c 'Tran Thi Binh')" '^0\|0$'
+$B world 'w["block_dot"]=False; w["block_dns"]=True'
+code="$($B x env REMOTE_ADDR=$ip3 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid3" /www-wiflow-portal/cgi-bin/portal | head -n1)"
+expect "grant check: DNS through the router broken -> 503" "$code" '503'
+$B world 'w["block_dns"]=False'
+code="$($B x env REMOTE_ADDR=$ip3 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid3" /www-wiflow-portal/cgi-bin/portal | head -n1)"
+expect "grant check: everything works -> 204, the guest is let in" "$code" '204'
+$B x $PC is-authorized "$sid3" && pass "grant check: guest authorized after a good check" || fail "grant check: guest not authorized after a good check"
+for i in $(seq 1 15); do grep -q "$cid3" /etc/wiflow/guests.known 2>/dev/null && break; sleep 1; done
+expect "grant check: the form data is remembered and sent only after the grant" "$(grep -c "$cid3" /etc/wiflow/guests.known 2>/dev/null)|$(grep -c 'Tran Thi Binh' /tmp/wiflow-guests.queue /tmp/mock/wp/heartbeat.jsonl 2>/dev/null | awk -F: '{s+=$2} END{print (s>0)?"sent":"missing"}')" '^1\|sent$'
+# Internet gone for good: every guest has to sign in again
+$B world 'w["inet"].update({k: False for k in w["inet"]})'
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 0; echo $(( $(date +%s) - 120 )) > /tmp/wiflow-net-down-since; net_down_tick'
+$B x $PC is-authorized "$sid3" && fail "Internet lost for 60 s: guest still authorized" || pass "Internet lost for 60 s: guests have to sign in again"
+expect "Internet lost for 60 s: the authed list is empty" "$($B x nft list set inet wiflow_captive authed | grep -c 'elements')" '^0$'
+$B world 'w["inet"].update({k: True for k in w["inet"]})'
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 1; net_down_tick'
+[ ! -f /tmp/wiflow-net-down-since ] && pass "Internet back: the outage timer is cleared" || fail "outage timer not cleared"
+
 # Safe mode: portal off, guests have Internet, comes back after
 $B x sh -c '. /usr/lib/wiflow/common.sh; safe_mode_enter'
 $B x nft list table inet wiflow_captive >/dev/null 2>&1 && fail "safe mode: captive rules still on" || pass "safe mode: captive rules removed (fail-open)"

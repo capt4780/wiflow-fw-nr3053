@@ -16,4 +16,11 @@ if 'connectivitycheck' in url or 'detectportal' in url:
     if 'generate_204' in url:
         sys.stdout.write('204' if ok else '000'); sys.exit(0 if ok else 7)
     sys.stdout.write('success\n' if ok else ''); sys.exit(0 if ok else 7)
+if ':853' in url:
+    # private DNS (DoT) probe: connects only while the mock world has Internet on the default route
+    r = subprocess.run(['ip', 'route', 'get', '1.1.1.1'], capture_output=True, text=True).stdout.split()
+    dev = r[r.index('dev') + 1] if 'dev' in r else None
+    w = json.load(open('/tmp/mock/world.json'))
+    ok = bool(dev) and w.get('inet', {}).get(dev, False) and not w.get('block_dot', False)
+    sys.stdout.write('0.012000' if ok else '0.000000'); sys.exit(0 if ok else 7)
 os.execv(os.environ.get("REAL_CURL", "/usr/bin/curl"), ['curl', '--noproxy', '*'] + a)

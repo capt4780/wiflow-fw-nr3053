@@ -11,6 +11,15 @@ while a:
     elif k.startswith('--header='):
         n, v = k.split('=', 1)[1].split(':', 1); hdr[n.strip()] = v.strip()
     else: url = k
+if url and ('connectivitycheck' in url or 'detectportal' in url):
+    # the mock world answers the Internet probe: it works while the default route's device has Internet
+    import json, subprocess
+    rr = subprocess.run(['ip', 'route', 'get', '1.1.1.1'], capture_output=True, text=True).stdout.split()
+    dev = rr[rr.index('dev') + 1] if 'dev' in rr else None
+    ok = bool(dev) and json.load(open('/tmp/mock/world.json')).get('inet', {}).get(dev, False)
+    if not ok:
+        sys.stderr.write('Connection error: mock world offline\n'); sys.exit(4)
+    sys.exit(0)
 try:
     r = urllib.request.urlopen(urllib.request.Request(url, data=data, headers=hdr), timeout=to)
     body = r.read()

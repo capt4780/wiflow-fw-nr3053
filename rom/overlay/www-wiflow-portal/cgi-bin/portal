@@ -33,6 +33,14 @@ uplink_hint(){ set -- $(net_status_read); echo "$1"; }
 if [ "${REQUEST_METHOD:-GET}" = OPTIONS ]; then printf 'Status: 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Expose-Headers: X-Wiflow-Portal, X-Wiflow-Uplink\r\nAccess-Control-Max-Age: 600\r\nCache-Control: no-store\r\n\r\n'; exit 0; fi
 [ "${REQUEST_METHOD:-GET}" = POST ] && read_body || BODY=''
 action="$(param action 2>/dev/null || true)"
+# v3.1: the guest's form data is stored, remembered and sent to WordPress only after the grant.
+guest_commit(){
+ _gf="/tmp/wiflow-guest-pending.$1"; [ -s "$_gf" ] || return 0
+ guest_remember "$2" || true
+ guest_enqueue "$(cat "$_gf")" || true
+ rm -f "$_gf"
+ : > "$HEARTBEAT_KICK" 2>/dev/null || true
+}
 case "$action" in
  authorize)
   # v1.0.15: the confirm only opens the Internet. Everything else was
@@ -50,11 +58,12 @@ case "$action" in
   /usr/lib/wiflow/portal-client authorize-session "$sid" "$cid" >/dev/null 2>&1; arc=$?
   if [ "$arc" = 0 ]; then
    authorized_204
+   ( guest_commit "$sid" "$cid" ) </dev/null >/dev/null 2>&1 &
    timing_write authorize "$(date +%s) granted $(( $(ms_now) - t0 ))ms net=$nv age=${na}s"
    ( event_enqueue content_interaction "$cid" "$sid" "$(date +%s)" ) </dev/null >/dev/null 2>&1 &
   else
    # v1.0.26: 423 = outside opening hours, 429 = guest limit reached, 409 = other.
-   case "$arc" in 7) st='423 Locked';; 6) st='429 Too Many Requests';; *) st='409 Conflict';; esac
+   case "$arc" in 7) st='423 Locked';; 6) st='429 Too Many Requests';; 8) st='503 Service Unavailable';; *) st='409 Conflict';; esac
    printf 'Status: %s\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: X-Wiflow-Portal\r\nX-Wiflow-Portal: 1\r\nCache-Control: no-store\r\n\r\n' "$st"
    timing_write authorize "$(date +%s) failed rc=$arc $(( $(ms_now) - t0 ))ms"
   fi
@@ -82,9 +91,9 @@ case "$action" in
   seen="/tmp/wiflow-guest-seen.$sid"
   if [ ! -e "$seen" ]; then
    : > "$seen"
-   guest_remember "$cid" || true
-   guest_enqueue "$(printf '{"session_id":"%s","client_id":"%s","name":"%s","phone":"%s","year":"%s","email":"%s","gender":"%s","at":%s}' "$sid" "$(json_escape "$cid")" "$(json_escape "$gname")" "$gphone" "$gyear" "$(json_escape "$gmail")" "$ggen" "$(date +%s)")" || true
-   : > "$HEARTBEAT_KICK" 2>/dev/null || true
+   printf '{"session_id":"%s","client_id":"%s","name":"%s","phone":"%s","year":"%s","email":"%s","gender":"%s","at":%s}' "$sid" "$(json_escape "$cid")" "$(json_escape "$gname")" "$gphone" "$gyear" "$(json_escape "$gmail")" "$ggen" "$(date +%s)" > "/tmp/wiflow-guest-pending.$sid"
+   # v3.1: what a guest typed is only kept once the Internet was really granted; until then it waits here.
+   if /usr/lib/wiflow/portal-client is-authorized "$sid" >/dev/null 2>&1; then guest_commit "$sid" "$cid"; fi
   fi
   headers 'application/json; charset=utf-8'; echo '{"ok":true}'; exit 0;;
  event)

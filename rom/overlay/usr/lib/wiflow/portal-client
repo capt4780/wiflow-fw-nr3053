@@ -67,6 +67,8 @@ authorize-session)
     # v1.0.26: outside opening hours (exit 7) / all places taken (exit 6).
     sched_closed && { log_client_event authorize_failed "$sid" closed; exit 7; }
     case "${authorized:-0}" in ''|0) guest_full && { log_client_event authorize_failed "$sid" full; exit 6; };; esac
+    # v3.1: a new guest is only let in when the way out works (Internet, DNS, private DNS); nothing is stored otherwise.
+    case "${authorized:-0}" in ''|0) grant_verify || { log_client_event authorize_failed "$sid" verify; exit 8; };; esac
     printf 'add element %s authed { %s . %s timeout 30d }\n' "$CAPTIVE_TABLE" "$ip" "$mac" | /usr/sbin/nft -f - >/dev/null 2>&1 || { log_client_event authorize_failed "$sid" policy_apply; exit 5; }
     now="$(date +%s)"; newly=0
     case "${authorized:-0}" in ''|0) authorized="$now"; newly=1;; esac
