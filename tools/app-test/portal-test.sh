@@ -73,6 +73,16 @@ wp "s['commands']=[{'id':'g1','action':'guest_settings','payload':{'down_kbps':0
 for i in $(seq 1 30); do [ "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('g1',{}).get('status',''))")" = success ] && break; sleep 2; done
 expect "settings: guest_settings command applied" "$(python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('g1',{}).get('status',''))")|$(U get wiflow.core.guest_session_min)|$(U get wiflow.core.guest_max)|$(U get wiflow.core.guest_down_kbps || echo 0)" '^success\|60\|20\|0?$'
 
+# Guest WiFi name from WordPress: every guest radio gets the new name, a bad one is refused
+$B x sh -c "uci -q get wireless.wfgap >/dev/null || { uci set wireless.wfgap=wifi-iface; uci set wireless.wfgap.device=MT7981_1_1; uci set wireless.wfgap.mode=ap; uci set wireless.wfgap.network=guest; uci set wireless.wfgap.ssid=Wiflow; uci commit wireless; }"
+rs(){ python3 -c "import json;print(json.load(open('/tmp/mock/wp/state.json'))['results'].get('$1',{}).get('status',''))"; }
+wp "s['commands']=[{'id':'n1','action':'guest_ssid','payload':{'ssid':'Quán Cà Phê A'}}]"
+for i in $(seq 1 30); do [ "$(rs n1)" = success ] && break; sleep 2; done
+expect "guest name: renamed from WordPress" "$(rs n1)|$($B x uci get wireless.wfgap.ssid)" '^success\|Quán Cà Phê A$'
+wp "s['commands']=[{'id':'n2','action':'guest_ssid','payload':{'ssid':'0123456789012345678901234567890123456789'}}]"
+for i in $(seq 1 30); do [ "$(rs n2)" = failed ] && break; sleep 2; done
+expect "guest name: a name over 32 bytes is refused and the old one stays" "$(rs n2)|$($B x uci get wireless.wfgap.ssid)" '^failed\|Quán Cà Phê A$'
+
 # Line speed test (a mock speed server stands in for the Internet): started from WordPress
 $B x setsid python3 "$T/speedsrv.py" 8098 >/tmp/mock/speed.log 2>&1 &
 sleep 1

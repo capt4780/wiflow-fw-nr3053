@@ -253,6 +253,14 @@ function run_command(cmd, online) {
 		W.kick_agent();
 		break;
 	}
+	case 'guest_ssid': {
+		// New name of the guest WiFi (set in WordPress); the radios restart for a few seconds.
+		writefile(`${W.RUN}/guest-ssid.json`, sprintf('%J', cmd.payload ?? {}));
+		const ok = W.run(`/usr/lib/wiflow/portal-hb guest-ssid ${W.RUN}/guest-ssid.json`).code == 0;
+		result(id, action, ok ? 'success' : 'failed', ok ? 'Guest WiFi name changed' : 'The guest WiFi name is not valid');
+		W.kick_agent();
+		break;
+	}
 	default:
 		result(id, action, 'failed', 'Not supported by this router. WiFi and network are set in LuCI.');
 	}

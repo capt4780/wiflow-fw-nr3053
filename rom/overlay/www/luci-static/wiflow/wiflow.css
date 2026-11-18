@@ -54,13 +54,13 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
 .w-fs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .w-fnn{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:16px 8px;background:var(--soft);min-width:0}
 .w-fnn.w-on{background:var(--pri-soft)}
-.w-fnn.w-ln{flex-direction:row;text-align:left;gap:14px;padding:12px 16px}
+.w-fnn.w-fnl{flex-direction:row;text-align:left;gap:14px;padding:12px 16px}
 .w-fni{position:relative;width:44px;height:44px;border-radius:50%;background:#fff;color:var(--mut);display:grid;place-items:center;flex:none}
 .w-fnn.w-on .w-fni,.w-fnn.w-rt .w-fni{background:var(--pri);color:#fff}
 .w-fni svg{width:22px;height:22px}
-.w-fnt{min-width:0}
-.w-fna{font-weight:600;font-size:14.5px;white-space:nowrap;color:var(--ink)}
-.w-fnb{font-size:12.5px;color:var(--mut);white-space:nowrap;margin-top:2px}
+.w-fnt{min-width:0;max-width:100%}
+.w-fna{font-weight:600;font-size:14.5px;white-space:nowrap;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.w-fnb{font-size:12.5px;color:var(--mut);white-space:nowrap;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
 .w-fnn.w-on .w-fnb{color:#3B4A7A}
 .w-fm{display:block}
 .w-fm svg,.w-fv svg,.w-fh svg{display:block;overflow:visible}
@@ -113,7 +113,7 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
 .w-fld{display:flex;flex-direction:column;gap:6px;min-width:0}
 .w-fld label{font-size:14px;font-weight:600}
 .w-in{height:var(--h);border:1px solid transparent;border-radius:var(--r);background:var(--card);display:flex;align-items:center;min-width:0;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.w-pn .w-in,.w-gc .w-in,.w-in.w-rd{background:var(--soft)}
+.w-pn .w-in,.modal .w-in,.w-gc .w-in,.w-in.w-rd{background:var(--soft)}
 .w-in.w-rd{color:var(--ink)}
 .w-in.w-pw{justify-content:space-between}
 .w-in.w-pw .w-ib{width:32px;height:32px}
@@ -191,7 +191,7 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
   .w-fm .w-mw{display:block;width:56px;height:196px}
   .w-fh{display:block;width:56px}
   .w-fh svg{width:56px;height:2px}
-  .w-fn>.w-fnn.w-ln{flex-direction:column;text-align:center;gap:10px;padding:22px 10px}
+  .w-fn>.w-fnn.w-fnl{flex-direction:column;text-align:center;gap:10px;padding:22px 10px}
   .w-cv{height:150px}
   :root{--gut:32px}
   .w-app{flex-direction:row}

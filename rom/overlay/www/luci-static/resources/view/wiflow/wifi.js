@@ -133,6 +133,8 @@ return view.extend({
 		});
 		const rows = groups.map(g => row(g.ssid, g.off ? chip('', _('Off')) : chip('ok', _('Broadcasting')),
 			{ sub: g.bands.length > 1 ? _('Auto 2.4 / 5 GHz') : band(g.bands[0]) }));
+		if (aps.length)
+			rows.push(E('div', { 'class': 'w-row w-stack' }, E('div', { 'class': 'w-acts' }, btn('s', _('Rename'), () => this.renameGuest(aps), { sm: true }))));
 		rows.push(row(_('Connected now'), String((this.st.clients || {}).now ?? 0), { t: 1 }));
 		const sp = this.speedBody();
 		return panel('users', _('Guest WiFi'), sp.tgl, rows.concat(sp.body), 'w-half');
@@ -306,6 +308,27 @@ return view.extend({
 					this.set('wireless', sta['.name'], 'key', pw.value);
 				}
 				this.staged(_('Source WiFi'), pw.value ? _('Password changed') : sta.ssid);
+			})
+		]);
+	},
+
+	/* The guest WiFi name: one name on every band, at most 32 bytes (the WiFi limit). */
+	renameGuest(aps) {
+		const cur = aps[0].ssid || '';
+		const inp = E('input', { 'type': 'text', 'value': cur, 'maxlength': '32', 'autocomplete': 'off', 'aria-label': _('Guest WiFi name') });
+		K.dialog(_('Rename guest WiFi'), [ this.stepper(1), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
+			K.field(_('Guest WiFi name'), inp),
+			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': aps.length > 1 ? _('Auto 2.4 / 5 GHz') : band(bandOf(aps[0].device)), 'readonly': '' }), { rd: 1 })
+		]) ], [
+			btn('g', _('Not now'), ui.hideModal),
+			btn('p', _('Continue'), () => {
+				const name = inp.value.trim();
+				if (!name || new TextEncoder().encode(name).length > 32 || /[\u0000-\u001f\u007f]/.test(name))
+					return ui.addNotification(null, E('p', {}, _('The name needs 1 to 32 characters.')), 'danger');
+				if (name == cur)
+					return ui.hideModal();
+				aps.forEach(a => this.set('wireless', a['.name'], 'ssid', name));
+				this.staged(_('Guest WiFi name'), name);
 			})
 		]);
 	},

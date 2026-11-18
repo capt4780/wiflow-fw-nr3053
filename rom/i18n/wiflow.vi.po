@@ -1368,3 +1368,15 @@ msgstr "Chưa lưu được"
 
 msgid "empty = no limit"
 msgstr "để trống = không giới hạn"
+
+msgid "Rename"
+msgstr "Đổi tên"
+
+msgid "Rename guest WiFi"
+msgstr "Đổi tên WiFi khách"
+
+msgid "Guest WiFi name"
+msgstr "Tên WiFi khách"
+
+msgid "The name needs 1 to 32 characters."
+msgstr "Tên cần từ 1 đến 32 ký tự."

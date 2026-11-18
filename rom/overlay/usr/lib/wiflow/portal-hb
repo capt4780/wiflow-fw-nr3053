@@ -8,6 +8,7 @@
 #   portal-hb timeok            the router clock was confirmed
 #   portal-hb unpaired          the router left its account: portal off, content and guests cleared
 #   portal-hb guest-settings <file.json>   apply a guest_settings command
+#   portal-hb guest-ssid <file.json>       apply a guest_ssid command (new name of the guest WiFi)
 set -u
 . /usr/lib/wiflow/common.sh
 
@@ -72,6 +73,20 @@ guest-settings)
  g(){ jsonfilter -i "$f" -e "@.$1" 2>/dev/null || true; }
  se="$(g sched_enabled)"; case "$se" in true|1) se=1;; false|0) se=0;; *) se='';; esac
  guest_settings_set "$(g down_kbps)" "$(g up_kbps)" "$(g session_min)" "$(g max)" "$se" "$(g sched_from)" "$(g sched_to)" "$(g sched_days)" "$(g sched_week)" "$(g auto_share | sed 's/^true$/1/;s/^false$/0/')"
+ ;;
+guest-ssid)
+ f="${2:-}"; [ -f "$f" ] || exit 2
+ n="$(jsonfilter -i "$f" -e '@.ssid' 2>/dev/null || true)"
+ [ -n "$n" ] || exit 2
+ case "$n" in *[[:cntrl:]]*) exit 2;; esac
+ [ "$(printf %s "$n" | wc -c)" -le 32 ] || exit 2
+ c=0
+ for s in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.mode='ap'$/\1/p"); do
+  uci -q set "wireless.$s.ssid=$n" && c=$((c+1))
+ done
+ [ "$c" -gt 0 ] || exit 2
+ uci -q commit wireless || exit 2
+ (sleep 2; wifi reload) </dev/null >/dev/null 2>&1 &
  ;;
 *) exit 2 ;;
 esac
