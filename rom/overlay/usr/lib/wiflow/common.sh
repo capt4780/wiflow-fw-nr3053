@@ -304,7 +304,7 @@ guest_revoke_all(){
     /usr/sbin/nft flush set $CAPTIVE_TABLE authed >/dev/null 2>&1 || true
     wlog portal "Mất Internet quá lâu: khách phải đăng nhập lại portal"
 }
-# v3.1: called every 5 s with the background check: Internet gone for 60 s -> guests sign in again.
+# v3.1: called every 5 s with the background check: Internet gone for 5 minutes -> guests sign in again.
 NET_DOWN_SINCE=/tmp/wiflow-net-down-since
 net_down_tick(){
     set -- $(net_status_read)
@@ -312,7 +312,7 @@ net_down_tick(){
         [ -f "$NET_DOWN_SINCE" ] || date +%s > "$NET_DOWN_SINCE"
         read -r _ds _dr < "$NET_DOWN_SINCE" 2>/dev/null || return 0
         case "$_ds" in ''|*[!0-9]*) return 0;; esac
-        if [ $(( $(date +%s) - _ds )) -ge "${NET_DOWN_REVOKE:-60}" ] && [ "${_dr:-}" != done ]; then
+        if [ $(( $(date +%s) - _ds )) -ge "${NET_DOWN_REVOKE:-300}" ] && [ "${_dr:-}" != done ]; then
             portal_nft_ready && guest_revoke_all
             printf '%s done\n' "$_ds" > "$NET_DOWN_SINCE"
         fi

@@ -136,9 +136,9 @@ for i in $(seq 1 15); do grep -q "$cid3" /etc/wiflow/guests.known 2>/dev/null &&
 expect "grant check: the form data is remembered and sent only after the grant" "$(grep -c "$cid3" /etc/wiflow/guests.known 2>/dev/null)|$(grep -c 'Tran Thi Binh' /tmp/wiflow-guests.queue /tmp/mock/wp/heartbeat.jsonl 2>/dev/null | awk -F: '{s+=$2} END{print (s>0)?"sent":"missing"}')" '^1\|sent$'
 # Internet gone for good: every guest has to sign in again
 $B world 'w["inet"].update({k: False for k in w["inet"]})'
-$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 0; echo $(( $(date +%s) - 120 )) > /tmp/wiflow-net-down-since; net_down_tick'
-$B x $PC is-authorized "$sid3" && fail "Internet lost for 60 s: guest still authorized" || pass "Internet lost for 60 s: guests have to sign in again"
-expect "Internet lost for 60 s: the authed list is empty" "$($B x nft list set inet wiflow_captive authed | grep -c 'elements')" '^0$'
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 0; echo $(( $(date +%s) - 400 )) > /tmp/wiflow-net-down-since; net_down_tick'
+$B x $PC is-authorized "$sid3" && fail "Internet lost for 5 minutes: guest still authorized" || pass "Internet lost for 5 minutes: guests have to sign in again"
+expect "Internet lost for 5 minutes: the authed list is empty" "$($B x nft list set inet wiflow_captive authed | grep -c 'elements')" '^0$'
 $B world 'w["inet"].update({k: True for k in w["inet"]})'
 $B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 1; net_down_tick'
 [ ! -f /tmp/wiflow-net-down-since ] && pass "Internet back: the outage timer is cleared" || fail "outage timer not cleared"
