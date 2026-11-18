@@ -55,7 +55,10 @@ expect "form: the router remembers this device (hashed id only) in flash" "$(cat
 $B x $PC revoke-session "$sid" >/dev/null 2>&1
 page2="$($B x env REMOTE_ADDR=$ip1 REQUEST_METHOD=GET /www-wiflow-portal/cgi-bin/portal)"
 expect "form: a returning guest is told apart, so the page shows the banner popup" "$page2" 'data-known="1"'
-expect "form: heartbeat report carries the waiting guests" "$($B x /usr/lib/wiflow/portal-hb report | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['guest_count'], b['guests'][0]['name'])")" '^1 Nguyen Van An$'
+# the agent may already have sent the guest with its own heartbeat (it is kicked right after the form), so accept either: still waiting in the report, or already received by WordPress
+hbg="$($B x /usr/lib/wiflow/portal-hb report 2>/dev/null | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['guest_count'], b['guests'][0]['name'])" 2>/dev/null || true)"
+[ -n "$hbg" ] || hbg="$(grep -q 'Nguyen Van An' /tmp/mock/wp/heartbeat.jsonl 2>/dev/null && echo '1 Nguyen Van An')"
+expect "form: the waiting guest reaches WordPress with the heartbeat" "$hbg" '^1 Nguyen Van An$'
 for i in $(seq 1 30); do [ ! -s /tmp/wiflow-guests.queue ] && break; sleep 2; done
 [ ! -s /tmp/wiflow-guests.queue ] && pass "form: queue emptied once WordPress took the heartbeat" || fail "form: queue not emptied"
 expect "form: WordPress received the guest in a heartbeat" "$(grep -c '"Nguyen Van An"' /tmp/mock/wp/heartbeat.jsonl)" '^[1-9]'
