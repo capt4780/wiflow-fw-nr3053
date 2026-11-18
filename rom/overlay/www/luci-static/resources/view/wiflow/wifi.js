@@ -237,7 +237,7 @@ return view.extend({
 	/* The two steps of a change: 1 = the form, 2 = review and apply. */
 	stepper(at) {
 		const dot = (n, t) => E('span', { 'class': 'w-stpi' + (at == n ? ' w-on' : '') }, [ E('i', {}, at > n ? '\u2713' : String(n)), t ]);
-		return E('div', { 'class': 'w-stp' }, [ dot(1, _('Details')), E('span', { 'class': 'w-ln' }), dot(2, _('Apply')) ]);
+		return E('div', { 'class': 'w-stp' }, [ dot(1, _('Details')), E('span', { 'class': 'w-stl' }), dot(2, _('Apply')) ]);
 	},
 
 	/* Step 2: what is about to be written, then Save & apply. */
