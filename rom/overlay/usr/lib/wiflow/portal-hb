@@ -8,7 +8,7 @@
 #   portal-hb timeok            the router clock was confirmed
 #   portal-hb unpaired          the router left its account: portal off, content and guests cleared
 #   portal-hb guest-settings <file.json>   apply a guest_settings command
-#   portal-hb guest-ssid <file.json>       apply a guest_ssid command (new name of the guest WiFi)
+#   portal-hb guest-ssid <file.json>       apply a guest_ssid command (writes the new name; the agent reloads the radios)
 set -u
 . /usr/lib/wiflow/common.sh
 
@@ -86,7 +86,6 @@ guest-ssid)
  done
  [ "$c" -gt 0 ] || exit 2
  uci -q commit wireless || exit 2
- (sleep 2; wifi reload) </dev/null >/dev/null 2>&1 &
  ;;
 *) exit 2 ;;
 esac

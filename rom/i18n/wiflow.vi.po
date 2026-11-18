@@ -1378,5 +1378,5 @@ msgstr "Đổi tên WiFi khách"
 msgid "Guest WiFi name"
 msgstr "Tên WiFi khách"
 
-msgid "The name needs 1 to 32 characters."
-msgstr "Tên cần từ 1 đến 32 ký tự."
+msgid "The name is over 32 bytes (accented letters count 2-3)."
+msgstr "Tên quá 32 byte (chữ có dấu tính 2-3 byte)."

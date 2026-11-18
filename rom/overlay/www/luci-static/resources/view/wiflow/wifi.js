@@ -315,22 +315,28 @@ return view.extend({
 	/* The guest WiFi name: one name on every band, at most 32 bytes (the WiFi limit). */
 	renameGuest(aps) {
 		const cur = aps[0].ssid || '';
-		const inp = E('input', { 'type': 'text', 'value': cur, 'maxlength': '32', 'autocomplete': 'off', 'aria-label': _('Guest WiFi name') });
+		const bytes = v => new TextEncoder().encode(v).length;
+		const inp = E('input', { 'type': 'text', 'value': cur, 'autocomplete': 'off', 'aria-label': _('Guest WiFi name') });
+		const cnt = E('div', { 'class': 'w-cnt' }, bytes(cur) + ' / 32');
+		const go = btn('p', _('Continue'), () => {
+			const name = inp.value.trim();
+			if (!name || bytes(name) > 32 || /[\u0000-\u001f\u007f]/.test(name))
+				return ui.addNotification(null, E('p', {}, _('The name is over 32 bytes (accented letters count 2-3).')), 'danger');
+			if (name == cur)
+				return ui.hideModal();
+			aps.forEach(a => this.set('wireless', a['.name'], 'ssid', name));
+			this.staged(_('Guest WiFi name'), name);
+		});
+		inp.addEventListener('input', () => {
+			const n = bytes(inp.value.trim());
+			cnt.textContent = n + ' / 32';
+			cnt.classList.toggle('w-bad', n > 32);
+			go.disabled = !n || n > 32;
+		});
 		K.dialog(_('Rename guest WiFi'), [ this.stepper(1), E('div', { 'class': 'w-fgrid', 'style': 'padding-bottom:12px' }, [
-			K.field(_('Guest WiFi name'), inp),
+			K.field(_('Guest WiFi name'), inp), cnt,
 			K.field(_('Radio band'), E('input', { 'type': 'text', 'value': aps.length > 1 ? _('Auto 2.4 / 5 GHz') : band(bandOf(aps[0].device)), 'readonly': '' }), { rd: 1 })
-		]) ], [
-			btn('g', _('Not now'), ui.hideModal),
-			btn('p', _('Continue'), () => {
-				const name = inp.value.trim();
-				if (!name || new TextEncoder().encode(name).length > 32 || /[\u0000-\u001f\u007f]/.test(name))
-					return ui.addNotification(null, E('p', {}, _('The name needs 1 to 32 characters.')), 'danger');
-				if (name == cur)
-					return ui.hideModal();
-				aps.forEach(a => this.set('wireless', a['.name'], 'ssid', name));
-				this.staged(_('Guest WiFi name'), name);
-			})
-		]);
+		]) ], [ btn('g', _('Not now'), ui.hideModal), go ]);
 	},
 
 	/* Scan one band, refreshing every 8 s until stopped or closed. */
