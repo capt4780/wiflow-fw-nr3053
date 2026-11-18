@@ -132,7 +132,7 @@ $B world 'w["block_dns"]=False'
 code="$($B x env REMOTE_ADDR=$ip3 REQUEST_METHOD=POST QUERY_STRING="action=authorize&session_id=$sid3" /www-wiflow-portal/cgi-bin/portal | head -n1)"
 expect "grant check: everything works -> 204, the guest is let in" "$code" '204'
 $B x $PC is-authorized "$sid3" && pass "grant check: guest authorized after a good check" || fail "grant check: guest not authorized after a good check"
-for i in $(seq 1 15); do grep -q "$cid3" /etc/wiflow/guests.known 2>/dev/null && break; sleep 1; done
+for i in $(seq 1 20); do grep -q "$cid3" /etc/wiflow/guests.known 2>/dev/null && cat /tmp/wiflow-guests.queue /tmp/mock/wp/heartbeat.jsonl 2>/dev/null | grep -q 'Tran Thi Binh' && break; sleep 1; done
 expect "grant check: the form data is remembered and sent only after the grant" "$(grep -c "$cid3" /etc/wiflow/guests.known 2>/dev/null)|$(grep -c 'Tran Thi Binh' /tmp/wiflow-guests.queue /tmp/mock/wp/heartbeat.jsonl 2>/dev/null | awk -F: '{s+=$2} END{print (s>0)?"sent":"missing"}')" '^1\|sent$'
 # Internet gone for good: every guest has to sign in again
 $B world 'w["inet"].update({k: False for k in w["inet"]})'
