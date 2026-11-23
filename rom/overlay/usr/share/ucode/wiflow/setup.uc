@@ -12,7 +12,7 @@ import { readfile, writefile, rename, mkdir, popen, unlink, access, glob, lsdir,
 import { cursor } from 'uci';
 import { connect } from 'ubus';
 
-export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.4';
+export const VERSION = trim(readfile('/etc/wiflow_release') ?? '') || '3.5';
 export const GEN = '4';
 export const MODEL = 'Wiflow Router';
 export const REST = getenv('WIFLOW_REST') || 'https://wiflow.projifylab.com/wp-json';
@@ -41,6 +41,19 @@ export function sh(cmd) {
 
 export function uptime() {
 	return int(split(readfile('/proc/uptime') ?? '0', '.')[0]);
+};
+
+// Something disruptive is about to run (WiFi reload, network or firewall restart done by something else than the recovery itself): the
+// self-recovery waits a while before it adds another one (same file as disrupt_mark in common.sh, uptime seconds).
+const DISRUPT_MARK = '/tmp/wiflow-disrupt';
+
+export function disrupt_mark() {
+	writefile(DISRUPT_MARK, `${uptime()}\n`);
+};
+
+export function disrupt_recent(secs) {
+	const u = +trim(readfile(DISRUPT_MARK) ?? '');
+	return u > 0 && uptime() - u < secs;
 };
 
 export function now() {
@@ -195,7 +208,7 @@ export function device_pin() {
 };
 
 export function os_version() {
-	return trim(readfile('/etc/wiflow_release') ?? '') || '3.4';
+	return trim(readfile('/etc/wiflow_release') ?? '') || '3.5';
 };
 
 /* ---------------------------------------------------------------- network */
@@ -218,19 +231,28 @@ export function has_default_route() {
 	return false;
 };
 
-// One real Internet check (HTTPS 204). Returns the time it took in ms, or -1.
-export function probe_ms(secs) {
-	const t = secs ?? 4;
-	const r = run(`curl -s -o /dev/null -w '%{http_code} %{time_total}' -m ${t} https://connectivitycheck.gstatic.com/generate_204`);
-	const f = split(trim(r.out), ' ');
-	if (f[0] == '204')
-		return max(1, int(+(f[1] ?? 0) * 1000 + 0.5));
-	const r2 = run(`curl -s -m ${t} http://detectportal.firefox.com/success.txt`);
-	return trim(r2.out) == 'success' ? 0 : -1;
+// The router's Internet status. ONE checker keeps it (portal-session-loop runs net_check_now, which writes
+// "<1|0> <uptime seconds> <latency ms>" to /tmp/wiflow-net-status; the router's uptime, so a clock change never makes
+// it look old or new); this only reads it. When the loop has not refreshed it in time (it is not running), one check
+// is asked for here, so there is never a second checker of our own.
+const NET_STATUS = '/tmp/wiflow-net-status';
+const NET_ON = +(getenv('WIFLOW_NET_ON') ?? 30) || 30;
+
+function net_read() {
+	const f = split(trim(readfile(NET_STATUS) ?? ''), ' ');
+	const t = +f[1] || 0;
+	return { v: f[0] == '1' ? 1 : (f[0] == '0' ? 0 : -1), age: t > 0 ? uptime() - t : 999999, ms: +(f[2] ?? 0) || 0 };
 };
 
-export function probe(secs) {
-	return probe_ms(secs) >= 0;
+// tick: the agent's period in seconds. Returns { online, latency } (latency -1 when offline, 0 when unknown).
+export function net_status(tick) {
+	let s = net_read();
+	if (s.v < 0 || s.age < -5 || s.age > (s.v == 1 ? NET_ON + tick : tick * 0.75)) {
+		run('/usr/lib/wiflow/portal-hb netcheck');
+		s = net_read();
+	}
+	const online = s.v == 1 && has_default_route();
+	return { online: online, latency: online ? s.ms : -1 };
 };
 
 // SSIDs as LuCI configured them (read only): the source WiFi (client) and the
@@ -383,6 +405,8 @@ export function diag_text() {
 	add(sh('uci -q show network'));
 	add('== routes');
 	add(readfile('/proc/net/route') ?? '');
+	add('== memory');
+	add(trim(sh('/usr/lib/wiflow/portal-hb memory')));
 	add('== wiflow log');
 	add(readfile(`${RUN}/log`) ?? '');
 	const tail = (a, n) => slice(a, max(0, length(a) - n));

@@ -1,6 +1,6 @@
 #!/usr/bin/ucode
 // Wiflow agent (procd service "wiflow"): every 20 s
-//  - checks the Internet (HTTPS 204);
+//  - reads the router's Internet status (one checker keeps it, see W.net_status) and runs the self-recovery;
 //  - talks to WordPress: heartbeat, commands, command results, unpair.
 // It does not change the WiFi or the network: that is done in LuCI.
 // Everything it keeps is in RAM (/tmp/wiflow); nothing is written to flash
@@ -35,12 +35,12 @@ function wan_carrier() {
 }
 
 function internet_tick() {
-	const ms = W.has_default_route() ? W.probe_ms(4) : -1;
-	const online = ms >= 0;
+	const n = W.net_status(TICK);
+	const online = n.online;
 	const prev = W.st_get('online', false);
 	if (online && !prev) W.st_set('online_since', W.uptime());
 	W.st_set('online', online);
-	W.st_set('latency', ms);
+	W.st_set('latency', n.latency);
 	return online;
 }
 
@@ -53,10 +53,15 @@ function internet_tick() {
 //   after 30 min reboot, at most 3 in a row; the count resets after 10 min online
 // Nothing is written to flash except right before a recovery reboot (the
 // reboot reason and the counter) and when the counter is cleared again.
+// v3.5: the WAN and WiFi steps (3 and 15 minutes) are skipped when the source router (the default gateway) still
+// answers: the link is fine, the outage is outside, and restarting here would only drop the guests. The 30 minute
+// restart stays as the last safety net (a fault inside this router is not seen by the gateway test). All the clocks
+// start again while something else is busy with the network (see hold_reason).
 // The test bench runs the same steps WIFLOW_REC_SCALE times faster.
 const RS = +(getenv('WIFLOW_REC_SCALE') ?? 1) || 1;
 const REC_T1 = 180 / RS, REC_T2 = 900 / RS, REC_T3 = 1800 / RS, REC_MAX = 3, REC_OK = 600 / RS, REC_BOOT = 60 / RS;
-let off_since = null, on_since = null, rec_stage = 0;
+const EDIT_HOLD = 180 / RS, SYNC_HOLD = 1200 / RS, DISRUPT_HOLD = 120 / RS;
+let off_since = null, on_since = null, rec_stage = 0, held = null;
 
 function sta_configured() {
 	for (let l in split(W.sh('uci -q show wireless'), '\n'))
@@ -67,6 +72,61 @@ function sta_configured() {
 
 function link_expected() {
 	return wan_carrier() || sta_configured();
+}
+
+// Is a file or directory changed within the last `secs` seconds (a clock that moved back counts as not recent)?
+function recent(path, secs) {
+	const m = stat(path)?.mtime;
+	const d = time() - (m ?? 0);
+	return m != null && d >= 0 && d < secs;
+}
+
+// Why the recovery must wait now (null: it may act). Restarting the WiFi or the WAN while someone sets the link up,
+// while the line is busy with a content download or right after another restart only makes things worse.
+function hold_reason() {
+	if (W.job_busy())
+		return 'a Wiflow change is in progress';
+	for (let p in [ '/etc/config/network', '/etc/config/wireless', '/tmp/.uci/network', '/tmp/.uci/wireless' ])
+		if (recent(p, EDIT_HOLD))
+			return 'the network or WiFi settings were just changed';
+	if (recent('/tmp/wiflow-portal-sync.lock', SYNC_HOLD))
+		return 'new content is downloading';
+	if (W.disrupt_recent(DISRUPT_HOLD))
+		return 'the network was just restarted';
+	return null;
+}
+
+// Has the gateway's address been resolved (a complete entry in the ARP table)?
+function arp_ok(ip) {
+	for (let l in split(readfile('/proc/net/arp') ?? '', '\n')) {
+		const f = split(trim(replace(l, /\s+/g, ' ')), ' ');
+		if (length(f) >= 4 && f[0] == ip)
+			return (hex(f[2]) & 2) != 0 && f[3] != '00:00:00:00:00:00';
+	}
+	return false;
+}
+
+// Does the source router (the default gateway) answer? Then the link is fine and the outage is outside.
+// A ping is the test. This image's BusyBox is trimmed and may have no ping (the shell then says 127): a connection to
+// the gateway then does the same job. One that is there answers it or refuses it (and its address is resolved);
+// one that is not there does not answer at all. Any doubt counts as "does not answer", which leaves the recovery
+// exactly as it was before 3.5.
+function gw_alive() {
+	for (let l in split(readfile('/proc/net/route') ?? '', '\n')) {
+		const f = split(trim(replace(l, /\s+/g, ' ')), ' ');
+		if (length(f) >= 8 && f[1] == '00000000' && f[7] == '00000000') {
+			const g = hex(f[2]);
+			if (!g)
+				return false;
+			const ip = `${g & 255}.${(g >> 8) & 255}.${(g >> 16) & 255}.${(g >> 24) & 255}`;
+			const r = W.run(`ping -c 1 -W 2 ${ip}`);
+			if (r.code != 127)
+				return r.code == 0;
+			const c = W.run(`curl -s -m 3 --connect-timeout 2 -o /dev/null http://${ip}/`).code;
+			return c == 0 || c == 52 || c == 56 || (c == 7 && arp_ok(ip));
+		}
+	}
+	return false;
 }
 
 // Whenever the Internet is lost (typically after a power cut: the router starts before the source does, and the
@@ -87,6 +147,8 @@ function wifi_source_tick(now, off) {
 	if (!wan_carrier() && sta_configured() && uplink_kind() == 'none') {
 		W.wlog('system', 'The source WiFi is not joined: restarting the WiFi');
 		W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
+	} else if (gw_alive()) {
+		W.wlog('system', 'No Internet, but the source router answers: the outage is outside, nothing is restarted');
 	} else {
 		W.wlog('system', 'No Internet: renewing the connection');
 		W.run('ifup wan >/dev/null 2>&1 &');
@@ -114,23 +176,45 @@ function recovery_tick(online) {
 	}
 	on_since = null;
 	if (off_since == null) off_since = now;
+	// Only act when the first Internet check after boot has had time and a link exists.
+	if (W.uptime() < REC_BOOT || !link_expected()) {
+		W.st_set('recovery', { stage: rec_stage, offline_s: now - off_since });
+		return;
+	}
+	const why = hold_reason();
+	if (why) {
+		if (why != held)
+			W.wlog('system', `Self-recovery waits: ${why}`);
+		held = why;
+		off_since = now;
+		ws_next = null;
+		ws_n = 0;
+		rec_stage = 0;
+		W.st_set('recovery', { stage: 0, offline_s: 0 });
+		return;
+	}
+	held = null;
 	const off = now - off_since;
 	W.st_set('recovery', { stage: rec_stage, offline_s: off });
-	// Only act when the first Internet check after boot has had time, a link exists
-	// and the router clock/uplink are not being changed on purpose (LuCI or a job).
-	if (W.uptime() < REC_BOOT || !link_expected() || W.job_busy())
-		return;
 	wifi_source_tick(now, off);
 	if (rec_stage < 1 && off >= REC_T1) {
 		rec_stage = 1;
-		W.wlog('system', 'No Internet for 3 minutes: renewing the WAN connection');
-		W.run('ifup wan >/dev/null 2>&1 &');
-		if (sta_configured())
-			W.run('ifup wwan >/dev/null 2>&1 &');
+		if (gw_alive()) {
+			W.wlog('system', 'No Internet for 3 minutes, but the source router answers: the outage is outside, nothing is restarted');
+		} else {
+			W.wlog('system', 'No Internet for 3 minutes: renewing the WAN connection');
+			W.run('ifup wan >/dev/null 2>&1 &');
+			if (sta_configured())
+				W.run('ifup wwan >/dev/null 2>&1 &');
+		}
 	} else if (rec_stage < 2 && off >= REC_T2) {
 		rec_stage = 2;
-		W.wlog('system', 'No Internet for 15 minutes: restarting the WiFi');
-		W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
+		if (gw_alive()) {
+			W.wlog('system', 'No Internet for 15 minutes, but the source router answers: the WiFi is left alone');
+		} else {
+			W.wlog('system', 'No Internet for 15 minutes: restarting the WiFi');
+			W.run('(wifi reload) </dev/null >/dev/null 2>&1 &');
+		}
 	} else if (rec_stage < 3 && off >= REC_T3) {
 		rec_stage = 3;
 		const n = W.num(W.core('recovery_reboots', '0'), 0);
@@ -178,14 +262,44 @@ function portal_report() {
 	return type(o) == 'object' ? o : {};
 }
 
-// Fetch the content revision WordPress wants, in the background, at most once a minute.
-function portal_content(desired) {
+// Fetch the content revision WordPress wants, in the background. Nothing runs while the router already has it or a
+// download is still going. After a failure the pause grows (1, 2, 5, 10, then every 30 minutes): a download that
+// keeps failing must not keep the line busy. A new revision starts afresh. (A partly downloaded file is kept by
+// portal-sync and continued, so a retry costs little.)
+const CT_STEPS = map([ 60, 120, 300, 600, 1800 ], x => x / RS);
+let ct_rev = null, ct_fails = 0, ct_next = 0, ct_t0 = null;
+
+function portal_content(desired, active, status) {
 	if (!match(`${desired}`, /^[0-9]+$/) || +desired <= 0)
 		return;
-	const t = W.st_get('content_try');
-	if (t != null && W.uptime() - t < 60)
+	if (+desired == +(active ?? -1)) {
+		ct_fails = 0;
+		ct_next = 0;
+		ct_t0 = null;
 		return;
-	W.st_set('content_try', W.uptime());
+	}
+	if (ct_rev != +desired) {
+		ct_rev = +desired;
+		ct_fails = 0;
+		ct_next = 0;
+		ct_t0 = null;
+	}
+	if (access('/tmp/wiflow-portal-sync.lock'))
+		return;
+	const now = W.uptime();
+	if (ct_t0 != null) {
+		// the last attempt has ended: a failure lengthens the pause (counted from now, so a long transfer that stalled
+		// does not start again at once)
+		if (status == 'failed') {
+			ct_fails++;
+			ct_next = now + CT_STEPS[min(ct_fails, length(CT_STEPS)) - 1];
+		}
+		ct_t0 = null;
+	}
+	if (now < ct_next)
+		return;
+	ct_t0 = now;
+	ct_next = now + CT_STEPS[0];
 	W.run(`(/usr/lib/wiflow/portal-hb content ${+desired}) </dev/null >/dev/null 2>&1 &`);
 }
 
@@ -250,8 +364,10 @@ function run_command(cmd, online) {
 		// New name of the guest WiFi (set in WordPress); the radios restart for a few seconds.
 		writefile(`${W.RUN}/guest-ssid.json`, sprintf('%J', cmd.payload ?? {}));
 		const ok = W.run(`/usr/lib/wiflow/portal-hb guest-ssid ${W.RUN}/guest-ssid.json`).code == 0;
-		if (ok)
+		if (ok) {
+			W.disrupt_mark();
 			W.run('(sleep 2; reload_config) </dev/null >/dev/null 2>&1 &');
+		}
 		result(id, action, ok ? 'success' : 'failed', ok ? 'Guest WiFi name changed' : 'The guest WiFi name is not valid');
 		W.kick_agent();
 		break;
@@ -322,7 +438,7 @@ function heartbeat(online) {
 				W.wlog('system', b.plan_active ? 'The usage plan is active' : 'The usage plan has ended: the guest page is off');
 			}
 		}
-		portal_content(b.desired_portal_revision);
+		portal_content(b.desired_portal_revision, p.active_portal_revision, p.portal_sync_status);
 		if (b.command)
 			run_command(b.command, online);
 		return TICK;

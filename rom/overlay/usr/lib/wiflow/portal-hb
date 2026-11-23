@@ -6,6 +6,8 @@
 #   portal-hb ack <events> <guests>   WordPress accepted the report
 #   portal-hb content <rev>     fetch the content revision WordPress wants
 #   portal-hb timeok            the router clock was confirmed
+#   portal-hb memory            RAM report for the support report (diag)
+#   portal-hb netcheck          refresh the router Internet status when the loop has not (the agent asks)
 #   portal-hb unpaired          the router left its account: portal off, content and guests cleared
 #   portal-hb guest-settings <file.json>   apply a guest_settings command
 #   portal-hb guest-ssid <file.json>       apply a guest_ssid command (writes the new name; the agent reloads the radios)
@@ -56,6 +58,8 @@ enable)
  portal_activate
  ;;
 timeok) state_set wp_time_ok 1 ;;
+netcheck) net_maintain ;;
+memory) mem_line; echo; mem_top 8 | awk '{printf "  %7d kB  %s\n", $1, $2}' ;;
 plan)
  # the plan of the account changed (or was just read): switch the guest page off or on
  portal_activate

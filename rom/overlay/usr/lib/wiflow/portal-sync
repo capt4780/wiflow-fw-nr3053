@@ -1,10 +1,26 @@
 #!/bin/sh
 set -u
 . /usr/lib/wiflow/common.sh
+# v3.5 content download, kind to the Internet line:
+#  - the transfer is capped (WIFLOW_SYNC_RATE, 1 MB/s) so guests and the Internet check never see a saturated line;
+#  - a partly downloaded file is kept (named by its hash) and continued on the next try, never started again;
+#  - a stalled transfer is dropped (under 2 KB/s for 30 s);
+#  - every file is hashed once per run;
+#  - the lock records the process: a killed run no longer blocks the next ones, and the self-recovery of the router
+#    waits while this lock is held (a busy line is not a dead line).
 SYNC_LOCK=/tmp/wiflow-portal-sync.lock
-if ! mkdir "$SYNC_LOCK" 2>/dev/null; then exit 0; fi
-cleanup_lock(){ rmdir "$SYNC_LOCK" 2>/dev/null || true; }
+if ! mkdir "$SYNC_LOCK" 2>/dev/null; then
+ _lp="$(cat "$SYNC_LOCK/pid" 2>/dev/null)"
+ [ -n "$_lp" ] && kill -0 "$_lp" 2>/dev/null && exit 0
+ [ -z "$_lp" ] && [ -z "$(find "$SYNC_LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ] && exit 0
+ rm -rf "$SYNC_LOCK"; mkdir "$SYNC_LOCK" 2>/dev/null || exit 0
+fi
+echo $$ > "$SYNC_LOCK/pid"
+HC="/tmp/wiflow-sync-hash.$$"; : > "$HC"
+cleanup_lock(){ rm -rf "$SYNC_LOCK" 2>/dev/null || true; rm -f "$HC" 2>/dev/null || true; }
 trap cleanup_lock EXIT INT TERM
+SYNC_RATE="${WIFLOW_SYNC_RATE:-1M}"
+PART_DIR="$PORTAL_RUNTIME/partial"
 WANTED="${1:-0}"
 case "$WANTED" in ''|*[!0-9]*) WANTED=0;; esac
 fail(){
@@ -53,7 +69,31 @@ uci set wiflow.core.portal_sync_status='syncing'; uci set wiflow.core.portal_syn
 STORAGE_RESERVE=4194304
 PENDING="$PORTAL_RUNTIME/pending-$REV"
 for d in "$PORTAL_RUNTIME"/pending-*; do [ -e "$d" ] || continue; [ "$d" = "$PENDING" ] || rm -rf "$d"; done
-file_ok(){ [ -f "$1" ] && [ "$(sha256sum "$1" 2>/dev/null | awk '{print $1}')" = "$2" ]; }
+fhash(){ # sha256 of a file, computed once per run
+ _k="$1|$(stat -c '%s.%Y' "$1" 2>/dev/null)"; _v="$(awk -F'\t' -v k="$_k" '$1==k{print $2;exit}' "$HC" 2>/dev/null)"
+ [ -n "$_v" ] || { _v="$(sha256sum "$1" 2>/dev/null | awk '{print $1}')"; printf '%s\t%s\n' "$_k" "$_v" >> "$HC"; }
+ printf '%s' "$_v"
+}
+file_ok(){ [ -f "$1" ] && [ "$(fhash "$1")" = "$2" ]; }
+partial_bytes(){ _pb="$(wc -c < "$PART_DIR/$1.part" 2>/dev/null | tr -d ' ')"; num_or0 "$_pb"; }
+# One media file: $1 url, $2 sha256 (names the partial file), $3 size, $4 destination.
+fetch_media(){
+ _u="$1"; _h="$2"; _sz="$3"; _o="$4"; _p="$PART_DIR/$_h.part"; mkdir -p "$PART_DIR" 2>/dev/null || return 1
+ _have="$(partial_bytes "$_h")"; [ "$_have" -le "$_sz" ] || { rm -f "$_p"; _have=0; }
+ _did="$(device_id)"; _tok="$(device_token)"; [ -n "$_did" ] && [ -n "$_tok" ] || return 2
+ _try=0
+ while [ "$_have" -lt "$_sz" ] && [ "$_try" -lt 2 ]; do
+  _try=$((_try+1))
+  curl -sf -C - --limit-rate "$SYNC_RATE" --connect-timeout 10 --speed-limit 2048 --speed-time 30 --max-time 1800 \
+   -H "X-Wiflow-Device-ID: $_did" -H "X-Wiflow-Device-Token: $_tok" -o "$_p" "$_u" >/dev/null 2>&1; _rc=$?
+  _have="$(partial_bytes "$_h")"
+  [ "$_rc" -eq 0 ] && break
+  # the server ignored the range or the partial file is not usable: start that file again, once
+  case "$_rc" in 33|36) rm -f "$_p"; _have=0;; *) return "$_rc";; esac
+ done
+ [ "$_have" -eq "$_sz" ] || return 1
+ mv -f "$_p" "$_o"
+}
 WANT="/tmp/wiflow-portal-want.$$"; : > "$WANT"
 need=0; j=0
 while [ "$j" -lt 24 ]; do
@@ -62,7 +102,7 @@ while [ "$j" -lt 24 ]; do
  case "$r_size" in ''|*[!0-9]*) r_size=0;; esac
  printf '%s' "$r_name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'
  printf '%s|%s\n' "$r_name" "$r_hash" >> "$WANT"
- file_ok "$PORTAL_ACTIVE/media/$r_name" "$r_hash" || file_ok "$PENDING/media/$r_name" "$r_hash" || need=$((need + r_size))
+ file_ok "$PORTAL_ACTIVE/media/$r_name" "$r_hash" || file_ok "$PENDING/media/$r_name" "$r_hash" || { _pb="$(partial_bytes "$r_hash")"; [ "$_pb" -le "$r_size" ] || _pb=0; need=$((need + r_size - _pb)); }
  j=$((j+1))
 done
 set_total=0; j=0
@@ -78,7 +118,7 @@ else
  # Space freed by deleting the old files that the new set does not reuse.
  freed=0
  if [ -d "$PORTAL_ACTIVE/media" ]; then
-  for f in "$PORTAL_ACTIVE"/media/*; do [ -f "$f" ] || continue; n="${f##*/}"; h="$(sha256sum "$f" | awk '{print $1}')"; grep -qx "$n|$h" "$WANT" && continue; links="$(stat -c %h "$f" 2>/dev/null || echo 1)"; [ "$links" -le 1 ] && freed=$((freed + $(wc -c < "$f" | tr -d ' '))); done
+  for f in "$PORTAL_ACTIVE"/media/*; do [ -f "$f" ] || continue; n="${f##*/}"; h="$(fhash "$f")"; grep -qx "$n|$h" "$WANT" && continue; links="$(stat -c %h "$f" 2>/dev/null || echo 1)"; [ "$links" -le 1 ] && freed=$((freed + $(wc -c < "$f" | tr -d ' '))); done
  fi
  [ $((free_b + freed)) -ge $((need + STORAGE_RESERVE)) ] || { rm -f "$WANT"; fail "storage_insufficient:need=$need:free=$free_b:freed=$freed"; }
  STAGE="$PENDING"; KEEP_STAGE=1; mkdir -p "$STAGE/media" || fail 'staging_create_failed'
@@ -93,6 +133,8 @@ else
  sync
  logger -t wiflow-portal-sync "low-space update revision=$REV need=$need free=$free_b freed=$freed" 2>/dev/null || true
 fi
+# Partial files of an older revision are not needed any more.
+for pf in "$PART_DIR"/*.part; do [ -e "$pf" ] || continue; ph="${pf##*/}"; ph="${ph%.part}"; grep -q "|$ph\$" "$WANT" 2>/dev/null || rm -f "$pf"; done
 rm -f "$WANT"
 MAN="$STAGE/manifest.list"; : > "$MAN"
 seen='|'; i=0
@@ -104,7 +146,7 @@ while [ "$i" -lt 24 ]; do
  case "$seen" in *"|$role|"*) fail 'media_duplicate';; esac; seen="$seen$role|"
  printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]{1,120}$' || fail 'media_name'; key="${url##*/}"; printf '%s' "$key" | grep -Eq '^m[0-9]{1,12}-[a-f0-9]{8}$' || fail 'media_url'; url="$WIFLOW_PORTAL_API/media/$key";
  printf '%s' "$hash" | grep -Eq '^[A-Fa-f0-9]{64}$' || fail 'media_hash'; case "$size" in ''|*[!0-9]*) fail 'media_size';; esac; [ "$size" -gt 0 ] && [ "$size" -le 157286400 ] || fail 'media_size'
- out="$STAGE/media/$name"; if file_ok "$out" "$hash"; then :; elif file_ok "$PORTAL_ACTIVE/media/$name" "$hash" && { rm -f "$out"; ln "$PORTAL_ACTIVE/media/$name" "$out" 2>/dev/null; }; then :; else dst="$out"; rm -f "$dst" "$dst.part"; wiflow_get "$dst.part" "$url" >/dev/null 2>&1 || { rm -f "$dst.part"; fail "download_$role"; }; mv -f "$dst.part" "$dst" || fail "download_$role"; out="$dst"; fi; got_size="$(wc -c < "$out" 2>/dev/null | tr -d ' ')"; [ "$got_size" = "$size" ] || fail "size_$role"; got_hash="$(sha256sum "$out" | awk '{print $1}')"; [ "$got_hash" = "$hash" ] || fail "hash_$role"; chmod 644 "$out" 2>/dev/null || true; printf '%s|%s\n' "$role" "$name" >> "$MAN"; i=$((i+1))
+ out="$STAGE/media/$name"; if file_ok "$out" "$hash"; then :; elif file_ok "$PORTAL_ACTIVE/media/$name" "$hash" && { rm -f "$out"; ln "$PORTAL_ACTIVE/media/$name" "$out" 2>/dev/null; }; then :; else rm -f "$out"; fetch_media "$url" "$hash" "$size" "$out" || fail "download_$role"; fi; got_size="$(wc -c < "$out" 2>/dev/null | tr -d ' ')"; [ "$got_size" = "$size" ] || fail "size_$role"; got_hash="$(fhash "$out")"; [ "$got_hash" = "$hash" ] || { rm -f "$out"; fail "hash_$role"; }; chmod 644 "$out" 2>/dev/null || true; printf '%s|%s\n' "$role" "$name" >> "$MAN"; i=$((i+1))
 done
 has(){ grep -q "^$1|" "$MAN" 2>/dev/null; }; path_for(){ awk -F'|' -v r="$1" '$1==r{print "/runtime/active/media/"$2;exit}' "$MAN"; }
 # A content snapshot may carry Website + Image + Video assets together. Active mode is synced separately.
@@ -119,7 +161,7 @@ jsonfilter -i "$STAGE/portal.json" -e '@.revision' >/dev/null 2>&1 || fail 'conf
 [ "$(jsonfilter -i "$STAGE/portal.json" -e '@.mode' 2>/dev/null || true)" = "$mode" ] || fail 'config_mode'
 rm -f "$MAN"; chmod 644 "$STAGE/portal.json" 2>/dev/null || true
 DEST="$PORTAL_REVISIONS/rev-$REV"; rm -rf "$DEST" 2>/dev/null || true; mv "$STAGE" "$DEST" || fail 'revision_prepare'; STAGE=''; LINK="$PORTAL_RUNTIME/.active-$$"; rm -f "$LINK"; ln -s "revisions/rev-$REV" "$LINK" || fail 'active_link'; if [ -e "$PORTAL_ACTIVE" ] && [ ! -L "$PORTAL_ACTIVE" ]; then rm -rf "$PORTAL_ACTIVE" || fail 'legacy_active'; fi; mv -Tf "$LINK" "$PORTAL_ACTIVE" || fail 'active_swap'
-for d in "$PORTAL_REVISIONS"/rev-*; do [ -e "$d" ] || continue; [ "$d" = "$DEST" ] || rm -rf "$d"; done; rm -rf "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* "$PORTAL_RUNTIME"/pending-* 2>/dev/null || true
+for d in "$PORTAL_REVISIONS"/rev-*; do [ -e "$d" ] || continue; [ "$d" = "$DEST" ] || rm -rf "$d"; done; rm -rf "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* "$PORTAL_RUNTIME"/pending-* "$PART_DIR" 2>/dev/null || true
 uci set "wiflow.core.portal_revision=$REV"; uci set wiflow.core.portal_sync_status='active'; uci set wiflow.core.portal_sync_error=''; uci commit wiflow >/dev/null 2>&1 || true; secure_configs; /usr/lib/wiflow/portal-firewall refresh >/dev/null 2>&1 || true
 wlog content "Nhận nội dung portal bản $REV · $(grep -c . "$MAN" 2>/dev/null || echo 0) file" 2>/dev/null || true
 ack="/tmp/wiflow-portal-ack.$$"; body="{\"revision\":$REV,\"status\":\"active\",\"data_generation\":$WIFLOW_DATA_GENERATION}"; wiflow_post "$ack" "$WIFLOW_PORTAL_API/ack" "$body" >/dev/null 2>&1 || true; rm -f "$ack" "$RESP"; logger -t wiflow-portal-sync "status=active revision=$REV mode=$mode" 2>/dev/null || true

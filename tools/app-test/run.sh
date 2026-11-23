@@ -4,6 +4,7 @@
 T="$(cd "$(dirname "$0")" && pwd)"
 B="$T/bench.sh"
 export WIFLOW_TICK=4
+export WIFLOW_NET_ON=3
 fails=0
 pass(){ echo "PASS $*"; }
 fail(){ echo "FAIL $*"; fails=$((fails+1)); }
@@ -39,7 +40,7 @@ diff -r /tmp/cfg.before /etc/config >/dev/null && pass "boot is idempotent (no c
 rm -rf /tmp/cfg.before
 
 expect "rpcd: only status, pair, unpair, job_clear" "$($B x ubus -v list wiflow | sed -n 's/^[[:space:]]*"\([a-z_]*\)":.*/\1/p' | sort | tr "\n" " ")" "^job_clear pair status unpair $"
-expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '3\.4'\)$"
+expect "status before linking" "$(st "(s['wp']['paired'], s['device']['model'], s['device']['agent'])")" "^\(False, 'Wiflow Router', '3\.5'\)$"
 expect "status: server host shown on the link card" "$(st "s['wp']['server']")" "^[A-Za-z0-9.:-]+$"
 expect "pair: bad format" "$(call pair '{"code":"abc"}')" '12 letters and digits'
 
@@ -63,7 +64,7 @@ n1="$(wc -l < /tmp/mock/iwinfo.log 2>/dev/null || echo 0)"
 [ "$n0" = "$n1" ] && pass "no driver access while the Wiflow App page is closed" || fail "driver polled in the background ($n0 -> $n1)"
 expect "status after linking" "$(st "(s['wp']['paired'], s['wp']['account'])")" "^\(True, 'WIFUID482913'\)$"
 hb="$(tail -n1 /tmp/mock/wp/heartbeat.jsonl)"
-expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^3\.4 4  Wiflow 2\.4G (lan|wifi) \[\]$'
+expect "heartbeat body: SSIDs as set in LuCI, no guest data" "$(printf '%s' "$hb" | python3 -c "import json,sys; b=json.load(sys.stdin); print(b['agent_version'], b['data_generation'], b['wifi_ssid'], b['guest_ssid'], b['health']['uplink_active'], b['events'])")" '^3\.5 4  Wiflow 2\.4G (lan|wifi) \[\]$'
 
 wp "s['commands']=[
  {'id':'c1','action':'change_guest_ssid','payload':{'guest_ssid':'X'}},
@@ -100,6 +101,9 @@ expect "plan renewed: stored" "$(U get wiflow.core.plan_active)" '^1$'
 r="$(job unpair)"; expect "unpair from router" "$r|$(U get wiflow.core.paired)|$(U get wiflow.core.device_token)" '^success\|.*\|0\|$'
 echo '{}' > /tmp/rq.json; $B x /usr/libexec/wiflow/job diag /tmp/rq.json
 r="$(st "(s['job'] or {}).get('state','')")"; expect "diagnostic report (keys hidden)" "$r|$(grep -c '== wireless' /tmp/wiflow/diag.txt)|$(grep -c 'cafe1234' /tmp/wiflow/diag.txt)" '^success\|1\|0$'
+expect "diagnostic report: memory section (free RAM, /tmp, connections, load, biggest programs)" "$(grep -c '== memory' /tmp/wiflow/diag.txt)|$(grep -c '^RAM: còn [0-9]* MB / [0-9]* MB' /tmp/wiflow/diag.txt)" '^1\|1$'
+$B x sh -c '. /usr/lib/wiflow/common.sh; pidof(){ echo 1; }; state_set ram_log ''; watchdog_tick' >/dev/null 2>&1
+expect "memory log: the watchdog writes the RAM line to the log (hourly, and every 10 minutes with the biggest programs when RAM is low)" "$(grep -c '|RAM: còn' /tmp/wiflow/log /tmp/wiflow-log 2>/dev/null | awk -F: '{s+=$2} END{print (s>0)?"logged":"none"}')" '^logged$'
 
 . "$T/portal-test.sh"
 
@@ -149,6 +153,53 @@ $B x sh -c "uci delete wireless.wfsrc; uci commit wireless"
 $B x ip link set wan up
 $B world 'w["wan_cable"]=True; w["inet"].update({k: True for k in w["inet"]})'
 rm -rf /tmp/wiflow/st/recovery /tmp/wiflow/st/boot_reason
+# --- v3.5: the self-recovery does not cut a network that is fine, nor one somebody is working on.
+# Here the router has a route but the Internet checks fail, so the recovery would act at once (steps of 6, 30 and 60 s).
+rwait(){ for i in $(seq 1 "$1"); do eval "$2" && return 0; sleep 1; done; return 1; }
+rlog(){ grep -c "$1" /tmp/wiflow/log 2>/dev/null || true; }
+rec_restart(){ $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1; rm -rf /tmp/wiflow/st/recovery /tmp/wiflow-disrupt /tmp/wiflow-portal-sync.lock /tmp/wiflow/log; : > /tmp/mock/calls.log; $B agent; }
+$B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
+export WIFLOW_REC_SCALE=30
+$B world 'w["wan_cable"]=True; w["inet"].update({k: True for k in w["inet"]}); w["block_https"]=True; w["block_443"]=True; w["block_http"]=True'
+rec_restart
+wait_for 40 "not s['internet']['online']" && pass "recovery hold: the router is offline (route there, checks failing)" || fail "recovery hold: not offline: $(st "s['internet']")"
+# 1) somebody edits the network settings (LuCI): the recovery waits, however long it takes
+for i in 1 2 3 4 5 6 7; do $B x touch /etc/config/network; sleep 2; done
+expect "recovery hold: while the network settings are being edited nothing is restarted (3 steps of 6 s passed)" "$(grep -c '^ifup\|^wifi reload' /tmp/mock/calls.log)|$(st "s['system']['recovery']['stage']")" '^0\|0$'
+expect "recovery hold: the log says why it waits" "$(rlog 'Self-recovery waits: the network or WiFi settings were just changed')" '^1$'
+# 2) a content download is running (its lock exists): still waiting
+$B x mkdir -p /tmp/wiflow-portal-sync.lock
+rwait 20 '[ "$(rlog "new content is downloading")" -ge 1 ]' && pass "recovery hold: a content download running also holds it (the log says so)" || fail "recovery hold: sync lock not noticed: $(tail -n5 /tmp/wiflow/log)"
+sleep 8
+expect "recovery hold: nothing restarted during the download either" "$(grep -c '^ifup\|^wifi reload' /tmp/mock/calls.log)" '^0$'
+# 3) another part restarted the network a moment ago (the shared marker)
+$B x rmdir /tmp/wiflow-portal-sync.lock
+for i in 1 2 3 4; do $B x sh -c '. /usr/lib/wiflow/common.sh; disrupt_mark'; sleep 2; done
+expect "recovery hold: a network restart by another part of the system holds it (shared marker, written by the shell, read by the agent)" "$(rlog 'Self-recovery waits: the network was just restarted')|$(grep -c '^ifup\|^wifi reload' /tmp/mock/calls.log)" '^1\|0$'
+# 4) nothing in the way any more: the recovery goes on by itself
+rwait 40 'grep -q "^ifup wan" /tmp/mock/calls.log' && pass "recovery hold: once nothing is changing, the recovery goes on by itself (WAN renewed)" || fail "recovery hold: never resumed: $(tail -n6 /tmp/wiflow/log)"
+# 5) the source router answers: the outage is outside, so nothing is cut
+$B world 'w["gw_answers"]=True'
+rec_restart
+rwait 40 '[ "$(st "s[\"internet\"][\"online\"]")" = False ]' || true
+sleep 16
+expect "gateway answers: no WAN renew, no WiFi restart (the outage is outside the router)" "$(grep -c '^ifup\|^wifi reload' /tmp/mock/calls.log)|$(rlog 'the source router answers')" '^0\|[1-9]'
+expect "gateway answers: the log says nothing was touched" "$(rlog 'nothing is restarted')" '^[1-9]'
+$B world 'w["gw_answers"]=False'
+rwait 40 'grep -q "^ifup wan" /tmp/mock/calls.log' && pass "gateway silent: the recovery acts again (WAN renewed)" || fail "gateway silent: nothing happened: $(tail -n6 /tmp/wiflow/log)"
+# 6) this router's BusyBox may have no ping: a connection to the gateway tells the same (answered or refused, address resolved)
+$B world 'w["no_ping"]=True'
+rec_restart
+rwait 60 'grep -q "^ifup wan" /tmp/mock/calls.log' && pass "no ping program, gateway silent: the recovery acts (WAN renewed)" || fail "no ping, gateway silent: nothing happened: $(tail -n6 /tmp/wiflow/log)"
+$B x ip addr add 192.168.1.1/32 dev lo; $B x ip neigh replace 192.168.1.1 lladdr 02:00:00:00:00:01 dev wan nud permanent
+rec_restart
+rwait 40 '[ "$(st "s[\"internet\"][\"online\"]")" = False ]' || true
+sleep 16
+expect "no ping program, gateway there (refuses the connection): nothing is restarted" "$(grep -c '^ifup\|^wifi reload' /tmp/mock/calls.log)|$(rlog 'the source router answers')" '^0\|[1-9]'
+$B x ip addr del 192.168.1.1/32 dev lo; $B x ip neigh del 192.168.1.1 dev wan
+$B world 'w["no_ping"]=False'
+$B world 'w["block_https"]=False; w["block_443"]=False; w["block_http"]=False'
+$B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 unset WIFLOW_REC_SCALE
 $B x sh -c 'kill $(pgrep -f "^/usr/bin/ucode /usr/libexec/wiflow/agen[t]")'; sleep 1
 pgrep -f '^/usr/bin/ucode /usr/libexec/wiflow/agen[t]' >/dev/null && fail "agent ignores SIGTERM" || pass "agent stops on SIGTERM"

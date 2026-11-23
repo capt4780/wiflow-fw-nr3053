@@ -1,4 +1,4 @@
-# v3.4 guest session tests (sourced by portal-test.sh, uses its helpers and variables). Real nftables in the bench
+# v3.5 guest session tests (sourced by portal-test.sh, uses its helpers and variables). Real nftables in the bench
 # namespace, a real veth "phone" for the idle timer, the real portal scripts. Covers: the firewall renews the idle timer
 # by itself, one sweep a minute keeps the session files in line, guests who were online while the portal was off keep
 # their Internet, the fast probe path, captive-api by the real state, the Internet check (two failures in a row) and
@@ -118,18 +118,33 @@ $B x sh -c '. /usr/lib/wiflow/common.sh; safe_mode_enter'; safe="$(ps)"
 $B x sh -c '. /usr/lib/wiflow/common.sh; state_set safe_until ""; portal_activate'; on2="$(ps)"
 expect "health report: the portal state is on, then safe in safe mode, then on again" "$on|$safe|$on2" '^on\|safe\|on$'
 
-# ---- 8. the Internet check: one failure is not an outage, two in a row are; either of the two ways answering is enough
+# ---- 8. the Internet check: ONE checker with three tests (HTTPS, a TCP connect, plain HTTP); any one answering means online.
+# One failed round is not an outage, two in a row are; a lost default route is an outage at once.
 nc(){ $B x sh -c '. /usr/lib/wiflow/common.sh; net_check_now; echo "$? $(net_status_read | cut -d" " -f1)"'; }
 rm -f /tmp/wiflow-net-fails
 expect "net check: online" "$(nc)" '^0 1$'
-$B world 'w["block_https"]=True; w["block_443"]=True'
-expect "net check: one failed check does not flip the status to offline" "$(nc)" '^1 1$'
-expect "net check: the second failure in a row does" "$(nc)" '^1 0$'
+expect "net check: the status file holds value, uptime seconds and latency (50 ms from the HTTPS check)" "$($B x cat /tmp/wiflow-net-status)" '^1 [0-9]+ 50$'
+$B world 'w["block_https"]=True; w["block_443"]=True; w["block_http"]=True'
+expect "net check: one failed round does not flip the status to offline" "$(nc)" '^1 1$'
+expect "net check: the second failed round in a row does" "$(nc)" '^1 0$'
 $B world 'w["block_https"]=False'
-expect "net check: the HTTPS check answers while the TCP connect is blocked -> online again" "$(nc)" '^0 1$'
+expect "net check: only the HTTPS check answers -> online again" "$(nc)" '^0 1$'
 $B world 'w["block_https"]=True; w["block_443"]=False'
-expect "net check: the TCP connect answers while the HTTPS check fails -> online" "$(nc)" '^0 1$'
-$B world 'w["block_https"]=False; w["block_443"]=False'
+expect "net check: only the TCP connect answers -> online" "$(nc)" '^0 1$'
+$B world 'w["block_443"]=True; w["block_http"]=False'
+expect "net check: only the plain HTTP check answers -> online (a blocked HTTPS or TLS never makes the router look offline)" "$(nc)" '^0 1$'
+$B world 'w["block_https"]=False; w["block_443"]=False; w["block_http"]=False'
+$B x sh -c '. /usr/lib/wiflow/common.sh; printf "%s\n" 5 > /tmp/wiflow-net-fails; net_check_now'
+expect "net check: a good round clears the failure count" "$($B x sh -c 'cat /tmp/wiflow-net-fails 2>/dev/null | wc -c')" '^0$'
+# the status is written once per check and read without starting any program
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 1 42; net_status_read' | grep -Eq '^1 [0-9] 42$' && pass "net status: value, age (uptime based) and latency read back" || fail "net status read: $($B x sh -c '. /usr/lib/wiflow/common.sh; net_status_read')"
+$B x sh -c '. /usr/lib/wiflow/common.sh; printf "1 999999 20\n" > /tmp/wiflow-net-status; net_status_read' | grep -Eq '^1 -' && fail "net status: a time in the future (clock or reboot) must read as old, not new" || pass "net status: a time in the future reads as old"
+# net_maintain refreshes an old status and leaves a fresh one alone (no extra requests)
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 1 42'; : > /tmp/mock/calls.log
+$B x sh -c '. /usr/lib/wiflow/common.sh; WIFLOW_NET_ON=30 net_maintain'
+expect "net maintain: a fresh status is not checked again" "$(grep -c '^probe' /tmp/mock/calls.log)" '^0$'
+$B x sh -c '. /usr/lib/wiflow/common.sh; printf "1 1 42\n" > /tmp/wiflow-net-status; WIFLOW_NET_ON=30 net_maintain'
+expect "net maintain: an old status is checked again, once" "$(grep -c '^probe .* True$' /tmp/mock/calls.log | awk '{print ($1>=1)?"checked":"not"}')|$($B x sh -c '. /usr/lib/wiflow/common.sh; net_status_read | cut -d" " -f1')" '^checked\|1$'
 
 # ---- 9. private DNS (853): refused while the network might be to blame, skipped for 30 minutes when it keeps being blocked
 $B x sh -c '. /usr/lib/wiflow/common.sh; state_set dot_fails 0; state_set dot_skip_until 0'

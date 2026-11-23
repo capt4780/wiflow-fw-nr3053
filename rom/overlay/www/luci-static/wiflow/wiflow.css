@@ -201,7 +201,10 @@ svg{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:
   .w-side .w-lg{margin-bottom:16px;align-items:center}
   .w-side .w-lg img{height:36px}
   .w-side .w-code{display:none}
-  .w-side .w-nv{display:flex;flex-direction:column;gap:8px;flex:1}
+  .w-side .w-nv{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  .w-side .w-nv::-webkit-scrollbar{display:none}
+  .w-side .w-nv a{flex:none}
+  .w-side .w-lg,.w-side .w-lang{flex:none}
   .w-side a{width:48px;height:48px;border-radius:var(--r);display:grid;place-items:center;color:var(--mut)}
   .w-side a span.w-l{display:none}
   .w-side a.w-on{background:var(--pri-soft);color:var(--pri-ink)}

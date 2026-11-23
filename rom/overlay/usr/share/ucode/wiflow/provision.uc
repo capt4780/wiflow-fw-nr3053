@@ -58,6 +58,8 @@ export function ensure_guest_network() {
 };
 
 export function reload(what) {
+	if (what.network || what.wireless || what.firewall || what.dhcp)
+		W.disrupt_mark();
 	if (what.network)
 		W.run('ubus call network reload');
 	if (what.wireless)

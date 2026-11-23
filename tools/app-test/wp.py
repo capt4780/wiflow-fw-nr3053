@@ -73,11 +73,26 @@ class H(BaseHTTPRequestHandler):
                     'website_url': po.get('website_url', ''), 'popup_count': 0, 'files': files}})
             if self.path.startswith('/wp-json/portal/media/'):
                 n = KEYS.get(self.path.rsplit('/', 1)[1], '')
+                rng = self.headers.get('Range')
+                log('media-req', {'name': n, 'range': rng, 't': time.time()})
+                if os.path.exists(D + '/media_fail'):
+                    return self.reply({'code': 'busy'}, 500)
                 try:
                     b = open(D + '/media/' + n, 'rb').read()
                 except Exception:
                     return self.reply({'code': 'nf'}, 404)
-                self.send_response(200); self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
+                # like the plugin: one byte range (bytes=N- or N-M) answers 206, a start past the end 416
+                m = re.match(r'^bytes=(\d+)-(\d*)$', rng or '')
+                if m:
+                    a0 = int(m.group(1)); a1 = int(m.group(2)) if m.group(2) else len(b) - 1
+                    if a0 >= len(b):
+                        self.send_response(416); self.send_header('Content-Range', 'bytes */%d' % len(b)); self.send_header('Content-Length', '0'); self.end_headers()
+                        return
+                    a1 = min(a1, len(b) - 1)
+                    self.send_response(206); self.send_header('Content-Range', 'bytes %d-%d/%d' % (a0, a1, len(b))); self.send_header('Accept-Ranges', 'bytes')
+                    self.send_header('Content-Length', str(a1 - a0 + 1)); self.end_headers(); self.wfile.write(b[a0:a1 + 1])
+                    return
+                self.send_response(200); self.send_header('Accept-Ranges', 'bytes'); self.send_header('Content-Length', str(len(b))); self.end_headers(); self.wfile.write(b)
                 return
         self.reply({'code': 'rest_no_route'}, 404)
 

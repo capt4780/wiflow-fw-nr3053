@@ -9,13 +9,41 @@ return baseclass.extend({
 	__init__() {
 		document.querySelectorAll('.w-lang').forEach(box => {
 			const btn = box.querySelector('.w-lb');
+			const menu = box.querySelector('.w-lm');
+
+			/* standard menu-button semantics for screen readers and the keyboard (no change to the look) */
+			btn.setAttribute('aria-haspopup', 'true');
+			btn.setAttribute('aria-expanded', 'false');
+			menu.setAttribute('role', 'menu');
+			menu.querySelectorAll('button').forEach(b => {
+				b.setAttribute('role', 'menuitemradio');
+				b.setAttribute('aria-checked', b.classList.contains('w-on') ? 'true' : 'false');
+			});
 
 			btn.addEventListener('click', ev => {
 				ev.stopPropagation();
 				const was = box.classList.contains('w-open');
 				this.closeMenus();
-				if (!was)
+				if (!was) {
 					box.classList.add('w-open');
+					btn.setAttribute('aria-expanded', 'true');
+				}
+			});
+
+			box.addEventListener('keydown', ev => {
+				if (!box.classList.contains('w-open'))
+					return;
+				if (ev.key == 'Escape') {
+					ev.stopPropagation();
+					this.closeMenus();
+					btn.focus();
+				}
+				else if (ev.key == 'ArrowDown' || ev.key == 'ArrowUp') {
+					const items = Array.from(menu.querySelectorAll('button'));
+					const i = items.indexOf(document.activeElement);
+					ev.preventDefault();
+					items[(i + (ev.key == 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+				}
 			});
 
 			box.querySelectorAll('.w-lm button').forEach(b => b.addEventListener('click', ev => {
@@ -45,16 +73,25 @@ return baseclass.extend({
 
 		document.addEventListener('click', () => this.closeMenus());
 		document.addEventListener('keydown', ev => { if (ev.key == 'Escape') this.closeMenus(); });
+		/* the sidebar and the top bar swap places when the window is resized: no menu stays open in the hidden one */
+		let lw = window.innerWidth;
+		window.addEventListener('resize', () => { if (window.innerWidth != lw) { lw = window.innerWidth; this.closeMenus(); } });
 	},
 
 	closeMenus() {
-		document.querySelectorAll('.w-lang.w-open').forEach(b => b.classList.remove('w-open'));
+		document.querySelectorAll('.w-lang.w-open').forEach(b => {
+			b.classList.remove('w-open');
+			const t = b.querySelector('.w-lb');
+			if (t)
+				t.setAttribute('aria-expanded', 'false');
+		});
 	},
 
 	setLang(lang, cur) {
 		this.closeMenus();
-		if (!lang || lang == cur)
+		if (!lang || lang == cur || this.busy)
 			return;
+		this.busy = true;	/* a second click while the change is saved must not start another one */
 
 		/* the sign-in pages show the same language after signing out */
 		document.cookie = 'wf_lang=' + lang + '; path=/; max-age=31536000; SameSite=Lax';

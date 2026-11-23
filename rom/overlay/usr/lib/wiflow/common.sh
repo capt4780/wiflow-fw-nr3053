@@ -11,14 +11,14 @@ PORTAL_REVISIONS=$PORTAL_RUNTIME/revisions
 PORTAL_ACTIVE=$PORTAL_RUNTIME/active
 # Production WordPress device API is package-owned, not user-configurable.
 WIFLOW_REST_ROOT="${WIFLOW_REST:-https://wiflow.projifylab.com/wp-json}"
-WIFLOW_DEVICE_API="$WIFLOW_REST_ROOT/devices"
 WIFLOW_PORTAL_API="$WIFLOW_REST_ROOT/portal"
-WIFLOW_AGENT_VERSION="$(tr -d ' \r\n' < /etc/wiflow_release 2>/dev/null)"; WIFLOW_AGENT_VERSION="${WIFLOW_AGENT_VERSION:-1.1.0}"
+WIFLOW_AGENT_VERSION="$( { tr -d ' \r\n' < /etc/wiflow_release; } 2>/dev/null)"; WIFLOW_AGENT_VERSION="${WIFLOW_AGENT_VERSION:-1.1.0}"
 WIFLOW_MODEL_CODE='NR3053'; WIFLOW_MODEL_NAME='Wiflow Router'
-WIFLOW_GATE_MASTER="WIFDID$WIFLOW_MODEL_CODE"
 WIFLOW_DATA_GENERATION='4'
-mkdir -p "$ROOT" "$CLIENT_SESSIONS" "$PORTAL_REVISIONS" 2>/dev/null || true
-chmod 700 "$ROOT" "$CLIENT_SESSIONS" 2>/dev/null || true
+[ -d "$ROOT" ] && [ -d "$CLIENT_SESSIONS" ] && [ -d "$PORTAL_REVISIONS" ] || {
+    mkdir -p "$ROOT" "$CLIENT_SESSIONS" "$PORTAL_REVISIONS" 2>/dev/null || true
+    chmod 700 "$ROOT" "$CLIENT_SESSIONS" 2>/dev/null || true
+}
 redirect(){ printf 'Status: 302 Found\r\nLocation: %s\r\nCache-Control: no-store\r\n\r\n' "$1"; exit 0; }
 read_body(){ n="${CONTENT_LENGTH:-0}"; case "$n" in ''|*[!0-9]*) n=0;; esac; [ "$n" -le 16384 ] || n=16384; BODY="$(dd bs=1 count="$n" 2>/dev/null)"; }
 urldecode(){ /usr/sbin/uhttpd -d "$(printf '%s' "$1" | tr '+' ' ')" 2>/dev/null; }
@@ -46,7 +46,7 @@ wiflow_post(){
 }
 
 portal_storage_reset(){
-    rm -rf "$PORTAL_REVISIONS" "$PORTAL_ACTIVE" "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* 2>/dev/null || true
+    rm -rf "$PORTAL_REVISIONS" "$PORTAL_ACTIVE" "$PORTAL_RUNTIME"/.staging-* "$PORTAL_RUNTIME"/.active-* "$PORTAL_RUNTIME"/pending-* "$PORTAL_RUNTIME"/partial 2>/dev/null || true
     mkdir -p "$PORTAL_REVISIONS" 2>/dev/null || true
     uci set wiflow.core.portal_revision='0'
     uci set wiflow.core.portal_sync_status='idle'
@@ -250,12 +250,6 @@ guest_carry_over(){
     return 0
 }
 
-# Only an explicit DEVICE_UNPAIRED from WordPress, seen 3 times in a row over
-# at least 10 minutes, clears the local pairing. Any other auth error is
-# treated as a server-side problem: the router keeps serving guests.
-UNPAIR_CONFIRMATIONS=3
-UNPAIR_MIN_SECONDS=600
-
 # Keep only the revision the active link points to, plus nothing half-written.
 # Covers a power cut between the active-link swap and the old-revision cleanup.
 portal_storage_gc(){
@@ -280,48 +274,50 @@ storage_free_bytes(){ kb="$(df -k "$PORTAL_RUNTIME" 2>/dev/null | awk 'END{print
 media_held_bytes(){ kb="$( { du -sk "$PORTAL_ACTIVE/media/" "$PORTAL_RUNTIME"/pending-*/media 2>/dev/null || true; } | awk '{s+=$1} END{print s+0}')"; case "$kb" in ''|*[!0-9]*) kb=0;; esac; printf '%s' $((kb * 1024)); }
 storage_usable_bytes(){ printf '%s' $(( $(storage_free_bytes) + $(media_held_bytes) )); }
 media_budget_bytes(){ u="$(storage_usable_bytes)"; printf '%s' $((u / 100 * MEDIA_CEILING_PCT)); }
-# v1.0.21: LuCI always uses the Wiflow theme. It is the only registered theme
-# (System > System > Language and Style offers nothing else) and any change made
-# from the shell, LuCI or a theme package (re)install is undone on the next
-# check (boot + every 15 s). Cheap no-op when already correct.
-LUCI_THEME_URL='/luci-static/wiflow'
-# Used only when the whole Wiflow package is removed: LuCI goes back to Bootstrap.
-# v1.0.23: LuCI root password defaults to 1234 (owner's decision; change it in
-# LuCI > System > Administration). Fresh install: always set. Upgrade / boot: set only
-# while root has no password (e.g. after a firmware reset), never over a changed one.
-LUCI_DEFAULT_ROOT_PW='1234'
-WIFLOW_SHADOW="${WIFLOW_SHADOW:-/etc/shadow}"
-
 # ---------------------------------------------------------------------------
-# v1.0.15: router Internet status for the portal. One small file replaced in
-# one step (write tmp + rename): readers never see a partial file and writers
-# never wait for a lock. Format: "<1|0> <epoch>".
+# Router Internet status: ONE checker (net_check_now, run by portal-session-loop) writes it, everybody else reads it
+# (portal pages, guest sign-in, the agent that reports to WordPress and runs the recovery). One small file replaced
+# in one step (write tmp + rename): readers never see a partial file and writers never wait for a lock.
+# Format: "<1|0> <uptime seconds> <latency ms>" (latency 0 when unknown, -1 when offline). The time is the router's
+# uptime, so a clock change (the time is set from WordPress after a start) never makes the status look old or new.
 # ---------------------------------------------------------------------------
 NET_STATUS=/tmp/wiflow-net-status
-net_status_write(){ _nt="$NET_STATUS.$$"; printf '%s %s\n' "$1" "$(date +%s)" > "$_nt" 2>/dev/null && mv -f "$_nt" "$NET_STATUS" 2>/dev/null; }
-# Prints "<value> <age_seconds>"; value is "?" when unknown.
-net_status_read(){
-    _sv=''; _st=0; read -r _sv _st 2>/dev/null < "$NET_STATUS" || true
-    case "$_sv" in 0|1) :;; *) _sv='?';; esac; case "$_st" in ''|*[!0-9]*) _st=0;; esac
-    printf '%s %s' "$_sv" $(( $(date +%s) - _st ))
+net_status_write(){ read -r _un _ < /proc/uptime 2>/dev/null || _un=0; _nt="$NET_STATUS.$$"; printf '%s %s %s\n' "$1" "${_un%%.*}" "${2:--1}" > "$_nt" 2>/dev/null && mv -f "$_nt" "$NET_STATUS" 2>/dev/null; }
+# Sets NS_V (1, 0 or ?), NS_AGE (seconds since the check) and NS_MS (latency); starts no program.
+net_status_load(){
+    NS_V=''; NS_T=0; NS_MS=-1; read -r NS_V NS_T NS_MS 2>/dev/null < "$NET_STATUS" || true
+    case "$NS_V" in 0|1) :;; *) NS_V='?';; esac; case "$NS_T" in ''|*[!0-9]*) NS_T=0;; esac; case "$NS_MS" in ''|*[!0-9]*) NS_MS=-1;; esac
+    read -r _un _ < /proc/uptime 2>/dev/null || _un=0; NS_AGE=$(( ${_un%%.*} - NS_T ))
+    [ "$NS_T" -gt 0 ] && [ "$NS_AGE" -ge 0 ] || NS_AGE=999999
 }
-# One real Internet check, about 3 s at most: an HTTPS request to the connectivity-check server and a TCP connect to
-# 1.1.1.1:443 run side by side; either one answering means "online". v3.4: a single failed check does not flip the
-# status to offline (a weak source WiFi loses one now and then); the second failure in a row does.
+# Prints "<value> <age_seconds> <latency_ms>"; value is "?" when unknown.
+net_status_read(){ net_status_load; printf '%s %s %s' "$NS_V" "$NS_AGE" "$NS_MS"; }
+# One real Internet check, about 3 s at most. Three independent tests run side by side and any one answering means
+# "online": HTTPS to the connectivity-check server (also the latency), a TCP connect to 1.1.1.1:443 (needs no valid
+# clock) and a plain HTTP request (needs no TLS). A weak source WiFi loses a check now and then, so the first failed
+# round does not flip the status to offline; the second one in a row does. A lost default route is offline at once.
 NET_FAILS=/tmp/wiflow-net-fails
 net_check_now(){
     _nd="/tmp/wiflow-netchk.$$"; rm -rf "$_nd"; mkdir -p "$_nd" 2>/dev/null || return 1
     if net_link_up; then
-        ( uclient-fetch -q -T 3 -O /dev/null 'https://connectivitycheck.gstatic.com/generate_204' >/dev/null 2>&1 && : > "$_nd/a" ) &
-        ( _tc="$(curl -sk -m 3 --connect-timeout 3 -o /dev/null -w '%{time_connect}' 'https://1.1.1.1/' 2>/dev/null)"; awk -v t="${_tc:-0}" 'BEGIN{exit !(t+0>0)}' && : > "$_nd/b" ) &
+        ( _o="$(curl -s -o /dev/null -m 3 --connect-timeout 3 -w '%{http_code} %{time_total}' 'https://connectivitycheck.gstatic.com/generate_204' 2>/dev/null)"; [ "${_o%% *}" = 204 ] && printf '%s\n' "$_o" > "$_nd/a" ) &
+        ( _tc="$(curl -sk -m 3 --connect-timeout 3 -o /dev/null -w '%{time_connect}' 'https://1.1.1.1/' 2>/dev/null)"; awk -v t="${_tc:-0}" 'BEGIN{exit !(t+0>0)}' && printf '%s\n' "$_tc" > "$_nd/b" ) &
+        ( [ "$(curl -s -m 3 --connect-timeout 3 'http://detectportal.firefox.com/success.txt' 2>/dev/null | tr -d '\r\n')" = success ] && : > "$_nd/c" ) &
         wait
     fi
-    if [ -e "$_nd/a" ] || [ -e "$_nd/b" ]; then rm -rf "$_nd"; rm -f "$NET_FAILS"; net_status_write 1; return 0; fi
+    if [ -e "$_nd/a" ] || [ -e "$_nd/b" ] || [ -e "$_nd/c" ]; then
+        _ms="$( { awk 'NF>=2{print $2}' "$_nd/a" 2>/dev/null; cat "$_nd/b" 2>/dev/null; } | awk '$1+0>0{printf "%d", $1*1000+0.5; exit}')"
+        rm -rf "$_nd"; rm -f "$NET_FAILS"; net_status_write 1 "${_ms:-0}"; return 0
+    fi
     rm -rf "$_nd"
     _nf="$(cat "$NET_FAILS" 2>/dev/null)"; case "$_nf" in ''|*[!0-9]*) _nf=0;; esac; _nf=$((_nf+1)); printf '%s\n' "$_nf" > "$NET_FAILS" 2>/dev/null
-    if [ "$_nf" -ge 2 ] || ! net_link_up; then net_status_write 0; fi
+    if [ "$_nf" -ge 2 ] || ! net_link_up; then net_status_write 0 -1; fi
     return 1
 }
+# Something disruptive just ran (WiFi reload, network or firewall restart; not the recovery's own steps, they have their own timers): the self-recovery waits
+# a while before it adds another one. The time is kept as uptime seconds, so a clock change cannot confuse it.
+DISRUPT_MARK=/tmp/wiflow-disrupt
+disrupt_mark(){ printf '%s\n' "$(uptime_s)" > "$DISRUPT_MARK" 2>/dev/null || true; }
 # v3.1: run a command for at most $1 seconds (no dependency on a timeout applet); 124 when it was stopped.
 run_limited(){
     _rs="$1"; shift; "$@" & _rp=$!; _ri=0
@@ -377,16 +373,17 @@ guest_revoke_all(){
 # v3.1: called every 5 s with the background check: Internet gone for 5 minutes -> guests sign in again.
 NET_DOWN_SINCE=/tmp/wiflow-net-down-since
 net_down_tick(){
-    set -- $(net_status_read)
-    if [ "$1" = 0 ]; then
-        [ -f "$NET_DOWN_SINCE" ] || date +%s > "$NET_DOWN_SINCE"
+    net_status_load
+    if [ "$NS_V" = 0 ]; then
+        read -r _dn _ < /proc/uptime 2>/dev/null || _dn=0; _dn="${_dn%%.*}"
+        [ -f "$NET_DOWN_SINCE" ] || printf '%s\n' "$_dn" > "$NET_DOWN_SINCE"
         read -r _ds _dr < "$NET_DOWN_SINCE" 2>/dev/null || return 0
         case "$_ds" in ''|*[!0-9]*) return 0;; esac
-        if [ $(( $(date +%s) - _ds )) -ge "${NET_DOWN_REVOKE:-300}" ] && [ "${_dr:-}" != done ]; then
+        if [ $(( _dn - _ds )) -ge "${NET_DOWN_REVOKE:-300}" ] && [ "${_dr:-}" != done ]; then
             portal_nft_ready && guest_revoke_all
             printf '%s done\n' "$_ds" > "$NET_DOWN_SINCE"
         fi
-    elif [ "$1" = 1 ]; then rm -f "$NET_DOWN_SINCE"; fi
+    elif [ "$NS_V" = 1 ]; then [ -f "$NET_DOWN_SINCE" ] && rm -f "$NET_DOWN_SINCE"; fi
     return 0
 }
 ms_now(){ awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null; }
@@ -395,8 +392,8 @@ timing_write(){ _tt="/tmp/wiflow-timing-$1.$$"; printf '%s\n' "$2" > "$_tt" 2>/d
 # Refresh the status when older than $1 seconds (or unknown). Only one check
 # runs at a time; anyone else simply keeps the current value (never waits).
 net_refresh_if_stale(){
-    _nm="$1"; set -- $(net_status_read)
-    [ "$1" != '?' ] && [ "$2" -lt "$_nm" ] && return 0
+    _nm="$1"; net_status_load
+    [ "$NS_V" != '?' ] && [ "$NS_AGE" -lt "$_nm" ] && return 0
     _nl=/tmp/wiflow-netcheck.lock
     if ! mkdir "$_nl" 2>/dev/null; then
         # A check killed mid-way must not block future checks.
@@ -407,11 +404,11 @@ net_refresh_if_stale(){
 }
 # One pass of the background check (portal-session-loop, every 5 s).
 net_maintain(){
+    net_status_load
     if net_link_up; then
-        set -- $(net_status_read)
-        if [ "$1" = 1 ]; then net_refresh_if_stale 30; else net_refresh_if_stale 5; fi
+        if [ "$NS_V" = 1 ]; then net_refresh_if_stale "${WIFLOW_NET_ON:-30}"; else net_refresh_if_stale 5; fi
     else
-        set -- $(net_status_read); [ "$1" = 0 ] && [ "$2" -lt 30 ] || net_status_write 0
+        [ "$NS_V" = 0 ] && [ "$NS_AGE" -lt 30 ] || net_status_write 0 -1
     fi
     return 0
 }
@@ -434,17 +431,9 @@ wlog(){
 tcp_listening(){ addr="$1"; port="$2"; [ -r /proc/net/tcp ] || return 1; awk -v target="${addr}:${port}" '$2 == target && $4 == "0A" {ok=1} END{exit(ok?0:1)}' /proc/net/tcp; }
 cfg_num(){ _cv="$(uci -q get "wiflow.core.$1" 2>/dev/null || true)"; case "$_cv" in ''|*[!0-9]*) _cv="$2";; esac; [ "${#_cv}" -le 7 ] || _cv="$2"; printf '%s' "$_cv"; }
 num_or0(){ case "$1" in ''|*[!0-9]*) printf 0;; *) printf '%s' "$1";; esac; }
-# Auto mode keeps both uplinks configured: cable metric 10, source WiFi 20, so
-# the kernel moves to the WiFi by itself when the cable is pulled. When the
-# cable is plugged in but its modem has no Internet, Wiflow adds a route of
-# higher priority (proto 188) through the WiFi until the cable answers again.
-# The override route is told apart by its metric (1); netifd never uses it.
-UPLINK_OVR_METRIC=1
-
 # --- Guest controls -----------------------------------------------------------
 # Time is trusted only after NTP synced (hotplug.d/ntp) or WordPress confirmed
 # it. Until then opening hours and session limits are not enforced (fail-open).
-NTP_OK=/tmp/wiflow-ntp-ok
 hm_to_min(){ case "$1" in [0-2][0-9]:[0-5][0-9]) _h="${1%%:*}"; _m="${1##*:}"; _h="${_h#0}"; _m="${_m#0}"; [ "${_h:-0}" -le 24 ] || return 1; printf '%s' $(( ${_h:-0} * 60 + ${_m:-0} ));; *) return 1;; esac; }
 # 0 = guests may use the Internet now, 1 = outside opening hours.
 sched_open_now(){
@@ -519,6 +508,20 @@ stats_sample(){
     return 0
 }
 mem_kb(){ awk -v k="$1:" '$1==k{print $2;exit}' /proc/meminfo 2>/dev/null; }
+# --- Memory report (diagnostics only: the log and the support report; nothing here changes how the router runs) ---
+# Sets MEM_T and MEM_A (kB, total and available); starts no program.
+mem_load(){ MEM_T=0; MEM_A=0; while read -r _mk _mv _; do case "$_mk" in MemTotal:) MEM_T="$_mv";; MemAvailable:) MEM_A="$_mv";; esac; done < /proc/meminfo; }
+# One line: RAM left, /tmp (RAM disk), connection table, load.
+mem_line(){
+    mem_load; _tu="$(df -k /tmp 2>/dev/null | awk 'END{print int($3/1024)}')"
+    _cc="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)")"; _cm="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null)")"
+    read -r _ld _ < /proc/loadavg 2>/dev/null || _ld=0
+    printf 'RAM: còn %s MB / %s MB · /tmp %s MB · kết nối %s/%s · tải %s' "$((MEM_A / 1024))" "$((MEM_T / 1024))" "${_tu:-0}" "$_cc" "$_cm" "$_ld"
+}
+# The biggest programs by resident memory (kB name), one pass over /proc.
+mem_top(){
+    awk 'FNR==1{if(n!="" && r>0)print r, n; n=""; r=0} /^Name:/{n=$2} /^VmRSS:/{r=$2} END{if(n!="" && r>0)print r, n}' /proc/[0-9]*/status 2>/dev/null | sort -rn | head -n "${1:-6}"
+}
 
 # --- Watchdog and safe mode ---------------------------------------------------
 # Safe mode = captive portal off for 10 minutes so guests keep the Internet
@@ -583,13 +586,11 @@ guest_settings_set(){
     return 0
 }
 
-# --- Support report, reset helpers, technician mode ---------------------------
-TECH_MODE=/etc/wiflow/tech-mode
-
 # --- this firmware -------------------------------------------------------------
 # WiFi and network are set in LuCI: "the uplink is up" simply means a default route.
 secure_configs(){ [ -f /etc/config/wiflow ] && chmod 600 /etc/config/wiflow 2>/dev/null || true; }
-net_link_up(){ ip route show default 2>/dev/null | grep -q default; }
+# A default route exists (read from the kernel table, no program is started).
+net_link_up(){ while read -r _li _ld _lg _lf _lc _lu _lm _lk _lx; do [ "$_ld" = 00000000 ] && [ "$_lk" = 00000000 ] && return 0; done < /proc/net/route; return 1; }
 # The agent keeps the clock state in /tmp/wiflow/st (NTP hotplug or WordPress time).
 time_valid(){ [ "$(cat /tmp/wiflow/st/time_ok 2>/dev/null)" = true ] || [ "$(state_get wp_time_ok)" = 1 ]; }
 # What the guest portal is doing: on (captive rules in force), plan (usage plan ended), safe (safe mode), nocontent
@@ -641,6 +642,14 @@ watchdog_tick(){
     _cc="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)")"; _cm="$(num_or0 "$(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null)")"
     if [ "$_cm" -gt 0 ] && [ $((_cc * 100 / _cm)) -ge 90 ] && [ $(( $(uptime_s) - $(num_or0 "$(state_get ct_warn)") )) -ge 3600 ]; then
         state_set ct_warn "$(uptime_s)"; wlog watchdog "Bảng kết nối gần đầy: $_cc/$_cm"
+    fi
+    # RAM in the log once after the start, then once an hour, and at once (at most every 10 minutes) when it runs low
+    # with the biggest programs: a slow leak or a runaway program shows up later in the support report.
+    mem_load; _up="$(uptime_s)"; _rs="$(state_get ram_log)"; _rl="$(num_or0 "$_rs")"; _low=0
+    [ "$MEM_T" -gt 0 ] && [ $((MEM_A * 100 / MEM_T)) -lt 15 ] && _low=1
+    if [ -z "$_rs" ] || [ "$_up" -ge $((_rl + 3600)) ] || { [ "$_low" = 1 ] && [ "$_up" -ge $((_rl + 600)) ]; }; then
+        state_set ram_log "$_up"; wlog watchdog "$(mem_line)"
+        [ "$_low" = 1 ] && wlog watchdog "Bộ nhớ thấp, lớn nhất: $(mem_top 3 | awk '{printf "%s%s %d MB", (NR>1?", ":""), $2, $1/1024}')"
     fi
     [ -n "$_fix" ] || return 0
     state_set wd_restarts $(( $(num_or0 "$(state_get wd_restarts)") + 1 ))

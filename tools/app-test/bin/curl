@@ -10,11 +10,13 @@ if 'connectivitycheck' in url or 'detectportal' in url:
         r = subprocess.run(['ip', 'route', 'get', '1.1.1.1'], capture_output=True, text=True).stdout
         p = r.split()
         dev = p[p.index('dev') + 1] if 'dev' in p else None
-    inet = json.load(open('/tmp/mock/world.json')).get('inet', {})
-    ok = bool(dev) and inet.get(dev, False)
+    w = json.load(open('/tmp/mock/world.json'))
+    ok = bool(dev) and w.get('inet', {}).get(dev, False)
+    # the HTTPS and the plain HTTP test can be blocked on their own (block_https, block_http)
+    ok = ok and not (w.get('block_https', False) if url.startswith('https') else w.get('block_http', False))
     with open('/tmp/mock/calls.log', 'a') as f: f.write('probe %s %s\n' % (dev, ok))
     if 'generate_204' in url:
-        sys.stdout.write('204' if ok else '000'); sys.exit(0 if ok else 7)
+        sys.stdout.write('204 0.050000' if ok else '000 0.000000'); sys.exit(0 if ok else 7)
     sys.stdout.write('success\n' if ok else ''); sys.exit(0 if ok else 7)
 if ':853' in url or url.rstrip('/') in ('https://1.1.1.1', 'https://1.1.1.1:443'):
     # TCP probes: private DNS (DoT, :853, block_dot blocks all four servers, dot_ok lists the only ones that answer) and

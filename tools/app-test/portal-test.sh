@@ -116,7 +116,7 @@ for i in $(seq 1 20); do grep -q "$cid3" /etc/wiflow/guests.known 2>/dev/null &&
 expect "grant check: the form data is remembered and sent only after the grant" "$(grep -c "$cid3" /etc/wiflow/guests.known 2>/dev/null)|$(grep -c 'Tran Thi Binh' /tmp/wiflow-guests.queue /tmp/mock/wp/heartbeat.jsonl 2>/dev/null | awk -F: '{s+=$2} END{print (s>0)?"sent":"missing"}')" '^1\|sent$'
 # Internet gone for good: every guest has to sign in again
 $B world 'w["inet"].update({k: False for k in w["inet"]})'
-$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 0; echo $(( $(date +%s) - 400 )) > /tmp/wiflow-net-down-since; net_down_tick'
+$B x sh -c '. /usr/lib/wiflow/common.sh; net_status_write 0; echo $(( $(cut -d. -f1 /proc/uptime) - 400 )) > /tmp/wiflow-net-down-since; net_down_tick'
 $B x $PC is-authorized "$sid3" && fail "Internet lost for 5 minutes: guest still authorized" || pass "Internet lost for 5 minutes: guests have to sign in again"
 expect "Internet lost for 5 minutes: the authed list is empty" "$($B x nft list set inet wiflow_captive authed | grep -c 'elements')" '^0$'
 $B world 'w["inet"].update({k: True for k in w["inet"]})'
@@ -139,6 +139,52 @@ head -c 3000 /dev/urandom > /tmp/mock/wp/media/bg2.jpg
 wp "s['portal']={'revision':8,'mode':'image','files':[{'role':'image_landscape','name':'bg2.jpg'},{'role':'shop_data','name':'shop.json'}]}"
 for i in $(seq 1 40); do [ "$(U get wiflow.core.portal_revision)" = 8 ] && break; sleep 2; done
 expect "portal: revision 8 replaces 7, old media removed" "$(U get wiflow.core.portal_revision)|$(ls /www-wiflow-portal/runtime/active/media | tr '\n' ' ')|$(ls /www-wiflow-portal/runtime/revisions | tr '\n' ' ')" '^8\|bg2.jpg shop.json \|rev-8 $'
+
+# v3.5 content download: a partly downloaded file is continued (not started again), the line is capped, and after a
+# failure the router waits longer and longer before it tries again (it never hammers the line)
+head -c 700000 /dev/urandom > /tmp/mock/wp/media/big.jpg
+bigsha="$(sha256sum /tmp/mock/wp/media/big.jpg | cut -d' ' -f1)"
+mkdir -p /www-wiflow-portal/runtime/partial; head -c 300000 /tmp/mock/wp/media/big.jpg > /www-wiflow-portal/runtime/partial/$bigsha.part
+rm -f /tmp/mock/wp/media-req.jsonl
+export WIFLOW_SYNC_RATE=100k; $B agent
+wp "s['portal']={'revision':9,'mode':'image','files':[{'role':'image_landscape','name':'big.jpg'},{'role':'shop_data','name':'shop.json'}]}"
+for i in $(seq 1 60); do [ "$(U get wiflow.core.portal_revision)" = 9 ] && break; sleep 2; done
+expect "content download: revision 9 active, the file is identical to the server copy" "$(U get wiflow.core.portal_revision)|$(cmp -s /tmp/mock/wp/media/big.jpg /www-wiflow-portal/runtime/active/media/big.jpg && echo same)" '^9\|same$'
+expect "content download: the 300000 bytes already on the router were not downloaded again (range request from byte 300000)" "$(python3 -c "
+import json
+l=[json.loads(x) for x in open('/tmp/mock/wp/media-req.jsonl') if 'big.jpg' in x]
+print(len(l), l[0]['range'])")" '^1 bytes=300000-$'
+expect "content download: capped at 100 KB/s here, so 400000 bytes took at least 2.5 s" "$(python3 -c "
+import json,os
+t=[json.loads(x)['t'] for x in open('/tmp/mock/wp/media-req.jsonl') if 'big.jpg' in x][0]
+print('slow' if os.path.getmtime('/tmp/mock/wp/portal-ack.jsonl')-t >= 2.5 else 'fast')")" '^slow$'
+expect "content download: no partial file left, no lock left" "$([ -e /www-wiflow-portal/runtime/partial ] && echo partial || echo none)|$([ -e /tmp/wiflow-portal-sync.lock ] && echo lock || echo none)" '^none\|none$'
+# a lock of a process that is gone does not block the next download; the lock of a live one does
+mkdir -p /tmp/wiflow-portal-sync.lock; echo 99999999 > /tmp/wiflow-portal-sync.lock/pid
+$B x /usr/lib/wiflow/portal-sync 9; r1=$?
+expect "content download: a lock left by a killed run is taken over (nothing to download, ends well)" "$r1|$([ -e /tmp/wiflow-portal-sync.lock ] && echo lock || echo none)" '^0\|none$'
+$B x sh -c 'sleep 30 & echo $! > /tmp/sl.pid; mkdir -p /tmp/wiflow-portal-sync.lock; cp /tmp/sl.pid /tmp/wiflow-portal-sync.lock/pid'
+$B x /usr/lib/wiflow/portal-sync 9; r2=$?
+expect "content download: a lock of a running download is respected (the second run leaves at once and keeps the lock)" "$r2|$([ -e /tmp/wiflow-portal-sync.lock ] && echo lock || echo none)" '^0\|lock$'
+$B x sh -c 'kill $(cat /tmp/sl.pid) 2>/dev/null; rm -rf /tmp/wiflow-portal-sync.lock /tmp/sl.pid'
+# a download that keeps failing: the pauses grow (6, 12 s here; 1, 2, 5, 10, 30 minutes on the router)
+unset WIFLOW_SYNC_RATE; export WIFLOW_REC_SCALE=10; $B agent
+head -c 100000 /dev/urandom > /tmp/mock/wp/media/big2.jpg
+touch /tmp/mock/wp/media_fail; rm -f /tmp/mock/wp/media-req.jsonl
+wp "s['portal']={'revision':10,'mode':'image','files':[{'role':'image_landscape','name':'big2.jpg'},{'role':'shop_data','name':'shop.json'}]}"
+nreq(){ n="$(grep -c big2 /tmp/mock/wp/media-req.jsonl 2>/dev/null)"; echo "${n:-0}"; }
+for i in $(seq 1 40); do [ "$(nreq)" -ge 1 ] && break; sleep 1; done
+sleep 3
+expect "content download: after a failure it does not try again at once" "$(nreq)|$(U get wiflow.core.portal_sync_status)" '^1\|failed$'
+for i in $(seq 1 60); do [ "$(nreq)" -ge 3 ] && break; sleep 1; done
+expect "content download: it tries again after the pause, and the pause before the third try is longer than before the second" "$(python3 -c "
+import json
+t=[json.loads(x)['t'] for x in open('/tmp/mock/wp/media-req.jsonl') if 'big2' in x]
+print(len(t)>=3 and (t[2]-t[1]) > (t[1]-t[0]))")" '^True$'
+rm -f /tmp/mock/wp/media_fail
+for i in $(seq 1 90); do [ "$(U get wiflow.core.portal_revision)" = 10 ] && break; sleep 2; done
+expect "content download: once the server answers again the content arrives, with the failures forgotten" "$(U get wiflow.core.portal_revision)|$(U get wiflow.core.portal_sync_status)|$(ls /www-wiflow-portal/runtime/active/media | tr '\n' ' ')" '^10\|active\|big2.jpg shop.json $'
+unset WIFLOW_REC_SCALE; $B agent
 
 # Rules wiped (reboot, firewall trouble): the self-repair step brings them back
 $B x nft delete table inet wiflow_captive

@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+# The test bench has no ping: the source router (the default gateway) answers when the mock world says so (gw_answers);
+# no_ping makes it behave like a BusyBox without the applet (exit 127).
+import json, sys
+w = json.load(open('/tmp/mock/world.json'))
+if w.get('no_ping', False): sys.exit(127)   # a BusyBox without the ping applet
+with open('/tmp/mock/calls.log', 'a') as f: f.write('ping %s\n' % sys.argv[-1])
+sys.exit(0 if w.get('gw_answers', False) else 1)

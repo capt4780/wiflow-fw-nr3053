@@ -172,6 +172,7 @@ ensure)
 	fi
 	[ "$changed" = 1 ] || exit 0
 	echo changed
+	cut -d. -f1 /proc/uptime > /tmp/wiflow-disrupt 2>/dev/null || true   # the self-recovery waits (see disrupt_mark)
 	/etc/init.d/firewall reload >/dev/null 2>&1 || true
 	/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 	/etc/init.d/uhttpd restart >/dev/null 2>&1 || true

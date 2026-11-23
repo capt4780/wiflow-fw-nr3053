@@ -1,6 +1,8 @@
 #!/bin/sh
-# The portal web server listens on the guest address: restart it once that
-# address exists (it may have started before the network was up).
+# The portal web server listens on the guest address: restart it once that address exists (it may have started
+# before the network was up). The restart also restarts LuCI's web server, so it only happens when the portal
+# really is not listening, checked again just before it runs (another start may have fixed it meanwhile).
 [ "$ACTION" = ifup ] && [ "$INTERFACE" = wiflow_guest ] || exit 0
-awk '$2 == "010A0A0A:0820" && $4 == "0A" {ok=1} END{exit ok?0:1}' /proc/net/tcp && exit 0
-( sleep 2; /etc/init.d/uhttpd restart ) </dev/null >/dev/null 2>&1 &
+listening(){ awk '$2 == "010A0A0A:0820" && $4 == "0A" {ok=1} END{exit ok?0:1}' /proc/net/tcp; }
+listening && exit 0
+( sleep 2; listening || /etc/init.d/uhttpd restart ) </dev/null >/dev/null 2>&1 &
